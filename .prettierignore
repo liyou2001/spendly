@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+dist/
+web-build/
+coverage/
+package-lock.json
+supabase/.temp/
+supabase/.branches/
+apps/mobile/ios/
+apps/mobile/android/

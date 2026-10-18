@@ -1,0 +1,47 @@
+# dependencies
+node_modules/
+
+# env files: only the example is committed
+.env
+.env.*
+!.env.example
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# generated native folders (Continuous Native Generation)
+apps/mobile/ios/
+apps/mobile/android/
+.kotlin/
+
+# signing material
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# test and build output
+coverage/
+*.tsbuildinfo
+
+# logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# real receipts used by the extraction accuracy script (Step 9)
+receipts/
