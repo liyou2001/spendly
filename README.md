@@ -106,7 +106,14 @@ Needs Docker running. The first start downloads several images and takes a few m
 npm run db:start    # npx supabase start
 npm run db:status   # URLs and keys for the local stack
 npm run db:stop     # npx supabase stop
+npm run db:reset    # rebuild the database from migrations, then load supabase/seed.sql
+npm run db:test     # pgTAP tests in supabase/tests
+npm run db:types    # regenerate packages/db/src/database.types.ts after a schema change
 ```
+
+The schema is in `supabase/migrations/` and drawn in [DATA_MODEL.md](DATA_MODEL.md). Change it by adding a new migration (`npx supabase migration new <name>`), never by editing one that's already been pushed, then run `db:reset`, `db:test` and `db:types`.
+
+The seed loads the plan's Costco example. Leo has an account (`leo@example.com`, password `password123`); Jeff and Maya are name-only. Local auth emails, including sign-in codes, show up in Mailpit.
 
 Local services:
 

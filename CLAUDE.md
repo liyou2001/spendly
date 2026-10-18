@@ -7,6 +7,7 @@ Budgeting app for college students that handles shared money correctly. The full
 - Node 24 (`nvm use`, see `.nvmrc`). npm workspaces: `apps/*`, `packages/*`.
 - `npm test` runs every workspace's tests. `npm run lint`, `npm run typecheck`, `npm run format:check` must pass before a step is done.
 - Supabase CLI is a dev dependency: run it as `npx supabase ...` from the repo root.
+- Database: schema changes go in a new file in `supabase/migrations/` (never edit an applied one). Then `npm run db:reset`, `npm run db:test` and `npm run db:types`. `DATA_MODEL.md` must stay in sync with the migrations.
 - Expo app: add packages with `npx expo install <pkg>` from `apps/mobile`, never plain `npm install`. Routes live in `apps/mobile/src/app/`. Expo changes between SDKs; see `apps/mobile/AGENTS.md` and check the versioned docs before using an Expo API.
 
 ## Project context

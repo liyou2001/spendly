@@ -111,7 +111,7 @@ Every expense belongs to a group. Each user gets an automatic "Personal" group c
 | `participants`        | People in a group; may have no account | `id`, `group_id`, `display_name`, `user_id` (nullable), `phone` (nullable)                                                                                                                                                                                                    |
 | `categories`          | Budget categories per user             | `id`, `user_id`, `name` (defaults: Rent, Groceries, Dining, Transport, Fun, Other)                                                                                                                                                                                            |
 | `budgets`             | Monthly limit per category             | `user_id`, `category_id`, `month` (first day of month), `amount_cents`                                                                                                                                                                                                        |
-| `expenses`            | One purchase                           | `id`, `group_id`, `paid_by` (participant), `merchant`, `expense_date`, `total_cents`, `category_id` (payer's), `source` (manual, photo, email), `created_by`, `voided_at`, `replaces_expense_id`                                                                              |
+| `expenses`            | One purchase                           | `id`, `group_id`, `paid_by` (participant), `merchant`, `expense_date`, `total_cents`, `category_id` (payer's), `source` (manual, photo, email), `created_by`, `voided_at`, `voided_by`, `replaces_expense_id`                                                                 |
 | `expense_items`       | Lines on a receipt                     | `id`, `expense_id`, `name`, `amount_cents`, `kind` (item, tax, tip, discount), `position`                                                                                                                                                                                     |
 | `item_assignments`    | Who an item is for                     | `item_id`, `participant_id` (several rows = split equally among them)                                                                                                                                                                                                         |
 | `shares`              | Each person's part of an expense       | `expense_id`, `participant_id`, `amount_cents`, `category_override_id`                                                                                                                                                                                                        |
@@ -124,12 +124,12 @@ Every expense belongs to a group. Each user gets an automatic "Personal" group c
 | `verified_emails`     | Addresses a user forwards from         | `user_id`, `email`, `verified_at`                                                                                                                                                                                                                                             |
 | `push_tokens`         | Expo push tokens                       | `user_id`, `token`                                                                                                                                                                                                                                                            |
 
-Database functions and views:
+Database functions (called with `supabase.rpc`):
 
 - `save_expense(...)`: inserts the expense, items, assignments and shares in one transaction. Rejects the save if shares don't sum to the total.
 - `void_expense(id)`: marks an expense voided; never deletes it.
-- `balances`: for each pair of participants in a group, the shares owed to the payer minus confirmed payments and forgiveness.
-- `my_spending`: for each user, category and month, the sum of their own shares plus any debts they forgave. A share's category is the user's `category_override_id` if set; otherwise the payer's own share uses the expense's category and anyone else's is uncategorized. Must match `spendingByCategory` in `packages/ledger`.
+- `balances()`: for each pair of participants in a group, the shares owed to the payer minus confirmed payments and forgiveness.
+- `my_spending()`: for each user, category and month, the sum of their own shares plus any debts they forgave. A share's category is the user's `category_override_id` if set; otherwise the payer's own share uses the expense's category and anyone else's is uncategorized. Must match `spendingByCategory` in `packages/ledger`.
 - `get_my_shares()`: what an account holder sees of expenses someone else paid: only their items and their amount.
 
 Privacy rules:
