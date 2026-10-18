@@ -45,3 +45,6 @@ yarn-error.*
 
 # real receipts used by the extraction accuracy script (Step 9)
 receipts/
+
+# Claude Code worktrees
+.claude/worktrees/
