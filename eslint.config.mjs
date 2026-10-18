@@ -35,6 +35,13 @@ export default defineConfig([
   {
     files: [mobileFiles],
     extends: [expoConfig],
+    settings: {
+      // Resolve the app's `@/` path alias from its tsconfig (the resolver comes with eslint-config-expo).
+      'import/resolver': {
+        typescript: { project: 'apps/mobile/tsconfig.json' },
+        node: true,
+      },
+    },
   },
 
   // Keep formatting rules out of ESLint; Prettier owns them.

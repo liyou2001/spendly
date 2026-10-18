@@ -244,6 +244,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# The app signs in with the one-time code, so these templates show {{ .Token }} instead of a
+# magic link. Hosted projects: paste the same templates into Authentication > Emails.
+[auth.email.template.magic_link]
+subject = "Your Spendly sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.confirmation]
+subject = "Your Spendly sign-up code"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

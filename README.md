@@ -8,6 +8,10 @@ The build plan is in [docs/PLAN.md](docs/PLAN.md). Project rules for Claude Code
 
 ```
 apps/mobile          Expo app (Expo Router, TypeScript)
+  src/app            routes: sign-in, (tabs)/ Home, Budget, People, Me, and the add-expense modal
+  src/components     shared UI (Screen, KeyBlock, ListRow, Button, Tag, Avatar, ProgressBar, Money, ...)
+  src/lib            Supabase client, encrypted session storage, session context
+  src/theme.ts       design tokens (colors, Hanken Grotesk, type, spacing, radii)
 packages/ledger      pure TypeScript money and split math (Vitest)
 supabase/            Supabase config, migrations, Edge Functions, database tests
 docs/                build plan and exported designs
@@ -32,7 +36,7 @@ cp .env.example apps/mobile/.env          # then delete the lines that aren't fo
 cp .env.example supabase/functions/.env   # then delete the lines that aren't for functions
 ```
 
-`.env.example` lists every variable, grouped by where it goes and which step first needs it. Real `.env` files are git-ignored. Nothing needs a value yet in Step 1.
+`.env.example` lists every variable, grouped by where it goes and which step first needs it. Real `.env` files are git-ignored. The app needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (see [Sign in on your phone](#sign-in-on-your-phone)); the rest can stay blank until their step.
 
 ## Run the app
 
@@ -77,6 +81,34 @@ npm run mobile -- --tunnel
 
 Press `w` in the dev server to open the web version in a browser instead.
 
+### Sign in on your phone
+
+The app signs in with a 6-digit code sent by email. Against local Supabase, the emails never leave your computer: they land in Mailpit.
+
+1. Start local Supabase (`npm run db:start`) if it isn't running.
+2. Point the app at your computer. Your phone can't use `127.0.0.1` (that's the phone itself), so use your computer's LAN IP:
+
+   ```sh
+   ipconfig getifaddr en0     # macOS Wi-Fi, e.g. 192.168.1.20
+   npm run db:status          # PUBLISHABLE_KEY is the key to use
+   ```
+
+   Then in `apps/mobile/.env`:
+
+   ```sh
+   EXPO_PUBLIC_SUPABASE_URL=http://192.168.1.20:54321
+   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
+
+   Restart `npm run mobile` after editing `.env`; values are read when the bundle is built. If you switch Wi-Fi networks, the IP may change.
+
+3. Open the app, enter an email and tap **Email me a code**. Use `leo@example.com` to sign in as the seed user, or any other address to create a new account (it gets a profile, a Personal group and the default categories).
+4. On your computer, open Mailpit at http://127.0.0.1:54324, open the newest "Your Spendly sign-in code" email and type the code into the app. It signs in as soon as all 6 digits are in.
+
+The session is saved on the phone (encrypted, with the key in the iOS Keychain / Android Keystore), so the app stays signed in after you close it. **Me → Sign out** signs out.
+
+The tunnel (`--tunnel`) only carries the Expo bundle, not the Supabase API, so the phone still needs to reach your computer's IP on port 54321. If campus Wi-Fi blocks that, use a hosted Supabase project instead.
+
 ### Troubleshooting
 
 | Message                                                | Fix                                                                                                     |
@@ -85,6 +117,9 @@ Press `w` in the dev server to open the web version in a browser instead.
 | "You need to be signed in to Expo Go"                  | Log in on the computer (`npx expo login --browser`) and in Expo Go with the same account.               |
 | "Project is incompatible with this version of Expo Go" | Your Expo Go supports a different SDK than the project. Update Expo Go, or move the project to its SDK. |
 | Connection times out                                   | Phone and computer can't reach each other. Use `npm run mobile -- --tunnel`.                            |
+| "Missing EXPO_PUBLIC_SUPABASE_URL..." on launch        | Create `apps/mobile/.env` (see [Sign in on your phone](#sign-in-on-your-phone)) and restart.            |
+| "Network request failed" when sending the code         | The phone can't reach Supabase. Check the IP in `apps/mobile/.env` and that `npm run db:start` is up.   |
+| Signed out after `npm run db:reset`                    | Expected: the reset deletes every session. Sign in again.                                               |
 
 ## Tests, lint, types, formatting
 
@@ -115,6 +150,8 @@ The schema is in `supabase/migrations/` and drawn in [DATA_MODEL.md](DATA_MODEL.
 
 The seed loads the plan's Costco example. Leo has an account (`leo@example.com`, password `password123`); Jeff and Maya are name-only. Local auth emails, including sign-in codes, show up in Mailpit.
 
+The sign-in emails come from `supabase/templates/` (set up in `supabase/config.toml`) and show the one-time code instead of a magic link. After changing `config.toml` or a template, restart the stack with `npm run db:stop && npm run db:start`.
+
 Local services:
 
 | Service                       | URL                                                     |
@@ -139,5 +176,7 @@ One-time setup:
    ```
 
    The project ref is the ID in the dashboard URL (`https://supabase.com/dashboard/project/<project-ref>`).
+
+For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.html` into the dashboard's **Authentication → Emails** templates (the hosted defaults send only a link, and the app needs the `{{ .Token }}` code). The built-in email sender allows only a few emails per hour, which is fine for testing.
 
 Later steps push migrations with `npx supabase db push` and set Edge Function secrets with `npx supabase secrets set --env-file supabase/functions/.env`.
