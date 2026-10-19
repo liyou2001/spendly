@@ -7,7 +7,7 @@ import { Text } from './Text';
 interface ButtonProps {
   label: string;
   onPress: () => void;
-  /** Primary is solid deep purple; secondary is outlined. */
+  /** Primary is solid orange; secondary is outlined. */
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
   /** Shows a spinner and ignores taps. */
@@ -39,7 +39,7 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={primary ? colors.onInk : colors.ink} />
+        <ActivityIndicator color={primary ? colors.onAccent : colors.ink} />
       ) : (
         <Text variant="bodyMedium" style={primary ? styles.primaryLabel : undefined}>
           {label}
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     borderColor: colors.controlBorder,
   },
   primaryLabel: {
-    color: colors.onInk,
+    color: colors.onAccent,
   },
   pressed: {
     opacity: 0.8,

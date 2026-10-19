@@ -72,7 +72,7 @@ function AddButton() {
         accessibilityLabel="Add expense"
         style={({ pressed }) => [styles.add, pressed && styles.addPressed]}
       >
-        <Feather name="plus" size={26} color={colors.onInk} />
+        <Feather name="plus" size={26} color={colors.onAccent} />
       </Pressable>
     </View>
   );

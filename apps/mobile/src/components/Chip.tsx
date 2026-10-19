@@ -10,7 +10,7 @@ interface ChipProps {
   label: string;
   onPress: () => void;
   selected?: boolean;
-  /** "you" is light purple, the color reserved for "You" tags. */
+  /** "you" is pale orange, the color reserved for "You" tags. */
   tone?: 'neutral' | 'you';
   icon?: ComponentProps<typeof Feather>['name'];
   /** After the label, e.g. a chevron on a chip that opens a dropdown. */
@@ -50,7 +50,9 @@ export function Chip({
         pressed && styles.pressed,
       ]}
     >
-      {icon ? <Feather name={icon} size={15} color={filled ? colors.onInk : colors.ink} /> : null}
+      {icon ? (
+        <Feather name={icon} size={15} color={filled ? colors.onAccent : colors.ink} />
+      ) : null}
       <Text
         variant="small"
         numberOfLines={1}
@@ -59,7 +61,7 @@ export function Chip({
         {label}
       </Text>
       {trailingIcon ? (
-        <Feather name={trailingIcon} size={15} color={filled ? colors.onInk : colors.ink} />
+        <Feather name={trailingIcon} size={15} color={filled ? colors.onAccent : colors.ink} />
       ) : null}
     </Pressable>
   );
@@ -94,6 +96,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   selectedLabel: {
-    color: colors.onInk,
+    color: colors.onAccent,
   },
 });

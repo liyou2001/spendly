@@ -6,7 +6,7 @@ import { Text } from './Text';
 
 interface TagProps {
   label: string;
-  /** "accent" is light purple, for "You" tags. "neutral" is outlined. */
+  /** "accent" is pale orange, for "You" tags. "neutral" is outlined. */
   tone?: 'accent' | 'neutral';
 }
 

@@ -7,7 +7,7 @@ import { Text } from './Text';
 interface AvatarProps {
   name: string;
   size?: number;
-  /** White circle instead, for avatars that sit on the light purple KeyBlock. */
+  /** White circle instead, for avatars that sit on the pale orange KeyBlock. */
   onKeyBlock?: boolean;
 }
 
