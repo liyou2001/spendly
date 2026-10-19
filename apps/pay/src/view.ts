@@ -24,8 +24,14 @@ export function formatDay(date: string): string {
   return `${MONTHS[(month ?? 1) - 1]} ${day}`;
 }
 
-/** "Split 3 ways" for a shared item, null for one that was all theirs. */
+/** "3 × Soft drink" for more than one, otherwise just the name. */
+export function itemTitle(item: Pick<ShareItem, 'name' | 'quantity'>): string {
+  return item.quantity > 1 ? `${item.quantity} × ${item.name}` : item.name;
+}
+
+/** "Your 1 of 3" when tagged one by one, "Split 3 ways" when split evenly, null if all theirs. */
 export function itemNote(item: ShareItem): string | null {
+  if (item.total_units !== item.split_count) return `Your ${item.my_units} of ${item.total_units}`;
   return item.split_count > 1 ? `Split ${item.split_count} ways` : null;
 }
 

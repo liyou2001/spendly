@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, formatDate, monthDay, todayLocal } from './dates';
+import { addDays, calendarWeeks, formatDate, monthDay, todayLocal } from './dates';
 
 describe('todayLocal', () => {
   it('uses the phone’s local calendar date', () => {
@@ -39,5 +39,30 @@ describe('monthDay', () => {
   it('always gives the short month and day', () => {
     expect(monthDay('2026-10-19')).toBe('Oct 19');
     expect(monthDay('2025-01-02')).toBe('Jan 2');
+  });
+});
+
+describe('calendarWeeks', () => {
+  it('lays out October 2026 from Sunday, starting on Thursday the 1st', () => {
+    const weeks = calendarWeeks('2026-10-17');
+    expect(weeks).toHaveLength(5);
+    expect(weeks[0]).toEqual([null, null, null, null, '2026-10-01', '2026-10-02', '2026-10-03']);
+    expect(weeks[4]).toEqual([
+      '2026-10-25',
+      '2026-10-26',
+      '2026-10-27',
+      '2026-10-28',
+      '2026-10-29',
+      '2026-10-30',
+      '2026-10-31',
+    ]);
+  });
+
+  it('handles leap years and pads the last week', () => {
+    const weeks = calendarWeeks('2028-02-01');
+    const days = weeks.flat().filter((d) => d !== null);
+    expect(days).toHaveLength(29);
+    expect(days.at(-1)).toBe('2028-02-29');
+    for (const week of weeks) expect(week).toHaveLength(7);
   });
 });

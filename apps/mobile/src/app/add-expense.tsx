@@ -14,6 +14,7 @@ import {
 import {
   AddPersonForm,
   Button,
+  CalendarPicker,
   Chip,
   FormMessage,
   IconButton,
@@ -27,7 +28,7 @@ import {
   TextButton,
   TextField,
 } from '@/components';
-import { addDays, formatDate, todayLocal } from '@/lib/dates';
+import { formatDate, todayLocal } from '@/lib/dates';
 import {
   addPerson,
   createGroup,
@@ -61,8 +62,11 @@ import {
   draftFromExpense,
   assignmentOptions,
   sameAssignment,
+  effectiveAssignment,
   owedToPayer,
+  readQuantity,
   savePayload,
+  tagsFor,
   type Assignment,
   type Draft,
   type DraftItem,
@@ -202,6 +206,7 @@ function ExpenseForm({
     key: `item-${nextKey.current++}`,
     name: '',
     amount: '',
+    quantity: '',
     assignment: { kind: 'you' },
   });
 
@@ -214,11 +219,12 @@ function ExpenseForm({
     () =>
       editing?.draft ?? {
         ...emptyDraft(first?.people.map((p) => p.id) ?? []),
-        items: [{ key: 'item-0', name: '', amount: '', assignment: { kind: 'you' } }],
+        items: [{ key: 'item-0', name: '', amount: '', quantity: '', assignment: { kind: 'you' } }],
       },
   );
   const [merchant, setMerchant] = useState(editing?.merchant ?? '');
   const [date, setDate] = useState(editing?.expenseDate ?? todayLocal());
+  const [choosingDate, setChoosingDate] = useState(false);
   const [paidBy, setPaidBy] = useState(editing?.paidBy ?? meInGroup?.id ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(editing?.categoryId ?? null);
   const [addingPerson, setAddingPerson] = useState(false);
@@ -227,6 +233,8 @@ function ExpenseForm({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [scan, setScan] = useState<ScanState>({ status: 'idle' });
+  const scanAttempt = useRef(0);
+  const scanning = scan.status === 'scanning';
 
   const people: SplitPeople = useMemo(
     () => ({ me: meInGroup?.id ?? '', everyone: group?.people.map((p) => p.id) ?? [] }),
@@ -332,14 +340,24 @@ function ExpenseForm({
   }
 
   async function scanFrom(from: 'camera' | 'library') {
+    // A cancelled scan's result is ignored when it arrives.
+    const attempt = ++scanAttempt.current;
     try {
       const photo = await pickReceiptPhoto(from);
       if (!photo) return;
       setScan({ status: 'scanning' });
-      applyScan(await scanReceipt(userId, photo));
+      const scanned = await scanReceipt(userId, photo);
+      if (attempt === scanAttempt.current) applyScan(scanned);
     } catch (e) {
-      setScan({ status: 'error', message: friendlyError(e as Error) });
+      if (attempt === scanAttempt.current) {
+        setScan({ status: 'error', message: friendlyError(e as Error) });
+      }
     }
+  }
+
+  function cancelScan() {
+    scanAttempt.current++;
+    setScan({ status: 'idle' });
   }
 
   async function save() {
@@ -437,260 +455,291 @@ function ExpenseForm({
               state={scan}
               currentTotal={draft.mode === 'items' ? result.totalCents : null}
               onScan={(from) => void scanFrom(from)}
+              onCancel={cancelScan}
             />
           )}
-          <View style={styles.stack}>
-            <TextField
-              label="Where"
-              value={merchant}
-              onChangeText={setMerchant}
-              placeholder="Costco"
-              error={visible('merchant')}
-              autoCapitalize="words"
-              maxLength={200}
-            />
-            <View style={styles.dateRow}>
-              <Text variant="sectionHeading" style={styles.flex}>
-                Date
-              </Text>
-              <IconButton
-                icon="chevron-left"
-                label="Day before"
-                onPress={() => setDate(addDays(date, -1))}
+          {/* Locked while a scan is being read: its result replaces these, so typing would be lost. */}
+          <View
+            style={[styles.formBody, scanning && styles.locked]}
+            pointerEvents={scanning ? 'none' : 'auto'}
+            accessibilityElementsHidden={scanning}
+            importantForAccessibility={scanning ? 'no-hide-descendants' : 'auto'}
+          >
+            <View style={styles.stack}>
+              <TextField
+                label="Where"
+                value={merchant}
+                onChangeText={setMerchant}
+                placeholder="Costco"
+                error={visible('merchant')}
+                autoCapitalize="words"
+                maxLength={200}
               />
-              <Text variant="body" style={styles.dateText}>
-                {formatDate(date, today)}
-              </Text>
-              {date < today ? (
-                <IconButton
-                  icon="chevron-right"
-                  label="Day after"
-                  onPress={() => setDate(addDays(date, 1))}
-                />
-              ) : (
-                <View style={styles.iconSpacer} />
-              )}
-            </View>
-          </View>
-
-          {shared ? (
-            <Section title="Paid by">
-              <View style={styles.wrap}>
-                {group.people.map((p) => (
+              <View style={styles.stack}>
+                <View style={styles.dateRow}>
+                  <Text variant="sectionHeading" style={styles.flex}>
+                    Date
+                  </Text>
                   <Chip
-                    key={p.id}
-                    label={nameOf(p.id)}
-                    selected={p.id === paidBy}
-                    onPress={() => setPaidBy(p.id)}
+                    label={formatDate(date, today)}
+                    icon="calendar"
+                    trailingIcon={choosingDate ? 'chevron-up' : 'chevron-down'}
+                    expanded={choosingDate}
+                    onPress={() => setChoosingDate(!choosingDate)}
+                    accessibilityLabel={`Date: ${formatDate(date, today)}`}
+                    accessibilityHint="Opens a calendar"
                   />
-                ))}
-                {addingPerson ? null : (
-                  <Chip label="Add person" icon="user-plus" onPress={() => setAddingPerson(true)} />
-                )}
+                </View>
+                {choosingDate ? (
+                  <CalendarPicker
+                    value={date}
+                    max={today}
+                    onPick={(picked) => {
+                      setDate(picked);
+                      setChoosingDate(false);
+                    }}
+                  />
+                ) : null}
               </View>
-              {addingPerson ? (
-                <AddPersonForm onAdd={addPersonToGroup} onCancel={() => setAddingPerson(false)} />
-              ) : null}
-            </Section>
-          ) : null}
+            </View>
 
-          <View style={styles.wrap}>
-            <Chip
-              label="Itemized"
-              icon="list"
-              selected={draft.mode === 'items'}
-              onPress={() => update({ mode: 'items' })}
-            />
-            <Chip
-              label="Just a total"
-              icon="hash"
-              selected={draft.mode === 'quick'}
-              onPress={() => update({ mode: 'quick' })}
-            />
-          </View>
-
-          {draft.mode === 'items' ? (
-            <Section title="Items">
-              <View>
-                {draft.items.map((item) => (
-                  <ItemRow
-                    key={item.key}
-                    item={item}
-                    people={people}
-                    names={names}
-                    nameOf={nameOf}
-                    error={visible(item.key)}
-                    onChange={(patch) => updateItem(item.key, patch)}
-                    onRemove={
-                      draft.items.length > 1
-                        ? () => update({ items: draft.items.filter((i) => i.key !== item.key) })
-                        : undefined
-                    }
-                    amountPlaceholder={amountPlaceholder}
-                    open={openItem === item.key}
-                    onToggle={() => setOpenItem(openItem === item.key ? null : item.key)}
-                  />
-                ))}
-              </View>
-              <TextButton
-                label="Add item"
-                icon="plus"
-                onPress={() => update({ items: [...draft.items, newItem()] })}
-              />
-              {ADJUSTMENTS.map(({ kind, label }) =>
-                draft[kind] === null ? null : (
-                  <AdjustmentRow
-                    key={kind}
-                    label={label}
-                    value={draft[kind] ?? ''}
-                    error={visible(kind)}
-                    onChange={(value) => update({ [kind]: value })}
-                    onRemove={() => update({ [kind]: null })}
-                    amountPlaceholder={amountPlaceholder}
-                  />
-                ),
-              )}
-              {ADJUSTMENTS.some(({ kind }) => draft[kind] === null) ? (
+            {shared ? (
+              <Section title="Paid by" divided>
                 <View style={styles.wrap}>
-                  {ADJUSTMENTS.map(({ kind, label }) =>
-                    draft[kind] === null ? (
-                      <TextButton
-                        key={kind}
-                        label={`Add ${label.toLowerCase()}`}
-                        icon="plus"
-                        onPress={() => update({ [kind]: '' })}
-                      />
-                    ) : null,
+                  {group.people.map((p) => (
+                    <Chip
+                      key={p.id}
+                      label={nameOf(p.id)}
+                      selected={p.id === paidBy}
+                      onPress={() => setPaidBy(p.id)}
+                    />
+                  ))}
+                  {addingPerson ? null : (
+                    <Chip
+                      label="Add person"
+                      icon="user-plus"
+                      onPress={() => setAddingPerson(true)}
+                    />
                   )}
                 </View>
-              ) : null}
-              {ADJUSTMENTS.some(({ kind }) => draft[kind] !== null) ? (
-                <Text variant="small">
-                  Tax, tip and discounts are split in proportion to each person’s items.
-                </Text>
-              ) : null}
-              {scan.status === 'read' && totalCheck(scan.receipt.total_cents, result.totalCents) ? (
-                <FormMessage message={totalCheck(scan.receipt.total_cents, result.totalCents)!} />
-              ) : null}
-            </Section>
-          ) : (
-            <Section title="Total">
-              <TextField
-                label="Total"
-                value={draft.quickTotal}
-                onChangeText={(quickTotal) => update({ quickTotal })}
-                placeholder={amountPlaceholder}
-                keyboardType="decimal-pad"
-                error={visible('quickTotal')}
-              />
-              {shared ? (
-                <View style={styles.stack}>
-                  <Text variant="small">Split between</Text>
-                  <View style={styles.wrap}>
-                    {group.people.map((p) => (
-                      <Chip
-                        key={p.id}
-                        label={nameOf(p.id)}
-                        selected={draft.quickPeople.includes(p.id)}
-                        onPress={() =>
-                          update({
-                            quickPeople: draft.quickPeople.includes(p.id)
-                              ? draft.quickPeople.filter((id) => id !== p.id)
-                              : [...draft.quickPeople, p.id],
-                          })
-                        }
-                      />
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-              {shared ? (
+                {addingPerson ? (
+                  <AddPersonForm onAdd={addPersonToGroup} onCancel={() => setAddingPerson(false)} />
+                ) : null}
+              </Section>
+            ) : null}
+
+            {draft.mode === 'items' ? (
+              <Section title="Items" divided>
                 <View style={styles.wrap}>
                   <Chip
-                    label="Split evenly"
-                    selected={draft.quickSplit === 'even'}
-                    onPress={() => update({ quickSplit: 'even' })}
+                    label="Itemized"
+                    icon="list"
+                    selected
+                    onPress={() => update({ mode: 'items' })}
                   />
                   <Chip
-                    label="By amount"
-                    selected={draft.quickSplit === 'amounts'}
-                    onPress={() => update({ quickSplit: 'amounts' })}
+                    label="Just a total"
+                    icon="hash"
+                    selected={false}
+                    onPress={() => update({ mode: 'quick' })}
                   />
                 </View>
-              ) : null}
-              {shared && draft.quickSplit === 'amounts'
-                ? people.everyone
-                    .filter((id) => draft.quickPeople.includes(id))
-                    .map((id) => (
-                      <View key={id} style={styles.stack}>
-                        <View style={styles.amountRow}>
-                          <Text variant="body" style={styles.flex}>
-                            {nameOf(id)}
-                          </Text>
-                          <TextInput
-                            value={draft.quickAmounts[id] ?? ''}
-                            onChangeText={(text) =>
-                              update({ quickAmounts: { ...draft.quickAmounts, [id]: text } })
-                            }
-                            placeholder={amountPlaceholder}
-                            placeholderTextColor={colors.muted}
-                            keyboardType="decimal-pad"
-                            accessibilityLabel={`${nameOf(id)}’s amount`}
-                            style={[styles.input, styles.amountInput]}
-                          />
-                        </View>
-                        {visible(`amount:${id}`) ? (
-                          <FormMessage message={visible(`amount:${id}`)!} />
-                        ) : null}
-                      </View>
-                    ))
-                : null}
-              {visible('quickAmounts') || visible('form') ? (
-                <FormMessage message={(visible('quickAmounts') ?? visible('form'))!} />
-              ) : null}
-            </Section>
-          )}
-
-          <Section title={shared ? 'Category for your share' : 'Category'}>
-            <View style={styles.wrap}>
-              {categories.map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.name}
-                  selected={c.id === categoryId}
-                  onPress={() => setCategoryId(c.id)}
+                <View>
+                  {draft.items.map((item) => (
+                    <ItemRow
+                      key={item.key}
+                      item={item}
+                      people={people}
+                      names={names}
+                      nameOf={nameOf}
+                      error={visible(item.key)}
+                      onChange={(patch) => updateItem(item.key, patch)}
+                      onRemove={
+                        draft.items.length > 1
+                          ? () => update({ items: draft.items.filter((i) => i.key !== item.key) })
+                          : undefined
+                      }
+                      amountPlaceholder={amountPlaceholder}
+                      open={openItem === item.key}
+                      onToggle={() => setOpenItem(openItem === item.key ? null : item.key)}
+                    />
+                  ))}
+                </View>
+                <TextButton
+                  label="Add item"
+                  icon="plus"
+                  onPress={() => update({ items: [...draft.items, newItem()] })}
                 />
-              ))}
-            </View>
-            {visible('category') ? <FormMessage message={visible('category')!} /> : null}
-          </Section>
+                {ADJUSTMENTS.map(({ kind, label }) =>
+                  draft[kind] === null ? null : (
+                    <AdjustmentRow
+                      key={kind}
+                      label={label}
+                      value={draft[kind] ?? ''}
+                      error={visible(kind)}
+                      onChange={(value) => update({ [kind]: value })}
+                      onRemove={() => update({ [kind]: null })}
+                      amountPlaceholder={amountPlaceholder}
+                    />
+                  ),
+                )}
+                {ADJUSTMENTS.some(({ kind }) => draft[kind] === null) ? (
+                  <View style={styles.wrap}>
+                    {ADJUSTMENTS.map(({ kind, label }) =>
+                      draft[kind] === null ? (
+                        <TextButton
+                          key={kind}
+                          label={`Add ${label.toLowerCase()}`}
+                          icon="plus"
+                          onPress={() => update({ [kind]: '' })}
+                        />
+                      ) : null,
+                    )}
+                  </View>
+                ) : null}
+                {ADJUSTMENTS.some(({ kind }) => draft[kind] !== null) ? (
+                  <Text variant="small">
+                    Tax, tip and discounts are split in proportion to each person’s items.
+                  </Text>
+                ) : null}
+                {scan.status === 'read' &&
+                totalCheck(scan.receipt.total_cents, result.totalCents) ? (
+                  <FormMessage message={totalCheck(scan.receipt.total_cents, result.totalCents)!} />
+                ) : null}
+              </Section>
+            ) : (
+              <Section title="Total" divided>
+                <View style={styles.wrap}>
+                  <Chip
+                    label="Itemized"
+                    icon="list"
+                    selected={false}
+                    onPress={() => update({ mode: 'items' })}
+                  />
+                  <Chip
+                    label="Just a total"
+                    icon="hash"
+                    selected
+                    onPress={() => update({ mode: 'quick' })}
+                  />
+                </View>
+                <TextField
+                  label="Total"
+                  value={draft.quickTotal}
+                  onChangeText={(quickTotal) => update({ quickTotal })}
+                  placeholder={amountPlaceholder}
+                  keyboardType="decimal-pad"
+                  error={visible('quickTotal')}
+                />
+                {shared ? (
+                  <View style={styles.stack}>
+                    <Text variant="small">Split between</Text>
+                    <View style={styles.wrap}>
+                      {group.people.map((p) => (
+                        <Chip
+                          key={p.id}
+                          label={nameOf(p.id)}
+                          selected={draft.quickPeople.includes(p.id)}
+                          onPress={() =>
+                            update({
+                              quickPeople: draft.quickPeople.includes(p.id)
+                                ? draft.quickPeople.filter((id) => id !== p.id)
+                                : [...draft.quickPeople, p.id],
+                            })
+                          }
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+                {shared ? (
+                  <View style={styles.wrap}>
+                    <Chip
+                      label="Split evenly"
+                      selected={draft.quickSplit === 'even'}
+                      onPress={() => update({ quickSplit: 'even' })}
+                    />
+                    <Chip
+                      label="By amount"
+                      selected={draft.quickSplit === 'amounts'}
+                      onPress={() => update({ quickSplit: 'amounts' })}
+                    />
+                  </View>
+                ) : null}
+                {shared && draft.quickSplit === 'amounts'
+                  ? people.everyone
+                      .filter((id) => draft.quickPeople.includes(id))
+                      .map((id) => (
+                        <View key={id} style={styles.stack}>
+                          <View style={styles.amountRow}>
+                            <Text variant="body" style={styles.flex}>
+                              {nameOf(id)}
+                            </Text>
+                            <TextInput
+                              value={draft.quickAmounts[id] ?? ''}
+                              onChangeText={(text) =>
+                                update({ quickAmounts: { ...draft.quickAmounts, [id]: text } })
+                              }
+                              placeholder={amountPlaceholder}
+                              placeholderTextColor={colors.muted}
+                              keyboardType="decimal-pad"
+                              accessibilityLabel={`${nameOf(id)}’s amount`}
+                              style={[styles.input, styles.amountInput]}
+                            />
+                          </View>
+                          {visible(`amount:${id}`) ? (
+                            <FormMessage message={visible(`amount:${id}`)!} />
+                          ) : null}
+                        </View>
+                      ))
+                  : null}
+                {visible('quickAmounts') || visible('form') ? (
+                  <FormMessage message={(visible('quickAmounts') ?? visible('form'))!} />
+                ) : null}
+              </Section>
+            )}
 
-          <Summary
-            totalCents={result.totalCents}
-            myShare={myShare}
-            categoryName={category?.name}
-            owed={owedToPayer(result.shares, paidBy)}
-            nameOf={nameOf}
-            me={people.me}
-            hasErrors={Object.keys(result.errors).length > 0}
-          />
+            <Section title={shared ? 'Category for your share' : 'Category'} divided>
+              <View style={styles.wrap}>
+                {categories.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={c.name}
+                    selected={c.id === categoryId}
+                    onPress={() => setCategoryId(c.id)}
+                  />
+                ))}
+              </View>
+              {visible('category') ? <FormMessage message={visible('category')!} /> : null}
+            </Section>
 
-          <View style={styles.stack}>
-            {showErrors && Object.keys(errors).length > 0 ? (
-              <FormMessage
-                message={
-                  draft.mode === 'items' && errors.form
-                    ? errors.form
-                    : 'Fix the highlighted details to save.'
-                }
-              />
-            ) : null}
-            {saveError ? <FormMessage message={saveError} /> : null}
-            <Button
-              label={editing ? 'Save changes' : 'Save expense'}
-              onPress={() => void save()}
-              loading={saving}
+            <Summary
+              totalCents={result.totalCents}
+              myShare={myShare}
+              categoryName={category?.name}
+              owed={owedToPayer(result.shares, paidBy)}
+              nameOf={nameOf}
+              me={people.me}
+              hasErrors={Object.keys(result.errors).length > 0}
             />
+
+            <View style={styles.stack}>
+              {showErrors && Object.keys(errors).length > 0 ? (
+                <FormMessage
+                  message={
+                    draft.mode === 'items' && errors.form
+                      ? errors.form
+                      : 'Fix the highlighted details to save.'
+                  }
+                />
+              ) : null}
+              {saveError ? <FormMessage message={saveError} /> : null}
+              <Button
+                label={editing ? 'Save changes' : 'Save expense'}
+                onPress={() => void save()}
+                loading={saving}
+              />
+            </View>
           </View>
         </>
       )}
@@ -724,25 +773,64 @@ function ItemRow({
   open,
   onToggle,
 }: ItemRowProps) {
-  const label = assignmentLabel(item.assignment, people, names);
   const alone = people.everyone.length === 1;
-  const custom = item.assignment.kind === 'custom' ? item.assignment : null;
-  const choose = (assignment: Assignment) => {
-    onChange({ assignment });
+  const quantity = readQuantity(item.quantity);
+  const several = quantity !== null && quantity > 1;
+  const assignment = effectiveAssignment(item.assignment, quantity, people);
+  // Split evenly: everyone to start, then untick people.
+  const evenly = assignment.kind === 'all' || assignment.kind === 'custom';
+  const sharing = evenly ? assignedTo(assignment, people) : [];
+  // One tag per unit ("3 × Soft drink": You, You, You), or null for one tag for the whole line.
+  const tags = tagsFor(assignment, quantity, people);
+  const label = assignmentLabel(assignment, people, names);
+  const itemName = item.name || 'Item';
+  // Which unit's tag the dropdown is for; null for the line's single tag.
+  const [openTag, setOpenTag] = useState<number | null>(null);
+  const tagOpen = open && tags !== null && openTag !== null && openTag < tags.length;
+
+  const choose = (next: Assignment) => {
+    onChange({ assignment: next });
     onToggle();
   };
 
-  function toggle(id: string) {
-    if (!custom) return;
-    const ids = custom.participantIds.includes(id)
-      ? custom.participantIds.filter((x) => x !== id)
-      : [...custom.participantIds, id];
-    onChange({ assignment: { kind: 'custom', participantIds: ids } });
+  function toggle(index: number | null) {
+    if (open && openTag === index) {
+      onToggle();
+      return;
+    }
+    setOpenTag(index);
+    if (!open) onToggle();
   }
+
+  function tagOne(index: number, id: string) {
+    if (!tags) return;
+    choose({ kind: 'each', people: tags.map((tag, i) => (i === index ? id : tag)) });
+  }
+
+  function toggleSharing(id: string) {
+    const ids = sharing.includes(id) ? sharing.filter((x) => x !== id) : [...sharing, id];
+    const everyone = people.everyone.every((x) => ids.includes(x));
+    onChange({ assignment: everyone ? { kind: 'all' } : { kind: 'custom', participantIds: ids } });
+  }
+
+  const removeButton = onRemove ? (
+    <IconButton icon="trash-2" label={`Remove ${itemName}`} onPress={onRemove} />
+  ) : null;
 
   return (
     <View style={styles.item}>
       <View style={styles.itemLine}>
+        <TextInput
+          value={item.quantity}
+          onChangeText={(text) => onChange({ quantity: text })}
+          placeholder="1"
+          placeholderTextColor={colors.muted}
+          keyboardType="number-pad"
+          maxLength={3}
+          accessibilityLabel={`${itemName} quantity`}
+          style={[styles.input, styles.quantityInput]}
+        />
+        <Text variant="small">×</Text>
         <TextInput
           value={item.name}
           onChangeText={(name) => onChange({ name })}
@@ -759,62 +847,106 @@ function ItemRow({
           placeholder={amountPlaceholder}
           placeholderTextColor={colors.muted}
           keyboardType="decimal-pad"
-          accessibilityLabel={`${item.name || 'Item'} amount`}
+          accessibilityLabel={`${itemName} amount`}
           style={[styles.input, styles.amountInput]}
         />
       </View>
-      <View style={styles.itemLine}>
-        {alone ? (
+      {several && !tags ? <Text variant="small">Enter the price for all {quantity}.</Text> : null}
+
+      {alone ? (
+        <View style={styles.itemLine}>
           <Tag label="You" tone="accent" />
-        ) : (
-          <>
-            <Text variant="small">Who’s it for?</Text>
-            <Chip
-              label={label}
-              tone={item.assignment.kind === 'you' ? 'you' : 'neutral'}
-              trailingIcon={open ? 'chevron-up' : 'chevron-down'}
-              onPress={onToggle}
-              expanded={open}
-              accessibilityLabel={`Who it’s for: ${label}`}
-              accessibilityHint="Opens a list of people to choose from"
-            />
-          </>
-        )}
-        <View style={styles.flex} />
-        {onRemove ? (
-          <IconButton icon="trash-2" label={`Remove ${item.name || 'item'}`} onPress={onRemove} />
-        ) : null}
-      </View>
-      {open ? (
+          <View style={styles.flex} />
+          {removeButton}
+        </View>
+      ) : tags ? (
+        <>
+          <Text variant="small">Enter the price for all {quantity}. Who’s each one for?</Text>
+          <View style={[styles.wrap, styles.tagRow]}>
+            {tags.map((id, index) => (
+              <Chip
+                key={index}
+                label={nameOf(id)}
+                tone={id === people.me ? 'you' : 'neutral'}
+                trailingIcon={open && openTag === index ? 'chevron-up' : 'chevron-down'}
+                onPress={() => toggle(index)}
+                expanded={open && openTag === index}
+                accessibilityLabel={`${itemName} ${index + 1} of ${tags.length}: ${nameOf(id)}`}
+                accessibilityHint="Opens a list of people to choose from"
+              />
+            ))}
+            <View style={styles.flex} />
+            {removeButton}
+          </View>
+        </>
+      ) : (
+        <View style={styles.itemLine}>
+          <Text variant="small">Who’s it for?</Text>
+          <Chip
+            label={label}
+            tone={assignment.kind === 'you' ? 'you' : 'neutral'}
+            trailingIcon={open ? 'chevron-up' : 'chevron-down'}
+            onPress={() => toggle(null)}
+            expanded={open}
+            accessibilityLabel={`Who it’s for: ${label}`}
+            accessibilityHint="Opens a list of people to choose from"
+          />
+          <View style={styles.flex} />
+          {removeButton}
+        </View>
+      )}
+
+      {open && tagOpen && tags && openTag !== null ? (
         <View style={styles.dropdown}>
-          {assignmentOptions(people, names).map((option) => (
+          {[people.me, ...people.everyone.filter((id) => id !== people.me)].map((id) => (
             <DropdownRow
-              key={option.key}
-              label={option.label}
-              selected={sameAssignment(option.assignment, item.assignment)}
-              onPress={() => choose(option.assignment)}
+              key={id}
+              label={nameOf(id)}
+              selected={tags[openTag] === id}
+              onPress={() => tagOne(openTag, id)}
             />
           ))}
           <DropdownRow
-            label="Choose people…"
-            selected={custom !== null}
-            onPress={() =>
-              choose({ kind: 'custom', participantIds: assignedTo(item.assignment, people) })
-            }
+            label={`Split all ${quantity} evenly`}
+            selected={false}
+            onPress={() => choose({ kind: 'all' })}
             last
           />
         </View>
-      ) : null}
-      {custom ? (
-        <View style={styles.wrap}>
-          {people.everyone.map((id) => (
-            <Chip
-              key={id}
-              label={nameOf(id)}
-              selected={assignedTo(custom, people).includes(id)}
-              onPress={() => toggle(id)}
+      ) : open && !tags ? (
+        <View style={styles.dropdown}>
+          {assignmentOptions(people, names).map((option, index, options) => (
+            <DropdownRow
+              key={option.key}
+              label={option.label}
+              selected={sameAssignment(option.assignment, assignment)}
+              onPress={() => choose(option.assignment)}
+              last={index === options.length - 1}
             />
           ))}
+        </View>
+      ) : null}
+      {evenly && !alone ? (
+        <View style={styles.stack}>
+          <View style={styles.wrap}>
+            {people.everyone.map((id) => (
+              <Chip
+                key={id}
+                label={nameOf(id)}
+                selected={sharing.includes(id)}
+                onPress={() => toggleSharing(id)}
+              />
+            ))}
+          </View>
+          {sharing.length > 0 ? (
+            <Text variant="small">
+              Split equally between{' '}
+              {sharing.length === people.everyone.length
+                ? 'everyone'
+                : joinNames(sharing.map(nameOf))}
+              . Tap a name to leave them out or add them back.
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {error ? <FormMessage message={error} /> : null}
@@ -1004,16 +1136,21 @@ function ScanReceipt({
   state,
   currentTotal,
   onScan,
+  onCancel,
 }: {
   state: ScanState;
   currentTotal: number | null;
   onScan: (from: 'camera' | 'library') => void;
+  onCancel: () => void;
 }) {
   if (state.status === 'scanning') {
     return (
       <View style={styles.scanRow} accessibilityLiveRegion="polite">
         <ActivityIndicator color={colors.ink} />
-        <Text variant="body">Reading your receipt…</Text>
+        <Text variant="body" style={styles.flex}>
+          Reading your receipt…
+        </Text>
+        <TextButton label="Cancel" onPress={onCancel} />
       </View>
     );
   }
@@ -1164,6 +1301,12 @@ function Summary({
 }
 
 const styles = StyleSheet.create({
+  formBody: {
+    gap: space.section,
+  },
+  locked: {
+    opacity: 0.4,
+  },
   scanRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1189,14 +1332,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  dateText: {
-    minWidth: 104,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-  iconSpacer: {
-    width: sizes.touch,
-  },
   item: {
     gap: space.sm,
     paddingVertical: space.md,
@@ -1216,6 +1351,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
+  },
+  tagRow: {
+    alignItems: 'center',
+  },
+  quantityInput: {
+    width: 48,
+    textAlign: 'center',
+    paddingHorizontal: space.xs,
+    fontVariant: ['tabular-nums'],
   },
   amountInput: {
     width: 104,

@@ -37,3 +37,20 @@ export function monthDay(date: string): string {
   const d = toUtc(date);
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
+
+/**
+ * A month as calendar rows, Sunday first: each row has 7 dates (YYYY-MM-DD), with null for
+ * the days before the 1st and after the last. `month` is any date in the month.
+ */
+export function calendarWeeks(month: string): (string | null)[][] {
+  const first = `${month.slice(0, 7)}-01`;
+  const start = toUtc(first);
+  const lead = start.getUTCDay();
+  const days = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+  const cells: (string | null)[] = [
+    ...Array.from({ length: lead }, () => null),
+    ...Array.from({ length: days }, (_, i) => addDays(first, i)),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, row) => cells.slice(row * 7, row * 7 + 7));
+}

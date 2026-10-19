@@ -11,7 +11,8 @@ export interface Receipt {
   merchant: string | null;
   /** YYYY-MM-DD, or null if there's no readable date. */
   date: string | null;
-  items: { name: string; amount_cents: number }[];
+  /** amount_cents is the line's total, for all `quantity` of it. */
+  items: { name: string; quantity: number; amount_cents: number }[];
   tax_cents: number;
   tip_cents: number;
   /** All discounts and coupons, as a positive number. */
@@ -29,6 +30,29 @@ const line = (description: string) => ({
   },
   required: ['name', 'amount_cents'],
 });
+
+/** A purchased line: how many, and its printed total (or only its unit price, if that's all). */
+const ITEM = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'What it is, without the count.' },
+    quantity: {
+      type: 'integer',
+      description:
+        'How many, if the line shows a count like "2 x", "2 @ 2.50" or "QTY 2"; otherwise 1.',
+    },
+    amount_cents: {
+      type: ['integer', 'null'],
+      description:
+        'The line’s printed total in cents, for all of them, e.g. 500 for 2 × $2.50. null only if the receipt prints just a unit price.',
+    },
+    unit_price_cents: {
+      type: ['integer', 'null'],
+      description: 'The printed price for one, in cents, if shown; otherwise null.',
+    },
+  },
+  required: ['name', 'quantity', 'amount_cents'],
+};
 
 /** The receipt record every model fills in, copied line by line (JSON Schema). */
 export const RECEIPT_SCHEMA = {
@@ -48,8 +72,8 @@ export const RECEIPT_SCHEMA = {
     items: {
       type: 'array',
       description:
-        'Every purchased line in order, including fees (bag, delivery, service, deposit). For a line bought several times, the line’s printed total.',
-      items: line('The line’s printed price in cents, e.g. 1299 for $12.99.'),
+        'Every purchased line in order, including fees (bag, delivery, service, deposit). A line bought several times is one entry with its quantity.',
+      items: ITEM,
     },
     discounts: {
       type: 'array',
@@ -154,12 +178,20 @@ export function parseReading(input: unknown, today = new Date()): Parsed {
   const items: Receipt['items'] = [];
   let discount = 0;
   for (const entry of raw.items) {
-    const amount = (entry as Record<string, unknown> | null)?.amount_cents;
-    const name = cleanText((entry as Record<string, unknown> | null)?.name, 200) ?? 'Item';
+    const printed = (entry ?? {}) as Record<string, unknown>;
+    const name = cleanText(printed.name, 200) ?? 'Item';
+    const quantity = printed.quantity ?? 1;
+    if (!Number.isSafeInteger(quantity) || (quantity as number) < 1 || (quantity as number) > 999) {
+      return { ok: false, error: `Bad quantity: ${quantity}` };
+    }
+    // The printed line total; if only a unit price is printed, code multiplies (never the model).
+    const unit = printed.unit_price_cents;
+    const amount =
+      printed.amount_cents ?? (isCents(unit) ? unit * (quantity as number) : printed.amount_cents);
     if (!isCents(amount) || amount === 0) return { ok: false, error: `Bad item amount: ${amount}` };
     // A discount printed among the items, as a negative line.
     if (amount < 0) discount -= amount;
-    else items.push({ name, amount_cents: amount });
+    else items.push({ name, quantity: quantity as number, amount_cents: amount });
   }
   for (const entry of raw.discounts) {
     const amount = (entry as Record<string, unknown> | null)?.amount_cents;

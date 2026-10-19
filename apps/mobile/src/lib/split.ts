@@ -19,14 +19,18 @@ export type Assignment =
   | { kind: 'you' }
   | { kind: 'all' }
   | { kind: 'person'; participantId: ParticipantId }
-  | { kind: 'custom'; participantIds: ParticipantId[] };
+  | { kind: 'custom'; participantIds: ParticipantId[] }
+  /** One tag per unit of a quantity over 1, e.g. 3 × Soft drink: Jeff, Jeff, Maya. */
+  | { kind: 'each'; people: ParticipantId[] };
 
 export interface DraftItem {
   /** Stable key for the row while editing. */
   key: string;
   name: string;
-  /** As typed, e.g. "12.34". Parsed with parseCents. */
+  /** The line's total as typed, e.g. "12.34". Parsed with parseCents. */
   amount: string;
+  /** How many, as typed, e.g. "3" for "3 × Soft drink". Blank means 1. */
+  quantity: string;
   assignment: Assignment;
 }
 
@@ -58,6 +62,10 @@ export type SaveItem = {
   amount_cents: Cents;
   kind: 'item' | 'tax' | 'tip' | 'discount';
   participant_ids: ParticipantId[];
+  /** Items only, when more than 1. */
+  quantity?: number;
+  /** Items tagged one by one: each person's number of tags, one per participant id. */
+  units?: number[];
 };
 
 export interface SplitResult {
@@ -82,8 +90,8 @@ export interface AssignmentOption {
 }
 
 /**
- * The dropdown's single choices, in order: All (split evenly), You, then each other person.
- * "Choose people" (a custom set) is offered separately. Alone in a group, only You.
+ * The dropdown's choices, in order: Split evenly (everyone, then untick people), You, then each
+ * other person. Alone in a group, only You.
  */
 export function assignmentOptions(
   people: SplitPeople,
@@ -92,7 +100,7 @@ export function assignmentOptions(
   const others = people.everyone.filter((id) => id !== people.me);
   return [
     ...(others.length > 0
-      ? [{ key: 'all', label: 'All (split evenly)', assignment: { kind: 'all' } as const }]
+      ? [{ key: 'all', label: 'Split evenly', assignment: { kind: 'all' } as const }]
       : []),
     { key: 'you', label: 'You', assignment: { kind: 'you' } as const },
     ...others.map((participantId) => ({
@@ -103,8 +111,11 @@ export function assignmentOptions(
   ];
 }
 
-/** Whether two assignments are the same choice. Any custom set counts as "Choose people". */
+/** Whether two assignments are the same choice. Everyone or some people evenly is "Split evenly". */
 export function sameAssignment(a: Assignment, b: Assignment): boolean {
+  // Split evenly starts with everyone; unticking people keeps it the same choice.
+  const even = (x: Assignment) => x.kind === 'all' || x.kind === 'custom';
+  if (even(a) && even(b)) return true;
   if (a.kind !== b.kind) return false;
   return a.kind !== 'person' || (b.kind === 'person' && a.participantId === b.participantId);
 }
@@ -120,7 +131,80 @@ export function assignedTo(assignment: Assignment, people: SplitPeople): Partici
       return people.everyone.includes(assignment.participantId) ? [assignment.participantId] : [];
     case 'custom':
       return people.everyone.filter((id) => assignment.participantIds.includes(id));
+    case 'each':
+      return people.everyone.filter((id) => assignment.people.includes(id));
   }
+}
+
+/** "Jeff 2, Maya 1", or "4 people" for more than two. */
+function unitsLabel(
+  units: Readonly<Record<ParticipantId, number>>,
+  people: SplitPeople,
+  names: Readonly<Record<ParticipantId, string>>,
+): string {
+  const ids = people.everyone.filter((id) => (units[id] ?? 0) > 0);
+  if (ids.length === 0) return 'Pick people';
+  if (ids.length > 2) return `${ids.length} people`;
+  return ids
+    .map((id) => `${id === people.me ? 'You' : (names[id] ?? 'Someone')} ${units[id]}`)
+    .join(', ');
+}
+
+/** The most units shown as separate tags; larger quantities have one tag for the whole line. */
+export const MAX_TAGS = 20;
+
+/**
+ * Who each unit of a quantity is for, one tag per unit: "3 × Soft drink" is three tags, which
+ * start as You. null when the line has one tag: a quantity of 1 (or over MAX_TAGS), or a line
+ * split evenly.
+ */
+export function tagsFor(
+  assignment: Assignment,
+  quantity: number | null,
+  people: SplitPeople,
+): ParticipantId[] | null {
+  if (quantity === null || quantity <= 1 || quantity > MAX_TAGS) return null;
+  const fill = (id: ParticipantId) => Array.from({ length: quantity }, () => id);
+  switch (assignment.kind) {
+    case 'each':
+      return Array.from({ length: quantity }, (_, i) => assignment.people[i] ?? people.me);
+    case 'you':
+      return fill(people.me);
+    case 'person':
+      return fill(assignment.participantId);
+    default:
+      return null;
+  }
+}
+
+/**
+ * The assignment the line has for its quantity. Tags are kept while the quantity is being
+ * retyped, but a line with one tag is for its first tag's person.
+ */
+export function effectiveAssignment(
+  assignment: Assignment,
+  quantity: number | null,
+  people: SplitPeople,
+): Assignment {
+  if (assignment.kind !== 'each' || tagsFor(assignment, quantity, people)) return assignment;
+  const first = assignment.people[0] ?? people.me;
+  return first === people.me ? { kind: 'you' } : { kind: 'person', participantId: first };
+}
+
+/** How many tags each person has, e.g. { Jeff: 2, Maya: 1 }. */
+function countTags(tags: readonly ParticipantId[]): Record<ParticipantId, number> {
+  const counts: Record<ParticipantId, number> = {};
+  for (const id of tags) counts[id] = (counts[id] ?? 0) + 1;
+  return counts;
+}
+
+/** A typed quantity: blank is 1; otherwise a whole number from 1 to 999. null if not. */
+export function readQuantity(typed: string): number | null {
+  const text = typed.trim();
+  if (!text) return 1;
+  if (!/^\d{1,3}$/.test(text)) return null;
+  const quantity = Number(text);
+  return quantity >= 1 ? quantity : null;
 }
 
 /** The tag's text: "You", "All", a name, or for a custom set "You, Jeff" / "3 people". */
@@ -131,18 +215,30 @@ export function assignmentLabel(
 ): string {
   if (assignment.kind === 'you') return 'You';
   if (assignment.kind === 'all') return 'All';
+  if (assignment.kind === 'each') return unitsLabel(countTags(assignment.people), people, names);
   const ids = assignedTo(assignment, people);
   if (ids.length === 0) return 'Pick people';
   if (ids.length > 2) return `${ids.length} people`;
   return ids.map((id) => (id === people.me ? 'You' : (names[id] ?? 'Someone'))).join(', ');
 }
 
-/** Labels a saved item's people the same way the tags do: You, All, a name, or "3 people". */
+/**
+ * Labels a saved item's people the same way the tags do: You, All, a name, "3 people", or by
+ * count ("Jeff 2, Maya 1") when the units differ.
+ */
 export function labelForIds(
   participantIds: readonly ParticipantId[],
   people: SplitPeople,
   names: Readonly<Record<ParticipantId, string>>,
+  units?: readonly number[],
 ): string {
+  if (units && units.length === participantIds.length && new Set(units).size > 1) {
+    return unitsLabel(
+      Object.fromEntries(participantIds.map((id, i) => [id, units[i] ?? 1])),
+      people,
+      names,
+    );
+  }
   const ids = new Set(participantIds);
   if (ids.size === 1 && ids.has(people.me)) return 'You';
   if (
@@ -232,20 +328,40 @@ function buildItemsSplit(draft: Draft, people: SplitPeople, options: SplitOption
       errors[item.key] = amount.ok ? hint(options, '12.34') : amount.error;
       continue;
     }
-    const participantIds = assignedTo(item.assignment, people);
+    const quantity = readQuantity(item.quantity);
+    if (quantity === null) {
+      errors[item.key] = 'Enter a quantity from 1 to 999';
+      continue;
+    }
+    // Tagged one by one: each person's units are how many tags they have.
+    const assignment = effectiveAssignment(item.assignment, quantity, people);
+    const tags = assignment.kind === 'each' ? tagsFor(assignment, quantity, people) : null;
+    const participantIds = tags
+      ? people.everyone.filter((id) => tags.includes(id))
+      : assignedTo(assignment, people);
     if (participantIds.length === 0) {
       errors[item.key] = 'Pick who this is for';
       continue;
     }
+    const counts = tags ? countTags(tags) : null;
+    const units =
+      counts && participantIds.length > 1 ? participantIds.map((id) => counts[id] ?? 0) : undefined;
     // Still counted in the summary; only saving needs the name.
     if (!name) errors[item.key] = 'Name this item';
 
-    lines.push({ kind: 'item', amountCents: amount.cents, participantIds });
+    lines.push({
+      kind: 'item',
+      amountCents: amount.cents,
+      participantIds,
+      ...(units ? { units } : {}),
+    });
     items.push({
       name: name || 'Item',
       amount_cents: amount.cents,
       kind: 'item',
       participant_ids: participantIds,
+      ...(quantity > 1 ? { quantity } : {}),
+      ...(units ? { units } : {}),
     });
   }
 
@@ -377,7 +493,15 @@ export interface SavedExpense {
   expenseDate: string;
   totalCents: Cents;
   categoryId: string | null;
-  items: { name: string; amountCents: Cents; kind: string; participantIds: ParticipantId[] }[];
+  items: {
+    name: string;
+    amountCents: Cents;
+    kind: string;
+    participantIds: ParticipantId[];
+    quantity: number;
+    /** Matching participantIds. */
+    units: number[];
+  }[];
   shares: { participantId: ParticipantId; amountCents: Cents; categoryOverrideId: string | null }[];
 }
 
@@ -390,11 +514,31 @@ export interface EditableExpense {
   categoryId: string | null;
 }
 
-/** The "Who's it for?" choice that matches a saved item's people. */
+/**
+ * The "Who's it for?" choice that matches a saved item's people. A quantity whose units add up
+ * to it was tagged one by one, so it comes back as tags (Jeff, Jeff, Maya).
+ */
 export function assignmentFor(
   participantIds: readonly ParticipantId[],
   people: SplitPeople,
+  units?: readonly number[],
+  quantity = 1,
 ): Assignment {
+  const sum = units?.reduce((total, n) => total + n, 0);
+  if (
+    quantity > 1 &&
+    participantIds.length > 1 &&
+    units?.length === participantIds.length &&
+    sum === quantity
+  ) {
+    return {
+      kind: 'each',
+      people: people.everyone.flatMap((id) => {
+        const count = units[participantIds.indexOf(id)] ?? 0;
+        return participantIds.includes(id) ? Array.from({ length: count }, () => id) : [];
+      }),
+    };
+  }
   const ids = new Set(participantIds);
   if (ids.size === 1 && ids.has(people.me)) return { kind: 'you' };
   if (
@@ -453,7 +597,8 @@ export function draftFromExpense(
             key: `item-${index}`,
             name: line.name,
             amount: typed(line.amountCents),
-            assignment: assignmentFor(line.participantIds, people),
+            quantity: line.quantity > 1 ? String(line.quantity) : '',
+            assignment: assignmentFor(line.participantIds, people, line.units, line.quantity),
           })),
           tax: sum('tax') > 0 ? typed(sum('tax')) : null,
           tip: sum('tip') > 0 ? typed(sum('tip')) : null,

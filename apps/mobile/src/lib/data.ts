@@ -430,7 +430,16 @@ export interface FullExpense {
   replacedById: string | null;
   /** Forgiveness is tied to this expense, so it can't be edited. */
   hasForgiveness: boolean;
-  items: { id: string; name: string; amountCents: Cents; kind: string; participantIds: string[] }[];
+  items: {
+    id: string;
+    name: string;
+    amountCents: Cents;
+    kind: string;
+    quantity: number;
+    participantIds: string[];
+    /** Matching participantIds: how many of the quantity each had (all 1 for an even split). */
+    units: number[];
+  }[];
   shares: { participantId: string; amountCents: Cents; categoryOverrideId: string | null }[];
 }
 
@@ -445,7 +454,16 @@ export interface ShareOfExpense {
   amountCents: Cents;
   /** Your category for your share: how you filed it, else the one set when it was saved. */
   categoryId: string | null;
-  items: { name: string; amountCents: Cents; splitCount: number }[];
+  items: {
+    name: string;
+    amountCents: Cents;
+    quantity: number;
+    /** How many people the item is split between. */
+    splitCount: number;
+    /** Tagged one by one: how many of the quantity were yours, out of all of them. */
+    myUnits: number;
+    totalUnits: number;
+  }[];
 }
 
 /** An expense in full if you paid or entered it, otherwise just your share. null if neither. */
@@ -456,7 +474,7 @@ export async function fetchExpense(
     .from('expenses')
     // One string literal, so supabase-js can infer the row type from it.
     .select(
-      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, item_assignments(participant_id)), shares(participant_id, amount_cents, category_override_id)',
+      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, quantity, item_assignments(participant_id, units)), shares(participant_id, amount_cents, category_override_id)',
     )
     .eq('id', expenseId)
     .maybeSingle();
@@ -494,7 +512,9 @@ export async function fetchExpense(
           name: item.name,
           amountCents: item.amount_cents,
           kind: item.kind,
+          quantity: item.quantity,
           participantIds: item.item_assignments.map((a) => a.participant_id),
+          units: item.item_assignments.map((a) => a.units),
         })),
       shares: data.shares.map((share) => ({
         participantId: share.participant_id,
@@ -522,8 +542,22 @@ export async function fetchExpense(
     amountCents: mine.amount_cents,
     categoryId: mine.category_id,
     items: items.map((raw) => {
-      const item = raw as { name: string; amount_cents: number; split_count: number };
-      return { name: item.name, amountCents: item.amount_cents, splitCount: item.split_count };
+      const item = raw as {
+        name: string;
+        amount_cents: number;
+        quantity?: number;
+        split_count: number;
+        my_units?: number;
+        total_units?: number;
+      };
+      return {
+        name: item.name,
+        amountCents: item.amount_cents,
+        quantity: item.quantity ?? 1,
+        splitCount: item.split_count,
+        myUnits: item.my_units ?? 1,
+        totalUnits: item.total_units ?? item.split_count,
+      };
     }),
   };
 }

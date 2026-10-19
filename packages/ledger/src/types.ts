@@ -10,11 +10,16 @@ export interface Share {
   amountCents: Cents;
 }
 
-/** A receipt line that belongs to specific people. Split equally among `participantIds`. */
+/**
+ * A receipt line that belongs to specific people. Split equally among `participantIds`, or in
+ * proportion to `units` when given: one whole number per person, e.g. Jeff 2 and Maya 1 of
+ * "3 × Soft drink".
+ */
 export interface ItemLine {
   kind: 'item';
   amountCents: Cents;
   participantIds: readonly ParticipantId[];
+  units?: readonly number[];
 }
 
 /**

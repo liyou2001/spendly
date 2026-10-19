@@ -30,7 +30,7 @@ import {
   type ShareOfExpense,
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
-import { debtLabel } from '@/lib/labels';
+import { debtLabel, itemTitle, yourPartOf } from '@/lib/labels';
 import { useSession } from '@/lib/session';
 import { labelForIds, owedToPayer, type SplitPeople } from '@/lib/split';
 import { useLoad } from '@/lib/useLoad';
@@ -199,9 +199,9 @@ function FullView({
             {[...lines, ...adjustments].map((item, index, all) => (
               <ListRow
                 key={item.id}
-                title={item.name}
+                title={itemTitle(item.name, item.quantity)}
                 {...(item.kind === 'item'
-                  ? { subtitle: labelForIds(item.participantIds, people, names) }
+                  ? { subtitle: labelForIds(item.participantIds, people, names, item.units) }
                   : { subtitle: 'Split in proportion' })}
                 trailing={<Money cents={item.amountCents} />}
                 divider={index < all.length - 1}
@@ -315,8 +315,8 @@ function ShareView({
             {expense.items.map((item, index) => (
               <ListRow
                 key={`${item.name}-${index}`}
-                title={item.name}
-                {...(item.splitCount > 1 ? { subtitle: `Split ${item.splitCount} ways` } : {})}
+                title={itemTitle(item.name, item.quantity)}
+                {...(yourPartOf(item) ? { subtitle: yourPartOf(item)! } : {})}
                 trailing={<Money cents={item.amountCents} />}
                 divider={index < expense.items.length - 1}
               />

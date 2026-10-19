@@ -8,6 +8,7 @@ import {
   formatDay,
   formatZelle,
   itemNote,
+  itemTitle,
   paymentNote,
   tokenFromHash,
 } from './view';
@@ -173,7 +174,7 @@ function Share({
                     {expense.items.map((item, i) => (
                       <li key={i} className="row">
                         <span className="small-ink">
-                          {item.name}
+                          {itemTitle(item)}
                           {itemNote(item) ? (
                             <span className="small"> · {itemNote(item)}</span>
                           ) : null}

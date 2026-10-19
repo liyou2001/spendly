@@ -113,6 +113,34 @@ describe('computeShares', () => {
     expect(result).toEqual({ a: 501, b: 499 });
   });
 
+  it('splits a line by units: 3 × Soft drink $7.50, Jeff 2 and Maya 1', () => {
+    const drinks: ExpenseLine = {
+      kind: 'item',
+      amountCents: 750,
+      participantIds: [JEFF, MAYA],
+      units: [2, 1],
+    };
+    expect(amounts([drinks])).toEqual({ [JEFF]: 500, [MAYA]: 250 });
+  });
+
+  it('treats equal units as an even split, and groups lines with the same units', () => {
+    const even: ExpenseLine = { kind: 'item', amountCents: 1000, participantIds: [JEFF, MAYA] };
+    expect(amounts([{ ...even, units: [3, 3] }])).toEqual(amounts([even]));
+    // 2:1 and 4:2 are the same split, so the two lines round once together.
+    const lines: ExpenseLine[] = [
+      { kind: 'item', amountCents: 101, participantIds: [JEFF, MAYA], units: [2, 1] },
+      { kind: 'item', amountCents: 100, participantIds: [MAYA, JEFF], units: [2, 4] },
+    ];
+    expect(amounts(lines)).toEqual({ [JEFF]: 134, [MAYA]: 67 });
+  });
+
+  it('gives a spare cent from a units split to the largest remainder, then by id', () => {
+    // $1.00 over 1:1:1 units would be even; over 2:1 it's 66.67 and 33.33.
+    expect(
+      amounts([{ kind: 'item', amountCents: 100, participantIds: [MAYA, JEFF], units: [1, 2] }]),
+    ).toEqual({ [JEFF]: 67, [MAYA]: 33 });
+  });
+
   it('rejects invalid expenses', () => {
     const item = (amountCents: number, participantIds = ['a']): ExpenseLine => ({
       kind: 'item',
@@ -132,6 +160,9 @@ describe('computeShares', () => {
       [item(100), { kind: 'discount', amountCents: 5 }],
       [item(100), { kind: 'discount', amountCents: -100 }],
       [item(100), { kind: 'discount', amountCents: -150 }],
+      [{ ...item(100, ['a', 'b']), units: [1] } as ExpenseLine],
+      [{ ...item(100, ['a', 'b']), units: [1, 0] } as ExpenseLine],
+      [{ ...item(100, ['a']), units: [1.5] } as ExpenseLine],
     ];
     for (const lines of bad) expect(() => computeShares({ lines })).toThrow(LedgerError);
   });
@@ -155,10 +186,12 @@ describe('computeShares', () => {
       for (let i = int(1, 15); i > 0; i--) {
         const amountCents = int(1, 50_000);
         itemsTotal += amountCents;
+        const participantIds = shuffle(people).slice(0, int(1, people.length));
         lines.push({
           kind: 'item',
           amountCents,
-          participantIds: shuffle(people).slice(0, int(1, people.length)),
+          participantIds,
+          ...(random() < 0.3 ? { units: participantIds.map(() => int(1, 5)) } : {}),
         });
       }
       if (random() < 0.6) lines.push({ kind: 'tax', amountCents: int(1, 5_000) });
@@ -177,9 +210,18 @@ describe('computeShares', () => {
         expect(share.amountCents).toBeGreaterThanOrEqual(0);
       }
 
-      const reordered = shuffle(lines).map((line) =>
-        line.kind === 'item' ? { ...line, participantIds: shuffle(line.participantIds) } : line,
-      );
+      // Shuffle each item's people together with their units.
+      const reordered = shuffle(lines).map((line) => {
+        if (line.kind !== 'item') return line;
+        const pairs = shuffle(
+          line.participantIds.map((id, i) => [id, line.units?.[i] ?? 1] as const),
+        );
+        return {
+          ...line,
+          participantIds: pairs.map(([id]) => id),
+          ...(line.units ? { units: pairs.map(([, units]) => units) } : {}),
+        };
+      });
       expect(computeShares({ lines: reordered })).toEqual(result);
     }
   });

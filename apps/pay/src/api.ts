@@ -3,8 +3,14 @@
 
 export interface ShareItem {
   name: string;
+  /** The line's total, for all `quantity` of it. */
   amount_cents: number;
+  quantity: number;
+  /** How many people it's split between. */
   split_count: number;
+  /** Tagged one by one: how many were yours, out of all of them (1 each when split evenly). */
+  my_units: number;
+  total_units: number;
 }
 
 export interface ShareExpense {

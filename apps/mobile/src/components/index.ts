@@ -2,6 +2,7 @@ export { AddPersonForm } from './AddPersonForm';
 export { AmountForm } from './AmountForm';
 export { Avatar } from './Avatar';
 export { Button } from './Button';
+export { CalendarPicker } from './CalendarPicker';
 export { Chip } from './Chip';
 export { KeyBlock } from './KeyBlock';
 export { ListRow } from './ListRow';

@@ -63,6 +63,7 @@ export type Database = {
           kind: string;
           name: string;
           position: number;
+          quantity: number;
         };
         ComputedFields: never;
         Insert: {
@@ -72,6 +73,7 @@ export type Database = {
           kind: string;
           name: string;
           position: number;
+          quantity?: number;
         };
         Update: {
           amount_cents?: number;
@@ -80,6 +82,7 @@ export type Database = {
           kind?: string;
           name?: string;
           position?: number;
+          quantity?: number;
         };
         Relationships: [
           {
@@ -271,15 +274,18 @@ export type Database = {
         Row: {
           item_id: string;
           participant_id: string;
+          units: number;
         };
         ComputedFields: never;
         Insert: {
           item_id: string;
           participant_id: string;
+          units?: number;
         };
         Update: {
           item_id?: string;
           participant_id?: string;
+          units?: number;
         };
         Relationships: [
           {

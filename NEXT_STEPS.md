@@ -60,8 +60,9 @@ For each question, the **How to test** line suggests something to ask or a task 
 - **Status:** Testing
 - **Was:** each item had a small tag that cycled You → All → each person → Custom on every tap, with the hint "Tap an item's tag…" in the People section above.
 - **Finding (2026-10-19, first test):** splitting wasn't found. A $30 dinner in a two-person group was saved entirely as "You", with no sign that the tag could be tapped.
-- **Now:** each item shows "Who's it for?" next to a button like **All ▾**. Tapping it opens a dropdown with All, You, each person, and "Choose people…" for a subset. The current choice is checked.
-- **How to test:** give someone the Costco receipt from the plan and ask them to split it without explaining anything. Note whether they find the dropdown, and whether "Choose people…" makes sense.
+- **Now:** each item shows "Who's it for?" next to a button like **You ▾**. Its dropdown has Split evenly, You, and each person. Split evenly starts with everyone selected ("Split equally between everyone") and shows a chip per person to leave someone out. The current choice is checked.
+- **How to test:** give someone the Costco receipt from the plan and ask them to split it without explaining anything. Note whether they find the dropdown, and whether they figure out how to leave someone out of Split evenly.
+- **Also (2026-10-19):** items now have a quantity ("3 ×" before the name). With more than one, the item shows one tag per unit, each starting as You, and tapping a tag picks who that one was for; a tag's list also has "Split all 3 evenly" for the whole line. Give someone a receipt with "3 x Soft drink" (Jeff had 2, Maya 1) and see whether they tag the drinks one by one without help.
 
 ### 4. Are the defaults right: new items on "You", and the newest shared group?
 
@@ -86,10 +87,9 @@ For each question, the **How to test** line suggests something to ask or a task 
 
 ### 7. Is stepping the date with ‹ › good enough?
 
-- **Status:** Open
-- **Now:** the date starts at today and moves one day per tap. There's no calendar picker, and no future dates.
-- **Why it matters:** entering a receipt from two weeks ago takes 14 taps. Step 9 (scanning) will fill in dates, but manual entry still happens.
-- **How to test:** ask how old their receipts usually are when they enter them, and have them enter one from last week.
+- **Status:** Answered (2026-10-19)
+- **Was:** the date started at today and moved one day per tap, with no calendar.
+- **Outcome:** a calendar was asked for. Tapping the date now opens a month calendar under it (future days disabled); picking a day closes it. Scanned receipts still fill the date in.
 
 ### 8. Does the privacy note reassure people, and do they believe it?
 

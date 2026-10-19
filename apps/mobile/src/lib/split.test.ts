@@ -6,6 +6,9 @@ import {
   assignmentOptions,
   buildSplit,
   draftFromExpense,
+  effectiveAssignment,
+  MAX_TAGS,
+  tagsFor,
   labelForIds,
   normalizeAmount,
   owedToPayer,
@@ -37,10 +40,11 @@ const draft = (overrides: Partial<Draft> = {}): Draft => ({
 });
 
 let nextKey = 0;
-const item = (name: string, amount: string, assignment: Assignment): DraftItem => ({
+const item = (name: string, amount: string, assignment: Assignment, quantity = ''): DraftItem => ({
   key: `k${nextKey++}`,
   name,
   amount,
+  quantity,
   assignment,
 });
 
@@ -165,6 +169,81 @@ describe('buildSplit (items)', () => {
   });
 });
 
+describe('quantities and one tag per unit', () => {
+  const drinks = (assignment: Assignment, quantity = '3') =>
+    draft({ items: [item('Soft drink', '7.50', assignment, quantity)] });
+  const each = (...people: string[]): Assignment => ({ kind: 'each', people });
+
+  it('splits 3 × Soft drink $7.50 tagged Jeff, Jeff, Maya by how many tags each has', () => {
+    const result = buildSplit(drinks(each(JEFF, MAYA, JEFF)), apartment);
+    expect(amounts(result.shares)).toEqual({ [JEFF]: 500, [MAYA]: 250 });
+    expect(result.items).toEqual([
+      {
+        name: 'Soft drink',
+        amount_cents: 750,
+        kind: 'item',
+        participant_ids: [JEFF, MAYA],
+        quantity: 3,
+        units: [2, 1],
+      },
+    ]);
+  });
+
+  it('starts every tag as You', () => {
+    expect(tagsFor(you, 3, apartment)).toEqual([LEO, LEO, LEO]);
+    expect(tagsFor(maya, 2, apartment)).toEqual([MAYA, MAYA]);
+    expect(tagsFor(all, 3, apartment)).toBeNull();
+    expect(tagsFor(you, 1, apartment)).toBeNull();
+    expect(tagsFor(you, MAX_TAGS + 1, apartment)).toBeNull();
+  });
+
+  it('keeps tags while the quantity is retyped: new ones are You, extra ones are set aside', () => {
+    const tagged = each(JEFF, MAYA, JEFF);
+    expect(tagsFor(tagged, 4, apartment)).toEqual([JEFF, MAYA, JEFF, LEO]);
+    expect(tagsFor(tagged, 2, apartment)).toEqual([JEFF, MAYA]);
+    // Back to one, the line is for the first tag's person.
+    expect(effectiveAssignment(tagged, 1, apartment)).toEqual({
+      kind: 'person',
+      participantId: JEFF,
+    });
+    expect(amounts(buildSplit(drinks(tagged, '1'), apartment).shares)).toEqual({ [JEFF]: 750 });
+  });
+
+  it('saves tags that are all one person without units', () => {
+    const result = buildSplit(drinks(each(MAYA, MAYA, MAYA)), apartment);
+    expect(result.items[0]).toEqual({
+      name: 'Soft drink',
+      amount_cents: 750,
+      kind: 'item',
+      participant_ids: [MAYA],
+      quantity: 3,
+    });
+  });
+
+  it('keeps an even split with a quantity, saving the quantity but no units', () => {
+    const result = buildSplit(drinks(all, '2'), apartment);
+    expect(amounts(result.shares)).toEqual({ [LEO]: 250, [JEFF]: 250, [MAYA]: 250 });
+    expect(result.items[0]).toMatchObject({ quantity: 2 });
+    expect(result.items[0]).not.toHaveProperty('units');
+  });
+
+  it('reads quantities: blank is 1, whole numbers up to 999 only', () => {
+    expect(buildSplit(drinks(you, ''), apartment).items[0]).not.toHaveProperty('quantity');
+    for (const bad of ['0', '1.5', 'two', '1000', '-2']) {
+      expect(Object.values(buildSplit(drinks(you, bad), apartment).errors)).toContain(
+        'Enter a quantity from 1 to 999',
+      );
+    }
+  });
+
+  it('labels tags by count', () => {
+    expect(assignmentLabel(each(JEFF, MAYA, JEFF), apartment, names)).toBe('Jeff 2, Maya 1');
+    expect(assignmentLabel(each(LEO, JEFF, MAYA), apartment, names)).toBe('3 people');
+    expect(labelForIds([JEFF, MAYA], apartment, names, [2, 1])).toBe('Jeff 2, Maya 1');
+    expect(labelForIds([JEFF, MAYA], apartment, names, [1, 1])).toBe('Jeff, Maya');
+  });
+});
+
 describe('buildSplit (quick)', () => {
   it('splits a total evenly, leftover cents in a fixed order', () => {
     const result = buildSplit(draft({ mode: 'quick', quickTotal: '10' }), apartment);
@@ -223,9 +302,9 @@ describe('buildSplit (quick)', () => {
 });
 
 describe('item tags', () => {
-  it('offer All (split evenly), You, then each other person in the dropdown', () => {
+  it('offer Split evenly, You, then each other person in the dropdown', () => {
     expect(assignmentOptions(apartment, names).map((o) => [o.label, o.assignment])).toEqual([
-      ['All (split evenly)', { kind: 'all' }],
+      ['Split evenly', { kind: 'all' }],
       ['You', { kind: 'you' }],
       ['Jeff', { kind: 'person', participantId: JEFF }],
       ['Maya', { kind: 'person', participantId: MAYA }],
@@ -242,6 +321,8 @@ describe('item tags', () => {
     expect(sameAssignment(maya, { kind: 'person', participantId: MAYA })).toBe(true);
     expect(sameAssignment(maya, { kind: 'person', participantId: JEFF })).toBe(false);
     expect(sameAssignment(all, you)).toBe(false);
+    // Split evenly with people left out is still Split evenly.
+    expect(sameAssignment(all, { kind: 'custom', participantIds: [JEFF, MAYA] })).toBe(true);
     expect(
       sameAssignment(
         { kind: 'custom', participantIds: [LEO] },
@@ -388,6 +469,8 @@ describe('draftFromExpense', () => {
         amountCents: i.amount_cents,
         kind: i.kind,
         participantIds: i.participant_ids,
+        quantity: i.quantity ?? 1,
+        units: i.units ?? i.participant_ids.map(() => 1),
       })),
       shares: payload.p_shares.map((s) => ({
         participantId: s.participant_id,
@@ -462,6 +545,27 @@ describe('draftFromExpense', () => {
       quickPeople: [LEO, JEFF],
       quickAmounts: { [LEO]: '12.50', [JEFF]: '17.50' },
     });
+  });
+
+  it('round-trips tags and quantities', () => {
+    const tagged = draft({
+      items: [
+        item('Soft drink', '7.50', { kind: 'each', people: [MAYA, JEFF, JEFF] }, '3'),
+        item('Pizza', '20.00', all, '2'),
+        item('Fries', '4.00', you, '2'),
+      ],
+    });
+    const edit = draftFromExpense(save(tagged), apartment);
+    if (!edit.ok) throw new Error(edit.reason);
+    expect(edit.value.draft.items.map((i) => [i.quantity, i.assignment])).toEqual([
+      // Tags come back grouped by person, in the group's order.
+      ['3', { kind: 'each', people: [JEFF, JEFF, MAYA] }],
+      ['2', { kind: 'all' }],
+      ['2', { kind: 'you' }],
+    ]);
+    expect(buildSplit(edit.value.draft, apartment).shares).toEqual(
+      buildSplit(tagged, apartment).shares,
+    );
   });
 
   it('uses the phone’s decimal separator', () => {

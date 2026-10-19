@@ -3,7 +3,14 @@ import { assertEquals } from 'jsr:@std/assert@1.0.13';
 import { askClaude, CLAUDE_MODELS } from './claude.ts';
 import { askGemini, GEMINI_MODELS, toGeminiSchema } from './gemini.ts';
 import { receiptReader } from './reader.ts';
-import { extractReceipt, mathGap, parseReading, toBase64, type Attempt } from './receipt.ts';
+import {
+  extractReceipt,
+  mathGap,
+  parseReading,
+  RECEIPT_SCHEMA,
+  toBase64,
+  type Attempt,
+} from './receipt.ts';
 
 const MODELS = { first: 'first-model', retry: 'stronger-model' };
 
@@ -60,10 +67,53 @@ Deno.test('code adds up tax and discount lines; negative items count as discount
   );
   if (!parsed.ok || !parsed.readable) throw new Error('should parse');
   assertEquals(parsed.receipt.merchant, 'Target');
-  assertEquals(parsed.receipt.items, [{ name: 'Lamp', amount_cents: 2500 }]);
+  assertEquals(parsed.receipt.items, [{ name: 'Lamp', quantity: 1, amount_cents: 2500 }]);
   assertEquals(parsed.receipt.discount_cents, 500);
   assertEquals(parsed.receipt.tax_cents, 175);
   assertEquals(mathGap(parsed.receipt), 0);
+});
+
+Deno.test('a "2 x Soft drink" line keeps its quantity and its printed total', () => {
+  const parsed = parseReading(
+    {
+      ...costco,
+      items: [
+        { name: 'Soft drink', quantity: 2, amount_cents: 500, unit_price_cents: 250 },
+        { name: 'Fries', quantity: 1, amount_cents: 400 },
+      ],
+      total_cents: 900,
+    },
+    TODAY,
+  );
+  if (!parsed.ok || !parsed.readable) throw new Error('should parse');
+  assertEquals(parsed.receipt.items, [
+    { name: 'Soft drink', quantity: 2, amount_cents: 500 },
+    { name: 'Fries', quantity: 1, amount_cents: 400 },
+  ]);
+  assertEquals(mathGap(parsed.receipt), 0);
+});
+
+Deno.test('with only a unit price printed, code multiplies it by the quantity', () => {
+  const parsed = parseReading(
+    {
+      ...costco,
+      items: [{ name: 'Taco', quantity: 3, amount_cents: null, unit_price_cents: 325 }],
+      total_cents: 975,
+    },
+    TODAY,
+  );
+  assertEquals(parsed.ok && parsed.readable && parsed.receipt.items, [
+    { name: 'Taco', quantity: 3, amount_cents: 975 },
+  ]);
+});
+
+Deno.test('a missing quantity is 1; a bad one is an error', () => {
+  const parsed = parseReading(costco, TODAY);
+  assertEquals(parsed.ok && parsed.readable && parsed.receipt.items[0]?.quantity, 1);
+  for (const quantity of [0, 1.5, 1000, '2']) {
+    const bad = { ...costco, items: [{ name: 'Soft drink', quantity, amount_cents: 500 }] };
+    assertEquals(parseReading(bad, TODAY).ok, false);
+  }
 });
 
 Deno.test('malformed amounts are errors, and odd dates are dropped', () => {
@@ -243,6 +293,13 @@ Deno.test('askGemini fails clearly on a cut-off, blocked or non-JSON reply', asy
   const quota = (() =>
     Promise.resolve(new Response('quota exceeded', { status: 429 }))) as typeof fetch;
   assertEquals(await ask(quota), 'Gemini m: 429 quota exceeded');
+});
+
+Deno.test('Gemini’s schema asks for quantities too', () => {
+  const schema = toGeminiSchema(RECEIPT_SCHEMA) as {
+    properties: { items: { items: { properties: Record<string, { type: string }> } } };
+  };
+  assertEquals(schema.properties.items.items.properties.quantity?.type, 'INTEGER');
 });
 
 Deno.test('the schema converts to Gemini’s form: upper-case types, nullable for null', () => {

@@ -19,8 +19,8 @@ const receipt: ScannedReceipt = {
   merchant: 'Costco',
   date: '2026-10-17',
   items: [
-    { name: 'Paper towels', amount_cents: 2299 },
-    { name: 'Dish soap', amount_cents: 1149 },
+    { name: 'Paper towels', quantity: 1, amount_cents: 2299 },
+    { name: 'Dish soap', quantity: 2, amount_cents: 1149 },
   ],
   tax_cents: 276,
   tip_cents: 0,
@@ -40,9 +40,9 @@ describe('draftFromReceipt', () => {
   it('fills an itemized draft whose total matches the receipt', () => {
     const draft = draftFromReceipt(receipt, empty);
     expect(draft.mode).toBe('items');
-    expect(draft.items.map((i) => [i.name, i.amount, i.assignment.kind])).toEqual([
-      ['Paper towels', '22.99', 'you'],
-      ['Dish soap', '11.49', 'you'],
+    expect(draft.items.map((i) => [i.quantity, i.name, i.amount, i.assignment.kind])).toEqual([
+      ['', 'Paper towels', '22.99', 'you'],
+      ['2', 'Dish soap', '11.49', 'you'],
     ]);
     expect([draft.tax, draft.tip, draft.discount]).toEqual(['2.76', null, '3.00']);
     const people = { me: 'p-me', everyone: ['p-me'] };

@@ -7,6 +7,7 @@ import {
   formatDay,
   formatZelle,
   itemNote,
+  itemTitle,
   paymentNote,
   tokenFromHash,
 } from './view';
@@ -15,7 +16,16 @@ const costco = {
   merchant: 'Costco',
   expense_date: '2026-10-17',
   amount_cents: 1500,
-  items: [{ name: 'Paper towels', amount_cents: 2299, split_count: 3 }],
+  items: [
+    {
+      name: 'Paper towels',
+      amount_cents: 2299,
+      quantity: 1,
+      split_count: 3,
+      my_units: 1,
+      total_units: 3,
+    },
+  ],
 };
 
 describe('view', () => {
@@ -37,10 +47,18 @@ describe('view', () => {
   it('formats names, days and item notes', () => {
     expect(firstName('Jeff Kim')).toBe('Jeff');
     expect(formatDay('2026-10-17')).toBe('Oct 17');
-    expect(itemNote({ name: 'Paper towels', amount_cents: 2299, split_count: 3 })).toBe(
+    const towels = { name: 'Paper towels', amount_cents: 2299, quantity: 1 };
+    expect(itemNote({ ...towels, split_count: 3, my_units: 1, total_units: 3 })).toBe(
       'Split 3 ways',
     );
-    expect(itemNote({ name: 'Hat', amount_cents: 999, split_count: 1 })).toBeNull();
+    expect(itemNote({ ...towels, split_count: 1, my_units: 1, total_units: 1 })).toBeNull();
+  });
+
+  it('shows quantities, and how many were yours when tagged one by one', () => {
+    const drinks = { name: 'Soft drink', amount_cents: 750, quantity: 3, split_count: 2 };
+    expect(itemTitle(drinks)).toBe('3 × Soft drink');
+    expect(itemTitle({ name: 'Hat', quantity: 1 })).toBe('Hat');
+    expect(itemNote({ ...drinks, my_units: 1, total_units: 3 })).toBe('Your 1 of 3');
   });
 
   it('shows Zelle phone numbers the familiar way', () => {

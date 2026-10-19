@@ -7,7 +7,8 @@ import type { Draft, SplitOptions } from './split';
 export interface ScannedReceipt {
   merchant: string | null;
   date: string | null;
-  items: { name: string; amount_cents: Cents }[];
+  /** amount_cents is the line's total, for all `quantity` of it. */
+  items: { name: string; quantity: number; amount_cents: Cents }[];
   tax_cents: Cents;
   tip_cents: Cents;
   discount_cents: Cents;
@@ -36,6 +37,7 @@ export function draftFromReceipt(
       key: `scan-${index}`,
       name: item.name,
       amount: typed(item.amount_cents),
+      quantity: item.quantity > 1 ? String(item.quantity) : '',
       assignment: { kind: 'you' },
     })),
     tax: receipt.tax_cents > 0 ? typed(receipt.tax_cents) : null,
