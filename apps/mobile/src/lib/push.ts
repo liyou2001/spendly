@@ -1,36 +1,53 @@
 // Push notifications: "Jeff says they paid you $15.00" and notes from the payment page. The
 // phone's Expo push token is saved to your account; Edge Functions send through Expo.
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import type { NotificationResponse } from 'expo-notifications';
 import { router, type Href } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { supabase } from './supabase';
 
-// Show notifications that arrive while the app is open, too.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+const projectId: string | null =
+  Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? null;
+const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+/**
+ * Whether this build can get pushes: a real phone, an EAS project id (`npx eas-cli init`), and
+ * not Expo Go on Android, which dropped remote pushes in SDK 53.
+ */
+const pushSupported =
+  Device.isDevice &&
+  Platform.OS !== 'web' &&
+  projectId !== null &&
+  !(inExpoGo && Platform.OS === 'android');
+
+// expo-notifications warns as soon as it loads in Expo Go, so it's only loaded where pushes work.
+let notificationsModule: Promise<typeof import('expo-notifications')> | null = null;
+function loadNotifications() {
+  notificationsModule ??= import('expo-notifications').then((Notifications) => {
+    // Show notifications that arrive while the app is open, too.
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+    return Notifications;
+  });
+  return notificationsModule;
+}
 
 let registeredToken: string | null = null;
 
-/**
- * Asks for permission (once) and saves this phone's token to your account. Quietly does nothing
- * where push can't work: simulators, web, Expo Go on Android, or before the project has an EAS
- * project id (`npx eas-cli init`).
- */
+/** Asks for permission (once) and saves this phone's token to your account. */
 export async function registerForPush(): Promise<void> {
-  const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? null;
-  if (!Device.isDevice || Platform.OS === 'web' || !projectId) return;
+  if (!pushSupported || !projectId) return;
   try {
+    const Notifications = await loadNotifications();
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Payments',
@@ -64,17 +81,24 @@ export function usePushNotifications(signedIn: boolean): void {
   }, [signedIn]);
 
   useEffect(() => {
-    if (!signedIn) return;
-    const open = (response: Notifications.NotificationResponse | null) => {
+    if (!signedIn || !pushSupported) return;
+    const open = (response: NotificationResponse | null) => {
       const url = response?.notification.request.content.data?.url;
       if (typeof url === 'string' && url.startsWith('/')) router.push(url as Href);
     };
-    // A tap that launched the app, then taps while it's running.
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      open(response);
+
+    let cancelled = false;
+    let subscription: { remove: () => void } | null = null;
+    void loadNotifications().then(async (Notifications) => {
+      if (cancelled) return;
+      // A tap that launched the app, then taps while it's running.
+      open(await Notifications.getLastNotificationResponseAsync());
       void Notifications.clearLastNotificationResponseAsync();
+      if (!cancelled) subscription = Notifications.addNotificationResponseReceivedListener(open);
     });
-    const subscription = Notifications.addNotificationResponseReceivedListener(open);
-    return () => subscription.remove();
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
   }, [signedIn]);
 }
