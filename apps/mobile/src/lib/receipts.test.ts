@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { categoryForReceipt, draftFromReceipt, totalCheck, type ScannedReceipt } from './receipts';
-import { buildSplit, type Draft } from './split';
+import {
+  categoryForReceipt,
+  draftFromReceipt,
+  hasEnteredDetails,
+  totalCheck,
+  type ScannedReceipt,
+} from './receipts';
+import { buildSplit, type Draft, type DraftItem } from './split';
 
 const empty: Draft = {
   mode: 'quick',
@@ -81,5 +87,32 @@ describe('totalCheck', () => {
     expect(totalCheck(14000, 13950)).toBe(
       'These lines add up to $139.50, but the receipt says $140.00 ($0.50 short). Check the amounts against your receipt.',
     );
+  });
+});
+
+describe('hasEnteredDetails', () => {
+  const blank: DraftItem = {
+    key: 'k',
+    name: '',
+    amount: '',
+    quantity: '',
+    assignment: { kind: 'you' },
+  };
+
+  it('is false for a fresh form, so scanning goes straight ahead', () => {
+    expect(hasEnteredDetails({ ...empty, mode: 'items', items: [blank] }, '  ')).toBe(false);
+  });
+
+  it('is true once anything a scan would replace is entered', () => {
+    const withItems = (patch: Partial<DraftItem>) => ({
+      ...empty,
+      items: [{ ...blank, ...patch }],
+    });
+    expect(hasEnteredDetails(empty, 'Costco')).toBe(true);
+    expect(hasEnteredDetails(withItems({ name: 'Milk' }), '')).toBe(true);
+    expect(hasEnteredDetails(withItems({ amount: '3' }), '')).toBe(true);
+    expect(hasEnteredDetails(withItems({ assignment: { kind: 'all' } }), '')).toBe(true);
+    expect(hasEnteredDetails({ ...empty, tax: '1.00' }, '')).toBe(true);
+    expect(hasEnteredDetails({ ...empty, quickTotal: '20' }, '')).toBe(true);
   });
 });

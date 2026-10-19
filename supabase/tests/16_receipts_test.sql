@@ -1,7 +1,7 @@
 -- Receipt photos: your own folder only, and the monthly scan count.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(8);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -39,6 +39,18 @@ select tests.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 select is_empty(
   $$select * from storage.objects where bucket_id = 'receipts'$$, 'Nobody else can see it'
 );
+-- Storage refuses deletes through SQL, so the delete itself is tested through the Storage
+-- API (supabase/functions/tests/extract-receipt_test.ts). Here: the rule is your own folder.
+reset role;
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'storage' and tablename = 'objects' and cmd = 'DELETE'
+      and policyname = 'Delete your own receipts'
+      and qual like '%receipts%' and qual like '%foldername%' and qual like '%auth.uid()%'
+  ),
+  'People can delete photos in their own receipts folder only'
+);
 
 -- This month: a.jpg read twice (Haiku, then Sonnet), b.jpg read, c.jpg too blurry, d.jpg only
 -- failed on our side (no API credits). Plus one from last month.
@@ -50,7 +62,7 @@ values
   ('11111111-1111-1111-1111-111111111111', 'photo', 'a.jpg', 'claude-haiku-5-5', 'mismatch', null, now()),
   ('11111111-1111-1111-1111-111111111111', 'photo', 'a.jpg', 'claude-sonnet-5-5', 'succeeded', null, now()),
   ('11111111-1111-1111-1111-111111111111', 'photo', 'b.jpg', 'claude-haiku-5-5', 'succeeded', null, now()),
-  ('11111111-1111-1111-1111-111111111111', 'photo', 'c.jpg', 'claude-haiku-5-5', 'failed', 'Unreadable: too blurry', now()),
+  ('11111111-1111-1111-1111-111111111111', 'photo', 'c.jpg', 'claude-haiku-5-5', 'unreadable', 'Unreadable: too blurry', now()),
   ('11111111-1111-1111-1111-111111111111', 'photo', 'd.jpg', 'claude-haiku-5-5', 'failed', 'Error: 400 credit balance too low', now()),
   ('11111111-1111-1111-1111-111111111111', 'photo', 'old.jpg', 'claude-haiku-5-5', 'succeeded', null,
    date_trunc('month', now()) - interval '1 day');

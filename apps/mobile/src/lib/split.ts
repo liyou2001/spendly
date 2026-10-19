@@ -501,6 +501,8 @@ export interface SavedExpense {
     quantity: number;
     /** Matching participantIds. */
     units: number[];
+    /** Tagged one by one (units saved), rather than split evenly or for one person. */
+    byUnits: boolean;
   }[];
   shares: { participantId: ParticipantId; amountCents: Cents; categoryOverrideId: string | null }[];
 }
@@ -515,27 +517,22 @@ export interface EditableExpense {
 }
 
 /**
- * The "Who's it for?" choice that matches a saved item's people. A quantity whose units add up
- * to it was tagged one by one, so it comes back as tags (Jeff, Jeff, Maya).
+ * The "Who's it for?" choice that matches a saved item's people. A line that was tagged one by
+ * one comes back as its tags (Jeff, Jeff, Maya).
  */
 export function assignmentFor(
   participantIds: readonly ParticipantId[],
   people: SplitPeople,
-  units?: readonly number[],
-  quantity = 1,
+  tagged?: { units: readonly number[] },
 ): Assignment {
-  const sum = units?.reduce((total, n) => total + n, 0);
-  if (
-    quantity > 1 &&
-    participantIds.length > 1 &&
-    units?.length === participantIds.length &&
-    sum === quantity
-  ) {
+  if (tagged && tagged.units.length === participantIds.length) {
     return {
       kind: 'each',
       people: people.everyone.flatMap((id) => {
-        const count = units[participantIds.indexOf(id)] ?? 0;
-        return participantIds.includes(id) ? Array.from({ length: count }, () => id) : [];
+        const count = participantIds.includes(id)
+          ? (tagged.units[participantIds.indexOf(id)] ?? 0)
+          : 0;
+        return Array.from({ length: count }, () => id);
       }),
     };
   }
@@ -598,7 +595,11 @@ export function draftFromExpense(
             name: line.name,
             amount: typed(line.amountCents),
             quantity: line.quantity > 1 ? String(line.quantity) : '',
-            assignment: assignmentFor(line.participantIds, people, line.units, line.quantity),
+            assignment: assignmentFor(
+              line.participantIds,
+              people,
+              line.byUnits ? { units: line.units } : undefined,
+            ),
           })),
           tax: sum('tax') > 0 ? typed(sum('tax')) : null,
           tip: sum('tip') > 0 ? typed(sum('tip')) : null,
@@ -634,4 +635,27 @@ export function draftFromExpense(
       },
     },
   };
+}
+
+/** One unit's tag changed to `id`, the rest kept. */
+export function retag(
+  tags: readonly ParticipantId[],
+  index: number,
+  id: ParticipantId,
+): Assignment {
+  return { kind: 'each', people: tags.map((tag, i) => (i === index ? id : tag)) };
+}
+
+/**
+ * Split evenly with one person ticked or unticked. Everyone ticked is All; an empty list is
+ * kept, so the form can say to pick someone.
+ */
+export function toggleEvenSplit(
+  sharing: readonly ParticipantId[],
+  id: ParticipantId,
+  people: SplitPeople,
+): Assignment {
+  const ids = sharing.includes(id) ? sharing.filter((x) => x !== id) : [...sharing, id];
+  if (people.everyone.every((x) => ids.includes(x))) return { kind: 'all' };
+  return { kind: 'custom', participantIds: people.everyone.filter((x) => ids.includes(x)) };
 }

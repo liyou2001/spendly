@@ -54,3 +54,12 @@ export function calendarWeeks(month: string): (string | null)[][] {
   while (cells.length % 7 !== 0) cells.push(null);
   return Array.from({ length: cells.length / 7 }, (_, row) => cells.slice(row * 7, row * 7 + 7));
 }
+
+/** How a day shows in the calendar: picked, today (the latest allowed), or not pickable. */
+export function calendarDay(
+  date: string,
+  value: string,
+  max: string,
+): { selected: boolean; today: boolean; pickable: boolean } {
+  return { selected: date === value, today: date === max, pickable: date <= max };
+}

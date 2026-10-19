@@ -8,7 +8,9 @@ import {
   draftFromExpense,
   effectiveAssignment,
   MAX_TAGS,
+  retag,
   tagsFor,
+  toggleEvenSplit,
   labelForIds,
   normalizeAmount,
   owedToPayer,
@@ -244,6 +246,22 @@ describe('quantities and one tag per unit', () => {
   });
 });
 
+describe('tag and Split evenly changes', () => {
+  it('retags one unit and keeps the rest', () => {
+    expect(retag([LEO, LEO, LEO], 1, JEFF)).toEqual({ kind: 'each', people: [LEO, JEFF, LEO] });
+  });
+
+  it('unticks and ticks people in Split evenly, back to All with everyone', () => {
+    const withoutLeo = toggleEvenSplit([LEO, JEFF, MAYA], LEO, apartment);
+    expect(withoutLeo).toEqual({ kind: 'custom', participantIds: [JEFF, MAYA] });
+    expect(toggleEvenSplit([JEFF, MAYA], LEO, apartment)).toEqual({ kind: 'all' });
+    expect(toggleEvenSplit([JEFF], JEFF, apartment)).toEqual({
+      kind: 'custom',
+      participantIds: [],
+    });
+  });
+});
+
 describe('buildSplit (quick)', () => {
   it('splits a total evenly, leftover cents in a fixed order', () => {
     const result = buildSplit(draft({ mode: 'quick', quickTotal: '10' }), apartment);
@@ -471,6 +489,7 @@ describe('draftFromExpense', () => {
         participantIds: i.participant_ids,
         quantity: i.quantity ?? 1,
         units: i.units ?? i.participant_ids.map(() => 1),
+        byUnits: i.units !== undefined,
       })),
       shares: payload.p_shares.map((s) => ({
         participantId: s.participant_id,
@@ -544,6 +563,18 @@ describe('draftFromExpense', () => {
       quickSplit: 'amounts',
       quickPeople: [LEO, JEFF],
       quickAmounts: { [LEO]: '12.50', [JEFF]: '17.50' },
+    });
+  });
+
+  it('reopens an even split of 2 × Pizza as Split evenly, not as tags', () => {
+    const pizza = draft({
+      items: [item('Pizza', '20.00', { kind: 'custom', participantIds: [JEFF, MAYA] }, '2')],
+    });
+    const edit = draftFromExpense(save(pizza), apartment);
+    if (!edit.ok) throw new Error(edit.reason);
+    expect(edit.value.draft.items[0]?.assignment).toEqual({
+      kind: 'custom',
+      participantIds: [JEFF, MAYA],
     });
   });
 

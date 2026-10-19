@@ -87,3 +87,20 @@ export function totalCheck(receiptTotal: Cents, onScreen: Cents | null): string 
   const diff = Math.abs(onScreen - receiptTotal);
   return `These lines add up to ${formatCents(onScreen)}, but the receipt says ${formatCents(receiptTotal)} (${formatCents(diff)} ${onScreen > receiptTotal ? 'over' : 'short'}). Check the amounts against your receipt.`;
 }
+
+/**
+ * Whether the form has anything a scan would replace: a store, an item, an amount, a person
+ * chosen, or tax, tip, discount or a total. Scanning then asks first.
+ */
+export function hasEnteredDetails(draft: Draft, merchant: string): boolean {
+  if (merchant.trim()) return true;
+  if (draft.tax?.trim() || draft.tip?.trim() || draft.discount?.trim()) return true;
+  if (draft.quickTotal.trim()) return true;
+  return draft.items.some(
+    (item) =>
+      item.name.trim() ||
+      item.amount.trim() ||
+      item.quantity.trim() ||
+      item.assignment.kind !== 'you',
+  );
+}

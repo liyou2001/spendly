@@ -37,14 +37,20 @@ export async function pickReceiptPhoto(from: 'camera' | 'library'): Promise<Phot
   return asset ? { uri: asset.uri, width: asset.width, height: asset.height } : null;
 }
 
-/** A smaller JPEG of the photo, at most LONG_EDGE on its long side. */
+/**
+ * A smaller JPEG of the photo, at most LONG_EDGE on its long side. Never enlarged: when the
+ * picker doesn't report the size, it's measured first.
+ */
 async function shrink(photo: Photo): Promise<string> {
+  let { width, height } = photo;
+  if (width === 0 || height === 0) {
+    const measured = await ImageManipulator.manipulate(photo.uri).renderAsync();
+    ({ width, height } = measured);
+  }
   const context = ImageManipulator.manipulate(photo.uri);
-  if (Math.max(photo.width, photo.height) > LONG_EDGE || photo.width === 0) {
+  if (Math.max(width, height) > LONG_EDGE) {
     context.resize(
-      photo.height >= photo.width
-        ? { width: null, height: LONG_EDGE }
-        : { width: LONG_EDGE, height: null },
+      height >= width ? { width: null, height: LONG_EDGE } : { width: LONG_EDGE, height: null },
     );
   }
   const image = await context.renderAsync();
@@ -65,6 +71,8 @@ export async function scanReceipt(userId: string, photo: Photo): Promise<ScanRes
     body: { path },
   });
   if (error || !data) {
+    // The function deletes photos it reads; one that never got that far is deleted here.
+    void supabase.storage.from('receipts').remove([path]);
     // The function explains itself in { error }, e.g. the monthly limit.
     const context = (error as { context?: Response } | null)?.context;
     const message = await context

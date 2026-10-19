@@ -50,3 +50,32 @@ Deno.test('Only your own uploaded photo can be scanned', network, async () => {
     await leo.auth.signOut();
   }
 });
+
+Deno.test('You can delete your own receipt photo, and no one else’s', network, async () => {
+  const admin = createClient(API_URL, requireEnv('SERVICE_ROLE_KEY'), {
+    auth: { persistSession: false },
+  });
+  const leo = createClient(API_URL, requireEnv('ANON_KEY'), { auth: { persistSession: false } });
+  const { data, error } = await leo.auth.signInWithPassword({
+    email: 'leo@example.com',
+    password: 'password123',
+  });
+  if (error || !data.user) throw error ?? new Error('No session');
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+  const own = `${data.user.id}/${crypto.randomUUID()}.jpg`;
+  const others = `${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`;
+  const exists = async (path: string) =>
+    !(await admin.storage.from('receipts').download(path)).error;
+
+  try {
+    await leo.storage.from('receipts').upload(own, jpeg, { contentType: 'image/jpeg' });
+    await admin.storage.from('receipts').upload(others, jpeg, { contentType: 'image/jpeg' });
+
+    await leo.storage.from('receipts').remove([own, others]);
+    assertEquals(await exists(own), false);
+    assertEquals(await exists(others), true);
+  } finally {
+    await admin.storage.from('receipts').remove([own, others]);
+    await leo.auth.signOut();
+  }
+});

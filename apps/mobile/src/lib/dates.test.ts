@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, calendarWeeks, formatDate, monthDay, todayLocal } from './dates';
+import { addDays, calendarDay, calendarWeeks, formatDate, monthDay, todayLocal } from './dates';
 
 describe('todayLocal', () => {
   it('uses the phone’s local calendar date', () => {
@@ -64,5 +64,20 @@ describe('calendarWeeks', () => {
     expect(days).toHaveLength(29);
     expect(days.at(-1)).toBe('2028-02-29');
     for (const week of weeks) expect(week).toHaveLength(7);
+  });
+});
+
+describe('calendarDay', () => {
+  it('marks the picked day and today, and refuses days after today', () => {
+    expect(calendarDay('2026-10-17', '2026-10-17', '2026-10-19')).toEqual({
+      selected: true,
+      today: false,
+      pickable: true,
+    });
+    expect(calendarDay('2026-10-19', '2026-10-17', '2026-10-19')).toMatchObject({
+      today: true,
+      pickable: true,
+    });
+    expect(calendarDay('2026-10-20', '2026-10-17', '2026-10-19').pickable).toBe(false);
   });
 });

@@ -439,6 +439,8 @@ export interface FullExpense {
     participantIds: string[];
     /** Matching participantIds: how many of the quantity each had (all 1 for an even split). */
     units: number[];
+    /** Tagged one by one, rather than split evenly. */
+    byUnits: boolean;
   }[];
   shares: { participantId: string; amountCents: Cents; categoryOverrideId: string | null }[];
 }
@@ -474,7 +476,7 @@ export async function fetchExpense(
     .from('expenses')
     // One string literal, so supabase-js can infer the row type from it.
     .select(
-      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, quantity, item_assignments(participant_id, units)), shares(participant_id, amount_cents, category_override_id)',
+      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, quantity, by_units, item_assignments(participant_id, units)), shares(participant_id, amount_cents, category_override_id)',
     )
     .eq('id', expenseId)
     .maybeSingle();
@@ -515,6 +517,7 @@ export async function fetchExpense(
           quantity: item.quantity,
           participantIds: item.item_assignments.map((a) => a.participant_id),
           units: item.item_assignments.map((a) => a.units),
+          byUnits: item.by_units,
         })),
       shares: data.shares.map((share) => ({
         participantId: share.participant_id,

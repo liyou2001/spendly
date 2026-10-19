@@ -1,10 +1,11 @@
 // extract-receipt: reads a receipt photo you uploaded into a draft for the split screen, with
 // Gemini or Claude (see _shared/reader.ts). Signed in only, for photos in your own folder,
-// within a monthly limit. Every attempt is logged in receipt_extractions.
+// within a monthly limit. The photo is deleted once read; every attempt is logged in
+// receipt_extractions.
 import { adminClient, withinLimit } from '../_shared/admin.ts';
 import { corsHeaders, fail, json, readBody, TOO_MANY } from '../_shared/http.ts';
 import { receiptReader } from '../_shared/reader.ts';
-import { extractReceipt, toBase64 } from '../_shared/receipt.ts';
+import { extractReceipt, monthlyScanLimit, toBase64 } from '../_shared/receipt.ts';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -29,7 +30,7 @@ Deno.serve(async (req) => {
     return fail(503, 'Receipt scanning isn’t set up yet. Enter it by hand for now.');
   }
   if (!(await withinLimit(admin, `receipt:user:${user.id}`, 20, 3600))) return fail(429, TOO_MANY);
-  const limit = Number(Deno.env.get('RECEIPT_SCANS_PER_MONTH') ?? '50');
+  const limit = monthlyScanLimit(Deno.env.get('RECEIPT_SCANS_PER_MONTH'));
   const { data: used, error: countError } = await admin.rpc('receipt_scans_this_month', {
     p_user_id: user.id,
   });
@@ -43,8 +44,12 @@ Deno.serve(async (req) => {
 
   const { data: photo, error: downloadError } = await admin.storage.from('receipts').download(path);
   if (downloadError || !photo) return fail(404, 'Couldn’t find that photo. Try again.');
-  if (photo.size > MAX_BYTES) return fail(413, 'That photo is too large.');
-  const imageBase64 = toBase64(new Uint8Array(await photo.arrayBuffer()));
+  const bytes = new Uint8Array(await photo.arrayBuffer());
+  // Nothing shows the photo again once it's read, so it isn't kept.
+  const { error: removeError } = await admin.storage.from('receipts').remove([path]);
+  if (removeError) console.error('Couldn’t delete the photo', removeError);
+  if (bytes.length > MAX_BYTES) return fail(413, 'That photo is too large.');
+  const imageBase64 = toBase64(bytes);
 
   const { data: categories } = await admin.from('categories').select('name').eq('user_id', user.id);
   const categoryNames = (categories ?? []).map((c) => c.name as string);

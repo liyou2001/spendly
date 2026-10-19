@@ -2,7 +2,7 @@
 -- Apartment: Leo ...0001, Jeff ...0002, Maya ...0003.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(12);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -52,6 +52,16 @@ select results_eq(
   $$values (3, 'Jeff', 2), (3, 'Maya', 1)$$,
   'The quantity and each person’s units are stored'
 );
+select tests.save_drinks(
+  '[{"name": "Pizza", "amount_cents": 750, "kind": "item", "quantity": 2,
+     "participant_ids": ["33333333-3333-3333-3333-333333330002", "33333333-3333-3333-3333-333333330003"]}]');
+select results_eq(
+  $$select name, by_units from public.expense_items
+    where expense_id in (select id from public.expenses where merchant = 'Pizza place')
+    order by name$$,
+  $$values ('Pizza', false), ('Soft drink', true)$$,
+  'Tagged lines are marked by_units; an even split of 2 × Pizza is not'
+);
 select results_eq(
   $$select i.quantity, a.units from public.expense_items i
     join public.item_assignments a on a.item_id = i.id
@@ -97,12 +107,12 @@ select results_eq(
   $$select item->>'name', (item->>'quantity')::int, (item->>'my_units')::int, (item->>'total_units')::int,
            (item->>'split_count')::int
     from public.get_my_shares(), jsonb_array_elements(items) item
-    where merchant = 'Pizza place'$$,
+    where merchant = 'Pizza place' and item->>'name' = 'Soft drink'$$,
   $$values ('Soft drink', 3, 2, 3, 2)$$,
   'Jeff’s share shows 3 × Soft drink, 2 of them his'
 );
 select ok(
-  (select items::text !~* 'maya|33333333-3333-3333-3333-333333330003'
+  (select bool_and(items::text !~* 'maya|33333333-3333-3333-3333-333333330003')
    from public.get_my_shares() where merchant = 'Pizza place'),
   'and nothing about whose the other one was'
 );
@@ -118,7 +128,7 @@ select results_eq(
     from jsonb_array_elements(
       public.link_share(encode(extensions.digest((select token from maya_link), 'sha256'), 'hex'))->'expenses'
     ) e, jsonb_array_elements(e->'items') item
-    where e->>'merchant' = 'Pizza place'$$,
+    where e->>'merchant' = 'Pizza place' and item->>'name' = 'Soft drink'$$,
   $$values (3, 1, 3)$$,
   'Maya’s payment page shows 3 × Soft drink, 1 of them hers'
 );

@@ -237,7 +237,8 @@ export function mathGap(receipt: Receipt): number {
 /** One try with one model, as receipt_extractions records it. */
 export interface Attempt {
   model: string;
-  status: 'succeeded' | 'mismatch' | 'failed';
+  /** unreadable: the model looked and couldn't read it. failed: something on our side. */
+  status: 'succeeded' | 'mismatch' | 'unreadable' | 'failed';
   result: Receipt | null;
   error: string | null;
 }
@@ -271,7 +272,7 @@ export async function extractReceipt(
         attempt = { model, status: 'failed', result: null, error: parsed.error };
       } else if (!parsed.readable) {
         problem = parsed.problem;
-        attempt = { model, status: 'failed', result: null, error: `Unreadable: ${parsed.problem}` };
+        attempt = { model, status: 'unreadable', result: null, error: parsed.problem };
       } else {
         const gap = mathGap(parsed.receipt);
         attempt = {
@@ -297,4 +298,10 @@ export async function extractReceipt(
     return { status: 'mismatch', receipt: best.receipt, gap_cents: best.gap, model: best.model };
   if (problem) return { status: 'unreadable', problem };
   return { status: 'failed' };
+}
+
+/** RECEIPT_SCANS_PER_MONTH as a whole number of scans; 50 if it's unset or not a number. */
+export function monthlyScanLimit(value: string | undefined): number {
+  const limit = Number(value);
+  return value && Number.isSafeInteger(limit) && limit >= 0 ? limit : 50;
 }

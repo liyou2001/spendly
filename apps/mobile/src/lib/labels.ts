@@ -34,3 +34,23 @@ export function yourPartOf(item: {
   if (item.totalUnits !== item.splitCount) return `Your ${item.myUnits} of ${item.totalUnits}`;
   return item.splitCount > 1 ? `Split ${item.splitCount} ways` : null;
 }
+
+/**
+ * What a "Split evenly" line means with the people still ticked: "Split equally between
+ * everyone.", "Split equally between You and Jeff.", or with one left, "Jeff is paying for
+ * all 3." / "You're paying for this."
+ */
+export function evenSplitMessage(input: {
+  /** The ticked people, in order; `you` marks the signed-in user. */
+  people: readonly { name: string; you: boolean }[];
+  everyone: boolean;
+  quantity: number;
+}): string {
+  const [only] = input.people;
+  if (input.people.length === 1 && only) {
+    const what = input.quantity > 1 ? `all ${input.quantity}` : 'this';
+    return only.you ? `You’re paying for ${what}.` : `${only.name} is paying for ${what}.`;
+  }
+  const names = input.people.map((p) => p.name);
+  return `Split equally between ${input.everyone ? 'everyone' : joinNames(names)}.`;
+}

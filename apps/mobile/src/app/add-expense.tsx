@@ -43,12 +43,13 @@ import {
   type Category,
   type Group,
 } from '@/lib/data';
-import { debtLabel, joinNames } from '@/lib/labels';
+import { debtLabel, evenSplitMessage, joinNames } from '@/lib/labels';
 import { deviceDecimalSeparator } from '@/lib/locale';
 import { dedupePeople, oneOffName, type KnownPerson } from '@/lib/oneOff';
 import {
   categoryForReceipt,
   draftFromReceipt,
+  hasEnteredDetails,
   totalCheck,
   type ScannedReceipt,
   type ScanResult,
@@ -65,8 +66,10 @@ import {
   effectiveAssignment,
   owedToPayer,
   readQuantity,
+  retag,
   savePayload,
   tagsFor,
+  toggleEvenSplit,
   type Assignment,
   type Draft,
   type DraftItem,
@@ -355,9 +358,15 @@ function ExpenseForm({
     }
   }
 
+  /** Scans straight away on a fresh form; otherwise asks before replacing what's there. */
+  function requestScan(from: 'camera' | 'library') {
+    if (hasEnteredDetails(draft, merchant)) setScan({ status: 'confirm', from, previous: scan });
+    else void scanFrom(from);
+  }
+
   function cancelScan() {
     scanAttempt.current++;
-    setScan({ status: 'idle' });
+    setScan((current) => (current.status === 'confirm' ? current.previous : { status: 'idle' }));
   }
 
   async function save() {
@@ -454,7 +463,8 @@ function ExpenseForm({
             <ScanReceipt
               state={scan}
               currentTotal={draft.mode === 'items' ? result.totalCents : null}
-              onScan={(from) => void scanFrom(from)}
+              onScan={requestScan}
+              onConfirm={(from) => void scanFrom(from)}
               onCancel={cancelScan}
             />
           )}
@@ -803,14 +813,11 @@ function ItemRow({
   }
 
   function tagOne(index: number, id: string) {
-    if (!tags) return;
-    choose({ kind: 'each', people: tags.map((tag, i) => (i === index ? id : tag)) });
+    if (tags) choose(retag(tags, index, id));
   }
 
   function toggleSharing(id: string) {
-    const ids = sharing.includes(id) ? sharing.filter((x) => x !== id) : [...sharing, id];
-    const everyone = people.everyone.every((x) => ids.includes(x));
-    onChange({ assignment: everyone ? { kind: 'all' } : { kind: 'custom', participantIds: ids } });
+    onChange({ assignment: toggleEvenSplit(sharing, id, people) });
   }
 
   const removeButton = onRemove ? (
@@ -940,11 +947,12 @@ function ItemRow({
           </View>
           {sharing.length > 0 ? (
             <Text variant="small">
-              Split equally between{' '}
-              {sharing.length === people.everyone.length
-                ? 'everyone'
-                : joinNames(sharing.map(nameOf))}
-              . Tap a name to leave them out or add them back.
+              {evenSplitMessage({
+                people: sharing.map((id) => ({ name: nameOf(id), you: id === people.me })),
+                everyone: sharing.length === people.everyone.length,
+                quantity: quantity ?? 1,
+              })}{' '}
+              Tap a name to leave them out or add them back.
             </Text>
           ) : null}
         </View>
@@ -1129,20 +1137,44 @@ type ScanState =
   | { status: 'idle' }
   | { status: 'scanning' }
   | { status: 'read'; receipt: ScannedReceipt; scansLeft: number }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string }
+  /** Asking before a scan replaces what's been entered. */
+  | { status: 'confirm'; from: 'camera' | 'library'; previous: ScanState };
 
 /** "Scan a receipt": take or choose a photo, then how the draft compares with its total. */
 function ScanReceipt({
   state,
   currentTotal,
   onScan,
+  onConfirm,
   onCancel,
 }: {
   state: ScanState;
   currentTotal: number | null;
+  /** Take or choose a photo; asks first if something's been entered. */
   onScan: (from: 'camera' | 'library') => void;
+  /** Scan anyway, replacing what's been entered. */
+  onConfirm: (from: 'camera' | 'library') => void;
+  /** Stop reading, or keep what's been entered. */
   onCancel: () => void;
 }) {
+  if (state.status === 'confirm') {
+    return (
+      <View style={styles.stack} accessibilityLiveRegion="polite">
+        <Text variant="body">
+          Scanning replaces the store, date and items you’ve entered with the receipt’s.
+        </Text>
+        <View style={styles.row}>
+          <View style={styles.flex}>
+            <Button label="Keep mine" variant="secondary" onPress={onCancel} />
+          </View>
+          <View style={styles.flex}>
+            <Button label="Scan anyway" onPress={() => onConfirm(state.from)} />
+          </View>
+        </View>
+      </View>
+    );
+  }
   if (state.status === 'scanning') {
     return (
       <View style={styles.scanRow} accessibilityLiveRegion="polite">
@@ -1301,6 +1333,10 @@ function Summary({
 }
 
 const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    gap: space.md,
+  },
   formBody: {
     gap: space.section,
   },

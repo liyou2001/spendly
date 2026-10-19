@@ -76,6 +76,7 @@ erDiagram
         text kind "item | tax | tip | discount"
         int position
         int quantity "1-999, e.g. 3 for 3 x Soft drink; 1 for tax, tip, discount"
+        boolean by_units "tagged one by one (units saved), not split evenly"
     }
     item_assignments {
         uuid item_id PK
@@ -154,7 +155,7 @@ erDiagram
 
 These tables are read and written by Edge Functions (Steps 8–11), not by the app directly. The exceptions: the app makes and revokes your payment links through `create_share_link` / `revoke_share_links`, reads problem reports sent to you, and saves its push token with `register_push_token`.
 
-Receipt photos live in the private Storage bucket `receipts`, at `<user id>/<file>.jpg`. You can upload to and read only your own folder; `extract-receipt` reads them with the service role and logs every attempt (model, status, the draft or the error) in `receipt_extractions`. Your own extractions are readable by you.
+Receipt photos go to the private Storage bucket `receipts`, at `<user id>/<file>.jpg`. You can upload to, read and delete only your own folder. `extract-receipt` reads a photo with the service role and then deletes it (nothing shows it again); if an upload never reaches the function, the app deletes it. Every attempt is logged in `receipt_extractions` with its model, status (`succeeded`, `mismatch`, `unreadable`, or `failed` for problems on our side) and the draft or error. Your own extractions are readable by you.
 
 ```mermaid
 erDiagram
@@ -206,7 +207,7 @@ erDiagram
         text source "photo | email"
         text storage_path
         text model
-        text status "pending | succeeded | mismatch | failed"
+        text status "pending | succeeded | mismatch | unreadable | failed"
         jsonb result
         text error
     }

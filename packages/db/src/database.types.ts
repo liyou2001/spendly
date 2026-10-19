@@ -58,6 +58,7 @@ export type Database = {
       expense_items: {
         Row: {
           amount_cents: number;
+          by_units: boolean;
           expense_id: string;
           id: string;
           kind: string;
@@ -68,6 +69,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           amount_cents: number;
+          by_units?: boolean;
           expense_id: string;
           id?: string;
           kind: string;
@@ -77,6 +79,7 @@ export type Database = {
         };
         Update: {
           amount_cents?: number;
+          by_units?: boolean;
           expense_id?: string;
           id?: string;
           kind?: string;

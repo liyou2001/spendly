@@ -6,6 +6,7 @@ import { receiptReader } from './reader.ts';
 import {
   extractReceipt,
   mathGap,
+  monthlyScanLimit,
   parseReading,
   RECEIPT_SCHEMA,
   toBase64,
@@ -186,10 +187,13 @@ Deno.test('if neither adds up, the closer draft comes back flagged', async () =>
 
 Deno.test('a blurry photo ends as unreadable; an API outage as failed', async () => {
   const blurry = { readable: false, problem: 'too blurry' };
-  assertEquals((await run({ [MODELS.first]: blurry, [MODELS.retry]: blurry })).outcome, {
-    status: 'unreadable',
-    problem: 'too blurry',
-  });
+  const unreadable = await run({ [MODELS.first]: blurry, [MODELS.retry]: blurry });
+  assertEquals(unreadable.outcome, { status: 'unreadable', problem: 'too blurry' });
+  // Its own status, which the monthly scan count relies on.
+  assertEquals(unreadable.recorded, [
+    [MODELS.first, 'unreadable'],
+    [MODELS.retry, 'unreadable'],
+  ]);
   const down = new Error('Claude: 529 overloaded');
   const { outcome, recorded } = await run({ [MODELS.first]: down, [MODELS.retry]: down });
   assertEquals(outcome.status, 'failed');
@@ -339,3 +343,9 @@ Deno.test(
     assertEquals(receiptReader(env({})), null);
   },
 );
+
+Deno.test('the monthly scan limit falls back to 50 unless set to a whole number', () => {
+  assertEquals(monthlyScanLimit('20'), 20);
+  assertEquals(monthlyScanLimit('0'), 0);
+  for (const bad of [undefined, '', 'fifty', '12.5', '-3']) assertEquals(monthlyScanLimit(bad), 50);
+});

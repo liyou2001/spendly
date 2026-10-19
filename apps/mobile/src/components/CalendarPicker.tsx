@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useState } from 'react';
 
 import { addMonths, monthLabel, monthStart } from '@/lib/budget';
-import { calendarWeeks } from '@/lib/dates';
+import { calendarDay, calendarWeeks } from '@/lib/dates';
 import { colors, fonts, radius, space } from '@/theme';
 
 import { Text } from './Text';
@@ -59,8 +59,8 @@ export function CalendarPicker({
         <View key={row} style={styles.week}>
           {week.map((date, index) => {
             if (!date) return <View key={index} style={styles.cell} />;
-            const selected = date === value;
-            const future = date > max;
+            const { selected, today, pickable } = calendarDay(date, value, max);
+            const future = !pickable;
             const day = Number(date.slice(8));
             return (
               <Pressable
@@ -76,7 +76,7 @@ export function CalendarPicker({
                   style={[
                     styles.day,
                     selected && styles.selected,
-                    date === max && !selected && styles.today,
+                    today && !selected && styles.today,
                   ]}
                 >
                   <Text
