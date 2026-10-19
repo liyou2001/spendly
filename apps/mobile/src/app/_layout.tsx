@@ -6,7 +6,6 @@ import { useEffect } from 'react';
 import { SessionProvider, useSession } from '@/lib/session';
 import { colors, fontFiles } from '@/theme';
 
-// Keep the splash screen up until the fonts and the saved session have loaded.
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -40,6 +39,11 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
       <Stack.Protected guard={session !== null}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="add-expense" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="groups/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="groups/[id]" />
+        <Stack.Screen name="expenses/[id]" />
+        <Stack.Screen name="settings/profile" />
+        <Stack.Screen name="settings/categories" />
       </Stack.Protected>
       <Stack.Protected guard={session === null}>
         <Stack.Screen name="sign-in" />

@@ -634,6 +634,7 @@ export type Database = {
           to_participant: string;
         }[];
       };
+      create_group: { Args: { p_name: string; p_people?: Json }; Returns: string };
       get_my_shares: {
         Args: Record<PropertyKey, never>;
         Returns: {

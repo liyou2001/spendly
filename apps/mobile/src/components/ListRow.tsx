@@ -9,9 +9,7 @@ import { Text } from './Text';
 interface ListRowProps {
   title: string;
   subtitle?: string;
-  /** Left of the text, e.g. an Avatar. */
   leading?: ReactNode;
-  /** Right of the text, e.g. Money or a Tag. */
   trailing?: ReactNode;
   /** Makes the row tappable and shows a chevron. */
   onPress?: () => void;

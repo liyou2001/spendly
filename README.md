@@ -83,43 +83,38 @@ Press `w` in the dev server to open the web version in a browser instead.
 
 ### Sign in on your phone
 
-The app signs in with a 6-digit code sent by email. Against local Supabase, the emails never leave your computer: they land in Mailpit.
+The app signs in with a 6-digit code sent by email. Against local Supabase, the emails never leave your computer: they land in Mailpit at http://127.0.0.1:54324 (see [Development emails](#development-emails-sign-in-codes)).
 
 1. Start local Supabase (`npm run db:start`) if it isn't running.
-2. Point the app at your computer. Your phone can't use `127.0.0.1` (that's the phone itself), so use your computer's LAN IP:
+2. Give the app the local key. Copy `PUBLISHABLE_KEY` from `npm run db:status` into `apps/mobile/.env`, and leave the URL blank:
 
    ```sh
-   ipconfig getifaddr en0     # macOS Wi-Fi, e.g. 192.168.1.20
-   npm run db:status          # PUBLISHABLE_KEY is the key to use
-   ```
-
-   Then in `apps/mobile/.env`:
-
-   ```sh
-   EXPO_PUBLIC_SUPABASE_URL=http://192.168.1.20:54321
+   EXPO_PUBLIC_SUPABASE_URL=
    EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
    ```
 
-   Restart `npm run mobile` after editing `.env`; values are read when the bundle is built. If you switch Wi-Fi networks, the IP may change.
+   With the URL blank, the app finds local Supabase by itself: it uses the same computer address your phone used to load the app, on port 54321. Nothing to update when your Wi-Fi address changes. Set the URL only for a hosted project (`https://<project-ref>.supabase.co`). Restart `npm run mobile` after editing `.env`; values are read when the bundle is built.
 
 3. Open the app, enter an email and tap **Email me a code**. Use `leo@example.com` to sign in as the seed user, or any other address to create a new account (it gets a profile, a Personal group and the default categories).
 4. On your computer, open Mailpit at http://127.0.0.1:54324, open the newest "Your Spendly sign-in code" email and type the code into the app. It signs in as soon as all 6 digits are in.
 
 The session is saved on the phone (encrypted, with the key in the iOS Keychain / Android Keystore), so the app stays signed in after you close it. **Me → Sign out** signs out.
 
-The tunnel (`--tunnel`) only carries the Expo bundle, not the Supabase API, so the phone still needs to reach your computer's IP on port 54321. If campus Wi-Fi blocks that, use a hosted Supabase project instead.
+Settings live in the **Me** tab: **Profile & payments** (your name and Venmo/PayPal/Cash App usernames) and **Categories** (add, rename or delete the categories your spending is sorted into).
+
+Your phone has to reach your computer directly, for the app bundle and for local Supabase. Some networks block that, including many campus and office Wi-Fi networks, and some VPN or security software on the computer. If the app won't load or can't send a code, connect your computer to your phone's personal hotspot (or your home Wi-Fi), or use a hosted Supabase project. The tunnel (`--tunnel`) only carries the app bundle, not Supabase.
 
 ### Troubleshooting
 
-| Message                                                | Fix                                                                                                     |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| "No usable data found" (iPhone Camera)                 | Install Expo Go first; the Camera app only opens `exp://` links once it's installed.                    |
-| "You need to be signed in to Expo Go"                  | Log in on the computer (`npx expo login --browser`) and in Expo Go with the same account.               |
-| "Project is incompatible with this version of Expo Go" | Your Expo Go supports a different SDK than the project. Update Expo Go, or move the project to its SDK. |
-| Connection times out                                   | Phone and computer can't reach each other. Use `npm run mobile -- --tunnel`.                            |
-| "Missing EXPO_PUBLIC_SUPABASE_URL..." on launch        | Create `apps/mobile/.env` (see [Sign in on your phone](#sign-in-on-your-phone)) and restart.            |
-| "Network request failed" when sending the code         | The phone can't reach Supabase. Check the IP in `apps/mobile/.env` and that `npm run db:start` is up.   |
-| Signed out after `npm run db:reset`                    | Expected: the reset deletes every session. Sign in again.                                               |
+| Message                                                | Fix                                                                                                                                |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| "No usable data found" (iPhone Camera)                 | Install Expo Go first; the Camera app only opens `exp://` links once it's installed.                                               |
+| "You need to be signed in to Expo Go"                  | Log in on the computer (`npx expo login --browser`) and in Expo Go with the same account.                                          |
+| "Project is incompatible with this version of Expo Go" | Your Expo Go supports a different SDK than the project. Update Expo Go, or move the project to its SDK.                            |
+| App won't load, or the connection times out            | Phone and computer can't reach each other on this network. Use your phone's hotspot, or `--tunnel` plus a hosted Supabase project. |
+| "Missing the Supabase URL..." on launch                | Create `apps/mobile/.env` with the publishable key (see [Sign in on your phone](#sign-in-on-your-phone)) and restart.              |
+| "Network request failed" when sending the code         | The phone can't reach Supabase. Check `npm run db:start` is up and the network allows it (see above).                              |
+| Signed out after `npm run db:reset`                    | Expected: the reset deletes every session. Sign in again.                                                                          |
 
 ## Tests, lint, types, formatting
 
@@ -161,7 +156,17 @@ Local services:
 | Studio                        | http://127.0.0.1:54323                                  |
 | Mailpit (catches auth emails) | http://127.0.0.1:54324                                  |
 
-To reach the local API from your phone, use your computer's LAN IP instead of `127.0.0.1`.
+The app reaches the local API at your computer's network address automatically (see [Sign in on your phone](#sign-in-on-your-phone)); `127.0.0.1` only works on the computer itself.
+
+### Development emails (sign-in codes)
+
+Local Supabase never sends real email. Every email it sends, to any address, lands in **Mailpit**, a test inbox on your computer:
+
+**http://127.0.0.1:54324**
+
+Open it in your computer's browser while local Supabase is running. Sign-in codes arrive as "Your Spendly sign-in code" (or "Your Spendly sign-up code" for a new address), newest at the top. Nothing reaches your real inbox, so you can sign in as any address, including made-up ones like `jeff@example.com`.
+
+`npm run db:reset` deletes every account except the seeded `leo@example.com`. If you signed in with your own address, sign in again afterwards to get a fresh account.
 
 ## Hosted Supabase
 

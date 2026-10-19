@@ -91,7 +91,8 @@ select throws_ok(
 -- The seed matches the plan's Costco example.
 select results_eq(
   $$select p.display_name, s.amount_cents from public.shares s
-    join public.participants p on p.id = s.participant_id order by p.display_name$$,
+    join public.participants p on p.id = s.participant_id
+    where s.expense_id = '44444444-4444-4444-4444-444444444444' order by p.display_name$$,
   $$values ('Jeff', 1500::bigint), ('Leo', 8300::bigint), ('Maya', 4200::bigint)$$,
   'Seeded Costco shares are Jeff 1500, Leo 8300, Maya 4200'
 );

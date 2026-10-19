@@ -1,20 +1,22 @@
+import Feather from '@expo/vector-icons/Feather';
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
-import { colors, space } from '@/theme';
+import { colors, sizes, space } from '@/theme';
 
 import { Text } from './Text';
 
 interface ScreenProps {
   title?: string;
-  /** Shown to the right of the title, e.g. an icon button. */
   headerRight?: ReactNode;
   children: ReactNode;
   /** Scrolls by default; turn off for screens that lay themselves out. */
   scroll?: boolean;
   /** Safe-area edges to pad. Tab screens skip the bottom, which the tab bar covers. */
   edges?: Edge[];
+  /** Shows a back arrow above the title. */
+  onBack?: () => void;
 }
 
 /** White page with the 24px side margins, an optional title and 28px between sections. */
@@ -24,15 +26,33 @@ export function Screen({
   children,
   scroll = true,
   edges = ['top', 'left', 'right'],
+  onBack,
 }: ScreenProps) {
-  const header = title ? (
-    <View style={styles.header}>
-      <Text variant="screenTitle" accessibilityRole="header" style={styles.title}>
-        {title}
-      </Text>
-      {headerRight}
-    </View>
+  const back = onBack ? (
+    <Pressable
+      onPress={onBack}
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      hitSlop={8}
+      style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+    >
+      <Feather name="chevron-left" size={26} color={colors.ink} />
+    </Pressable>
   ) : null;
+  const header =
+    title || back ? (
+      <View style={styles.headerStack}>
+        {back}
+        {title ? (
+          <View style={styles.header}>
+            <Text variant="screenTitle" accessibilityRole="header" style={styles.title}>
+              {title}
+            </Text>
+            {headerRight}
+          </View>
+        ) : null}
+      </View>
+    ) : null;
 
   return (
     <SafeAreaView edges={edges} style={styles.safeArea}>
@@ -41,6 +61,8 @@ export function Screen({
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          // iOS: scroll the focused field above the keyboard. Android resizes the window instead.
+          automaticallyAdjustKeyboardInsets
         >
           {header}
           {children}
@@ -68,6 +90,19 @@ const styles = StyleSheet.create({
   },
   fill: {
     flex: 1,
+  },
+  headerStack: {
+    gap: space.sm,
+  },
+  back: {
+    width: sizes.touch,
+    height: sizes.touch,
+    marginLeft: -space.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.6,
   },
   header: {
     flexDirection: 'row',

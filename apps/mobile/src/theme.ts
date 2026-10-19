@@ -9,12 +9,11 @@ import type { TextStyle } from 'react-native';
 export const colors = {
   background: '#FFFFFF',
   /** The one key block per screen, the active tab, "You" tags and avatars. */
-  accentPale: '#FFE3CC',
+  accentPale: '#EAE4FF',
   /** Only for progress bars and attention dots. */
-  accent: '#D96A22',
+  accent: '#6D4FD3',
   /** Text and primary buttons. */
   ink: '#2B2420',
-  /** Text on ink. */
   onInk: '#FFFFFF',
   muted: '#6B5F57',
   divider: '#F1E7DF',
@@ -38,7 +37,6 @@ export const fonts = {
 } as const satisfies Record<string, keyof typeof fontFiles>;
 
 export const type = {
-  /** Big numbers: 52px light, tight tracking, tabular figures. */
   bigNumber: {
     fontFamily: fonts.light,
     fontSize: 52,

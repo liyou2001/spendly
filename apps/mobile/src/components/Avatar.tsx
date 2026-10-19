@@ -7,11 +7,10 @@ import { Text } from './Text';
 interface AvatarProps {
   name: string;
   size?: number;
-  /** White circle instead, for avatars that sit on the pale orange KeyBlock. */
+  /** White circle instead, for avatars that sit on the light purple KeyBlock. */
   onKeyBlock?: boolean;
 }
 
-/** First letter of a name in a pale orange circle. */
 export function Avatar({ name, size = 40, onKeyBlock = false }: AvatarProps) {
   // Array.from splits by code point, so a name starting with an accented or non-Latin letter works.
   const initial = (Array.from(name.trim())[0] ?? '?').toLocaleUpperCase();

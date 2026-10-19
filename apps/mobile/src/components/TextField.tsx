@@ -6,13 +6,11 @@ import { Text } from './Text';
 
 interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
-  /** Muted help under the field. */
   hint?: string;
   /** Replaces the hint and marks the field with an attention dot. */
   error?: string | null | undefined;
 }
 
-/** A labelled text input with the control border. */
 export function TextField({ label, hint, error, ...inputProps }: TextFieldProps) {
   return (
     <View style={styles.field}>
@@ -28,7 +26,6 @@ export function TextField({ label, hint, error, ...inputProps }: TextFieldProps)
   );
 }
 
-/** An error or warning, flagged with a deep orange attention dot. */
 export function FormMessage({ message }: { message: string }) {
   return (
     <View style={styles.message} accessibilityLiveRegion="polite" accessibilityRole="alert">

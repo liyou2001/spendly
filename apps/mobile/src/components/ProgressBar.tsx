@@ -10,7 +10,7 @@ interface ProgressBarProps {
   accessibilityLabel?: string;
 }
 
-/** Deep orange bar on a pale track. Full when value reaches max. */
+/** Deep purple bar on a pale track. Full when value reaches max. */
 export function ProgressBar({ value, max, accessibilityLabel }: ProgressBarProps) {
   // Only the bar's width is a fraction; the amounts themselves stay whole cents.
   const fraction = max > 0 ? Math.min(Math.max(value / max, 0), 1) : 0;

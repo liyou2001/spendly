@@ -92,7 +92,7 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 
 ### Design
 
-- **Colors:** white `#FFFFFF` background. Pale orange `#FFE3CC` for the one key block per screen, the active tab, "You" tags and avatars. Deep orange `#D96A22` only for progress bars and attention dots. Ink `#2B2420` for text and primary buttons (white text on them). Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
+- **Colors:** white `#FFFFFF` background. Light purple `#EAE4FF` for the one key block per screen, the active tab, "You" tags and avatars. Deep purple `#6D4FD3` only for progress bars and attention dots. Ink `#2B2420` for text and primary buttons (white text on them). Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
 - **Type:** Hanken Grotesk, weights 300/400/500/600. Big numbers 52px at weight 300, letter-spacing -0.03em, tabular figures. Screen titles 24–28px/500. Section headings 15px/600. Body 15–16px/400. Small text 13–14px in muted.
 - **Layout:** 24px side margins, about 28px between sections. Lists separated by thin dividers, not cards. Key block corner radius 24px. Buttons radius 14px, at least 44px tall. Tags fully rounded.
 - **Tabs:** Home, Budget, + (dark circle, adds an expense), People, Me.
@@ -233,12 +233,12 @@ Splitting rules:
 
 - A theme file with the design tokens, and Hanken Grotesk loaded.
 - Shared components:
-  - `Screen`, `KeyBlock` (the pale orange block) and `ListRow`.
+  - `Screen`, `KeyBlock` (the light purple block) and `ListRow`.
   - `Button` (primary in ink, secondary outlined) and `Tag`.
   - `Avatar` (an initial in a circle), `ProgressBar` and `Money` (tabular figures).
 - Tabs: Home, Budget, + (center, opens Add expense), People, Me. Placeholder content for now.
 - Supabase Auth with an email one-time code. Phone login comes later because it needs a paid text provider. Supabase's built-in email has low rate limits, which is fine for testing.
-- Me screen: display name, Venmo, PayPal and Cash App usernames, sign out.
+- Me screen: display name, Venmo, PayPal and Cash App usernames, sign out. (Me is now a settings hub: Profile & payments and Categories are pages under it, and later steps add their settings there too.)
 - The session stays signed in between app launches.
 
 **Done when:**
@@ -309,7 +309,7 @@ Splitting rules:
 
 **Build:**
 
-- Manage categories and set a monthly budget for each.
+- Set a monthly budget for each category. Categories themselves are added, renamed and deleted in Me → Categories (built after Step 5).
 - The Budget screen, matching the design:
   - A month switcher.
   - A key block: spent so far, the budget, a progress bar, and what's left with days to go.

@@ -6,11 +6,10 @@ import { Text } from './Text';
 
 interface TagProps {
   label: string;
-  /** "accent" is pale orange, for "You" tags. "neutral" is outlined. */
+  /** "accent" is light purple, for "You" tags. "neutral" is outlined. */
   tone?: 'accent' | 'neutral';
 }
 
-/** A small fully rounded label. */
 export function Tag({ label, tone = 'neutral' }: TagProps) {
   return (
     <View style={[styles.tag, tone === 'accent' ? styles.accent : styles.neutral]}>

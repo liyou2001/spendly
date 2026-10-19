@@ -8,7 +8,7 @@ interface KeyBlockProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** The pale orange block that holds the one key thing on a screen. Use at most one per screen. */
+/** The light purple block that holds the one key thing on a screen. Use at most one per screen. */
 export function KeyBlock({ children, style }: KeyBlockProps) {
   return <View style={[styles.block, style]}>{children}</View>;
 }

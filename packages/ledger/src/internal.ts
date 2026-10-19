@@ -31,7 +31,6 @@ export function monthOf(date: string): string {
   return `${match[1]}-${match[2]}-01`;
 }
 
-/** Adds `amount` to the running total for `key`. */
 export function addTo<K>(totals: Map<K, number>, key: K, amount: number): void {
   totals.set(key, (totals.get(key) ?? 0) + amount);
 }
