@@ -18,6 +18,7 @@ import {
   Tag,
   Text,
   TextButton,
+  TextField,
   UsernameField,
 } from '@/components';
 import {
@@ -32,6 +33,7 @@ import {
   forgiveDebt,
   friendlyError,
   inviteToGroup,
+  updatePersonPhone,
   recordPayment,
   type PairExpense,
   type Person,
@@ -39,6 +41,7 @@ import {
   type PaymentHandles,
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
+import { normalizePhone } from '@/lib/phone';
 import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/requests';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
@@ -85,7 +88,7 @@ async function fetchPerson(participantId: string, userId: string) {
   };
 }
 
-type Form = 'none' | 'record' | 'paid' | 'forgive';
+type Form = 'none' | 'record' | 'paid' | 'forgive' | 'phone';
 
 export default function PersonDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -136,19 +139,35 @@ function PersonView({
     }
   }
 
-  async function requestPayment() {
+  function requestText(): string {
     const behind = expensesBehind(owedToMe, netCents);
     const link = paymentLink(myHandles, netCents, paymentNote(behind));
-    const message = requestMessage({ firstName, owedCents: netCents, expenses: behind, link });
+    return requestMessage({ firstName, owedCents: netCents, expenses: behind, link });
+  }
+
+  /** Opens Messages to this number with the request filled in, or the share sheet without SMS. */
+  async function textRequest(phone: string) {
     try {
-      if (them.phone && (await SMS.isAvailableAsync())) {
-        await SMS.sendSMSAsync([them.phone], message);
-      } else {
-        await Share.share({ message });
-      }
+      if (await SMS.isAvailableAsync()) await SMS.sendSMSAsync([phone], requestText());
+      else await Share.share({ message: requestText() });
     } catch {
       setError('Couldn’t open Messages. Try again.');
     }
+  }
+
+  async function shareRequest() {
+    try {
+      await Share.share({ message: requestText() });
+    } catch {
+      setError('Couldn’t open sharing. Try again.');
+    }
+  }
+
+  function requestPayment() {
+    setError(null);
+    // Without a phone number, ask for one first instead of opening a bare share sheet.
+    if (them.phone) void textRequest(them.phone);
+    else setForm('phone');
   }
 
   async function payThem() {
@@ -243,6 +262,21 @@ function PersonView({
           }
           onCancel={() => setForm('none')}
         />
+      ) : form === 'phone' ? (
+        <PhoneForRequest
+          name={firstName}
+          onSave={async (phone) => {
+            await updatePersonPhone(them.id, phone);
+            setForm('none');
+            onChanged();
+            await textRequest(phone);
+          }}
+          onShare={() => {
+            setForm('none');
+            void shareRequest();
+          }}
+          onCancel={() => setForm('none')}
+        />
       ) : form === 'forgive' ? (
         <AmountForm
           label={`Forgive ${firstName}`}
@@ -255,7 +289,7 @@ function PersonView({
         />
       ) : netCents > 0 ? (
         <View style={styles.actions}>
-          <Button label="Request payment" onPress={() => void requestPayment()} />
+          <Button label="Request payment" onPress={requestPayment} />
           {myHandles.venmo || myHandles.paypal || myHandles.cashtag ? null : (
             <Text variant="small">
               Add your Venmo, PayPal or Cash App in Me → Profile & payments to include a payment
@@ -282,6 +316,68 @@ function PersonView({
 
       <History expenses={expenses} payments={payments} me={me.id} name={firstName} />
     </>
+  );
+}
+
+/** "How should we reach Jeff?": a phone number to text the request to, or another app. */
+function PhoneForRequest({
+  name,
+  onSave,
+  onShare,
+  onCancel,
+}: {
+  name: string;
+  onSave: (phone: string) => Promise<void>;
+  onShare: () => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const parsed = normalizePhone(text);
+    if (!parsed.ok || !parsed.phone) {
+      setError(parsed.ok ? `Enter ${name}’s phone number.` : parsed.error);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(parsed.phone);
+    } catch (e) {
+      setError(friendlyError(e as Error));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <View style={styles.claim}>
+      <Text variant="sectionHeading">How should we reach {name}?</Text>
+      <TextField
+        label={`${name}’s phone number`}
+        value={text}
+        onChangeText={(next) => {
+          setText(next);
+          setError(null);
+        }}
+        error={error}
+        hint="Saved to them in this group, so you won’t be asked again."
+        placeholder="(608) 555-1234"
+        keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        autoComplete="tel"
+        autoFocus
+      />
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <Button label="Share another way" variant="secondary" onPress={onShare} />
+        </View>
+        <View style={styles.flex}>
+          <Button label="Save & text" onPress={() => void save()} loading={saving} />
+        </View>
+      </View>
+      <TextButton label="Cancel" onPress={onCancel} />
+    </View>
   );
 }
 

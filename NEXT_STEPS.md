@@ -135,8 +135,8 @@ For each question, the **How to test** line suggests something to ask or a task 
 ### 17. Do people add phone numbers for roommates?
 
 - **Status:** Open
-- **Now:** phone is optional when adding a person. Step 6 uses it to open a prefilled payment request in Messages.
-- **Why it matters:** payment requests and reminders depend on it. If people skip it, Step 6 should ask for it at the moment it's needed instead.
+- **Now:** phone is optional when adding a person. If you tap **Request payment** for someone without one, the app asks for their number first ("How should we reach Jeff?"), saves it, and opens Messages. **Share another way** is the fallback for WhatsApp, Instagram and similar.
+- **Why it matters:** payment requests and reminders depend on it. For people who have Spendly, a request inside the app (with a push notification, Step 8) may be better than a text.
 - **How to test:** see whether they fill it in while creating a group, and ask why or why not.
 
 ### 18. Do quick splits work for a random night out?

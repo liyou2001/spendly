@@ -199,6 +199,12 @@ export async function fetchKnownPeople(userId: string): Promise<KnownPerson[]> {
   }));
 }
 
+/** Saves a phone number for someone in a group you're in. */
+export async function updatePersonPhone(participantId: string, phone: string): Promise<void> {
+  const { error } = await supabase.from('participants').update({ phone }).eq('id', participantId);
+  if (error) throw error;
+}
+
 /** Adds a person to a group you're in, and invites an account to be them if one is given. */
 export async function addPerson(
   groupId: string,
