@@ -3,7 +3,7 @@
 -- Apartment: Leo ...0001 (paid the $140 Costco trip), Jeff ...0002, Maya ...0003.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(37);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -75,21 +75,36 @@ select results_eq(
 );
 select results_eq(
   $$select i->>'name' from page, jsonb_array_elements(body->'expenses') e, jsonb_array_elements(e->'items') i$$,
-  $$values ('Paper towels'), ('Dish soap'), ('Trash bags')$$,
-  'It lists only the 3 shared items'
+  $$values ('Protein powder'), ('Graphic tee'), ('Granola bars'), ('Paper towels'), ('Dish soap'),
+           ('Trash bags'), ('Oat milk'), ('Hummus'), ('Veggie chips')$$,
+  'It lists the whole receipt (groups are transparent)'
 );
 select results_eq(
   $$select e->>'merchant', (e->>'amount_cents')::bigint from page, jsonb_array_elements(body->'expenses') e$$,
   $$values ('Costco', 1500::bigint)$$,
   'and Jeff’s $15.00 share of the Costco trip'
 );
-select ok(
-  (select body::text !~* 'protein|graphic tee|granola|oat milk|hummus|veggie|maya|14000|4200|8300' from page),
-  'Nothing about Leo’s or Maya’s items, Maya, or the $140 total is in the response'
+select results_eq(
+  $$select (e->>'total_cents')::bigint,
+           (select string_agg(p->>'name' || ':' || (p->>'you'), ',' order by p->>'ref')
+            from jsonb_array_elements(e->'people') p),
+           (select string_agg(x->>'amount_cents', ',' order by x->>'ref')
+            from jsonb_array_elements(e->'shares') x)
+    from page, jsonb_array_elements(body->'expenses') e$$,
+  $$values (14000::bigint, 'Leo:false,Jeff:true,Maya:false', '8300,1500,4200')$$,
+  'with the $140 total and everyone’s shares, Jeff marked as you'
 );
 select ok(
-  (select not (body->'expenses'->0 ? 'total_cents') from page),
-  'Expenses carry no total'
+  (select body::text !~ '[0-9a-f]{8}-[0-9a-f]{4}-' from page),
+  'People are labelled p001, p002…; no real ids leave the database'
+);
+select results_eq(
+  $$select string_agg(x->>'ref', ',' order by x->>'ref')
+    from page, jsonb_array_elements(body->'expenses') e, jsonb_array_elements(e->'items') i,
+         jsonb_array_elements(i->'people') x
+    where i->>'name' = 'Paper towels'$$,
+  $$values ('p001,p002,p003')$$,
+  'Shared items list who they were for'
 );
 select throws_ok(
   $$select public.link_share(tests.hash('not-a-real-token'))$$,

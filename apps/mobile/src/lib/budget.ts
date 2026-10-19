@@ -20,7 +20,7 @@ export interface SpendingItem {
   /** Your category for it; null when uncategorized. */
   categoryId: string | null;
   amountCents: Cents;
-  /** The expense's total, only when you paid or entered it. */
+  /** The expense's total (groups are transparent). */
   totalCents: Cents | null;
   paidByName: string;
   youPaid: boolean;
@@ -121,10 +121,10 @@ export function splitNote(items: readonly SpendingItem[]): string | null {
   let note: string | null = null;
   const [only] = split;
   if (split.length === 1 && only) {
-    note =
-      only.youPaid && only.totalCents !== null
-        ? `Includes your ${shortMoney(only.amountCents)} share of the ${shortMoney(only.totalCents)} ${only.merchant} trip`
-        : `Includes your ${shortMoney(only.amountCents)} share of ${only.paidByName}’s ${only.merchant} trip`;
+    const total = only.totalCents !== null ? ` ${shortMoney(only.totalCents)}` : '';
+    note = only.youPaid
+      ? `Includes your ${shortMoney(only.amountCents)} share of the${total} ${only.merchant} trip`
+      : `Includes your ${shortMoney(only.amountCents)} share of ${only.paidByName}’s${total} ${only.merchant} trip`;
   } else if (split.length > 1) {
     note = `Includes your shares of ${split.length} split purchases`;
   }

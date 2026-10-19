@@ -20,6 +20,8 @@ export const colors = {
   /** Text and icons on `accent`. Dark, because white on it is only 2.5:1; ink is 6.1:1. */
   onAccent: '#2B2420',
   muted: '#6B5F57',
+  /** Example text in empty fields: lighter than muted so it never reads as something typed. */
+  placeholder: '#AEA39B',
   divider: '#F1E7DF',
   controlBorder: '#E2D5CB',
 } as const;

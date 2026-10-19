@@ -1,10 +1,11 @@
 // Supabase reads and writes for groups and expenses. Screens call these instead of building
-// queries themselves. Row-level security decides what each query can see: full expense rows
-// only for their payer (or whoever entered them), everything else through get_my_shares().
+// queries themselves. Row-level security decides what each query can see: groups are
+// transparent, so every expense in your groups in full, except other people's categories.
 import type { Cents, Debt } from '@spendly/ledger';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 import type { BudgetRow, SpendingItem } from './budget';
+import { toSummaries, type ExpenseSummary } from './expenseList';
 import type { KnownPerson } from './oneOff';
 import { profileColumns, toForm, type ProfileFields, type ProfileForm } from './profile';
 import type { SaveItem } from './split';
@@ -283,7 +284,7 @@ export async function deleteCategory(id: string): Promise<void> {
   if (error) throw categoryError(error);
 }
 
-/** Net balances for every pair that includes you, in one group or all of them. */
+/** Net balances for every pair in your groups (groups are transparent), in one or all of them. */
 export async function fetchBalances(groupId?: string): Promise<(Debt & { groupId: string })[]> {
   let query = supabase.rpc('balances');
   if (groupId) query = query.eq('group_id', groupId);
@@ -334,84 +335,27 @@ export async function voidExpense(expenseId: string): Promise<void> {
   if (error) throw error;
 }
 
-export interface ExpenseSummary {
-  id: string;
-  groupId: string;
-  merchant: string;
-  expenseDate: string;
-  /** When it was entered; empty for shares of someone else's expense. */
-  createdAt: string;
-  voided: boolean;
-  /** "full": you paid or entered it. "share": someone else paid; you see only your part. */
-  view: 'full' | 'share';
-  /** The total for full rows; your share for share rows. */
-  amountCents: Cents;
-}
+export type { ExpenseSummary } from './expenseList';
 
 /**
  * Expenses you can see, newest first, including voided ones: in one group, or in all of them.
- * Ones you paid or entered come in full; ones someone else paid come as your share.
+ * Groups are transparent, so every expense in them comes in full, with your share marked.
  */
 export async function fetchExpenses(
   options: { groupId?: string; limit?: number } = {},
 ): Promise<ExpenseSummary[]> {
-  let fullQuery = supabase
+  let query = supabase
     .from('expenses')
     .select(
-      'id, group_id, merchant, expense_date, total_cents, voided_at, created_at, replaces_expense_id',
+      'id, group_id, merchant, expense_date, total_cents, voided_at, created_at, replaces_expense_id, shares(amount_cents, participants(user_id))',
     )
     .order('expense_date', { ascending: false })
     .order('created_at', { ascending: false });
-  let shareQuery = supabase
-    .rpc('get_my_shares')
-    .select('expense_id, group_id, merchant, expense_date, amount_cents')
-    .order('expense_date', { ascending: false });
-  if (options.groupId) {
-    fullQuery = fullQuery.eq('group_id', options.groupId);
-    shareQuery = shareQuery.eq('group_id', options.groupId);
-  }
-  // The newest N overall are among the newest N of each list.
-  if (options.limit) {
-    fullQuery = fullQuery.limit(options.limit);
-    shareQuery = shareQuery.limit(options.limit);
-  }
+  if (options.groupId) query = query.eq('group_id', options.groupId);
+  if (options.limit) query = query.limit(options.limit);
 
-  const [full, mine] = await Promise.all([fullQuery, shareQuery]);
-  const fullRows = unwrap(full);
-  const shareRows = unwrap(mine);
-
-  const seen = new Set(fullRows.map((row) => row.id));
-  const replaced = new Set(fullRows.map((row) => row.replaces_expense_id).filter(Boolean));
-  const expenses = [
-    ...fullRows
-      .filter((row) => !replaced.has(row.id))
-      .map((row) => ({
-        id: row.id,
-        groupId: row.group_id,
-        merchant: row.merchant,
-        expenseDate: row.expense_date,
-        createdAt: row.created_at,
-        voided: row.voided_at !== null,
-        view: 'full' as const,
-        amountCents: row.total_cents,
-      })),
-    ...shareRows
-      .filter((row) => !seen.has(row.expense_id))
-      .map((row) => ({
-        id: row.expense_id,
-        groupId: row.group_id,
-        merchant: row.merchant,
-        expenseDate: row.expense_date,
-        // get_my_shares doesn't return when it was entered; the date orders it well enough.
-        createdAt: '',
-        voided: false,
-        view: 'share' as const,
-        amountCents: row.amount_cents,
-      })),
-  ].sort(
-    (a, b) => b.expenseDate.localeCompare(a.expenseDate) || b.createdAt.localeCompare(a.createdAt),
-  );
-  return options.limit ? expenses.slice(0, options.limit) : expenses;
+  const [rows, session] = await Promise.all([query, supabase.auth.getSession()]);
+  return toSummaries(unwrap(rows), session.data.session?.user.id);
 }
 
 export interface FullExpense {
@@ -422,7 +366,6 @@ export interface FullExpense {
   merchant: string;
   expenseDate: string;
   totalCents: Cents;
-  categoryId: string | null;
   voidedAt: string | null;
   /** The earlier version this one replaced, if it was saved as an edit. */
   replacesExpenseId: string | null;
@@ -430,6 +373,13 @@ export interface FullExpense {
   replacedById: string | null;
   /** Forgiveness is tied to this expense, so it can't be edited. */
   hasForgiveness: boolean;
+  /** Who entered it. They and the payer can edit or void it. */
+  createdBy: string;
+  /**
+   * Your category for it: the expense's if you paid, otherwise how you filed your share (or the
+   * category set when it was saved). Only you see it; other people's categories stay private.
+   */
+  myCategoryId: string | null;
   items: {
     id: string;
     name: string;
@@ -442,7 +392,7 @@ export interface FullExpense {
     /** Tagged one by one, rather than split evenly. */
     byUnits: boolean;
   }[];
-  shares: { participantId: string; amountCents: Cents; categoryOverrideId: string | null }[];
+  shares: { participantId: string; amountCents: Cents }[];
 }
 
 export interface ShareOfExpense {
@@ -476,14 +426,14 @@ export async function fetchExpense(
     .from('expenses')
     // One string literal, so supabase-js can infer the row type from it.
     .select(
-      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, quantity, by_units, item_assignments(participant_id, units)), shares(participant_id, amount_cents, category_override_id)',
+      'id, group_id, paid_by, created_by, merchant, expense_date, total_cents, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, quantity, by_units, item_assignments(participant_id, units)), shares(participant_id, amount_cents)',
     )
     .eq('id', expenseId)
     .maybeSingle();
   if (error) throw error;
 
   if (data) {
-    const [replacement, forgiveness] = await Promise.all([
+    const [replacement, forgiveness, mine] = await Promise.all([
       supabase.from('expenses').select('id').eq('replaces_expense_id', expenseId).maybeSingle(),
       supabase
         .from('payments')
@@ -491,21 +441,24 @@ export async function fetchExpense(
         .eq('expense_id', expenseId)
         .eq('kind', 'forgiveness')
         .eq('status', 'confirmed'),
+      supabase.rpc('my_category_for', { p_expense_id: expenseId }),
     ]);
     if (replacement.error) throw replacement.error;
     if (forgiveness.error) throw forgiveness.error;
+    if (mine.error) throw mine.error;
     return {
       view: 'full',
       replacesExpenseId: data.replaces_expense_id,
       replacedById: replacement.data?.id ?? null,
       hasForgiveness: (forgiveness.count ?? 0) > 0,
+      createdBy: data.created_by,
+      myCategoryId: mine.data ?? null,
       id: data.id,
       groupId: data.group_id,
       paidBy: data.paid_by,
       merchant: data.merchant,
       expenseDate: data.expense_date,
       totalCents: data.total_cents,
-      categoryId: data.category_id,
       voidedAt: data.voided_at,
       items: [...data.expense_items]
         .sort((a, b) => a.position - b.position)
@@ -522,7 +475,6 @@ export async function fetchExpense(
       shares: data.shares.map((share) => ({
         participantId: share.participant_id,
         amountCents: share.amount_cents,
-        categoryOverrideId: share.category_override_id,
       })),
     };
   }

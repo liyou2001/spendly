@@ -855,6 +855,7 @@ export type Database = {
         Args: { p_opt_in: boolean; p_phone: string; p_token_hash: string };
         Returns: boolean;
       };
+      my_category_for: { Args: { p_expense_id: string }; Returns: string };
       my_invites: {
         Args: Record<PropertyKey, never>;
         Returns: {

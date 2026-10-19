@@ -43,7 +43,7 @@ import {
   type Category,
   type Group,
 } from '@/lib/data';
-import { debtLabel, evenSplitMessage, joinNames } from '@/lib/labels';
+import { debtLabel, evenSplitMessage } from '@/lib/labels';
 import { deviceDecimalSeparator } from '@/lib/locale';
 import { dedupePeople, oneOffName, type KnownPerson } from '@/lib/oneOff';
 import {
@@ -60,6 +60,7 @@ import {
   assignedTo,
   assignmentLabel,
   buildSplit,
+  canEditExpense,
   draftFromExpense,
   assignmentOptions,
   sameAssignment,
@@ -91,7 +92,13 @@ async function fetchForm(userId: string, editId: string | undefined) {
 
   const group = groups.find((g) => g.id === expense?.groupId);
   const me = group?.people.find((p) => p.userId === userId);
-  if (!expense || expense.view !== 'full' || !group || !me) {
+  if (
+    !expense ||
+    expense.view !== 'full' ||
+    !group ||
+    !me ||
+    !canEditExpense(expense, me.id, userId)
+  ) {
     throw new UserFacingError('Only the person who paid or entered an expense can edit it.');
   }
   const people = { me: me.id, everyone: group.people.map((p) => p.id) };
@@ -663,17 +670,20 @@ function ExpenseForm({
                   </View>
                 ) : null}
                 {shared ? (
-                  <View style={styles.wrap}>
-                    <Chip
-                      label="Split evenly"
-                      selected={draft.quickSplit === 'even'}
-                      onPress={() => update({ quickSplit: 'even' })}
-                    />
-                    <Chip
-                      label="By amount"
-                      selected={draft.quickSplit === 'amounts'}
-                      onPress={() => update({ quickSplit: 'amounts' })}
-                    />
+                  <View style={styles.stack}>
+                    <Text variant="small">How to split</Text>
+                    <View style={styles.wrap}>
+                      <Chip
+                        label="Split evenly"
+                        selected={draft.quickSplit === 'even'}
+                        onPress={() => update({ quickSplit: 'even' })}
+                      />
+                      <Chip
+                        label="By amount"
+                        selected={draft.quickSplit === 'amounts'}
+                        onPress={() => update({ quickSplit: 'amounts' })}
+                      />
+                    </View>
                   </View>
                 ) : null}
                 {shared && draft.quickSplit === 'amounts'
@@ -691,7 +701,7 @@ function ExpenseForm({
                                 update({ quickAmounts: { ...draft.quickAmounts, [id]: text } })
                               }
                               placeholder={amountPlaceholder}
-                              placeholderTextColor={colors.muted}
+                              placeholderTextColor={colors.placeholder}
                               keyboardType="decimal-pad"
                               accessibilityLabel={`${nameOf(id)}’s amount`}
                               style={[styles.input, styles.amountInput]}
@@ -731,6 +741,7 @@ function ExpenseForm({
               nameOf={nameOf}
               me={people.me}
               hasErrors={Object.keys(result.errors).length > 0}
+              sharedWith={shared ? group.name : null}
             />
 
             <View style={styles.stack}>
@@ -826,12 +837,13 @@ function ItemRow({
 
   return (
     <View style={styles.item}>
+      {several ? <Text variant="small">Enter the price for all {quantity}.</Text> : null}
       <View style={styles.itemLine}>
         <TextInput
           value={item.quantity}
           onChangeText={(text) => onChange({ quantity: text })}
           placeholder="1"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.placeholder}
           keyboardType="number-pad"
           maxLength={3}
           accessibilityLabel={`${itemName} quantity`}
@@ -842,7 +854,7 @@ function ItemRow({
           value={item.name}
           onChangeText={(name) => onChange({ name })}
           placeholder="Item"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.placeholder}
           accessibilityLabel="Item name"
           autoCapitalize="sentences"
           maxLength={200}
@@ -852,13 +864,12 @@ function ItemRow({
           value={item.amount}
           onChangeText={(amount) => onChange({ amount })}
           placeholder={amountPlaceholder}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.placeholder}
           keyboardType="decimal-pad"
           accessibilityLabel={`${itemName} amount`}
           style={[styles.input, styles.amountInput]}
         />
       </View>
-      {several && !tags ? <Text variant="small">Enter the price for all {quantity}.</Text> : null}
 
       {alone ? (
         <View style={styles.itemLine}>
@@ -868,7 +879,7 @@ function ItemRow({
         </View>
       ) : tags ? (
         <>
-          <Text variant="small">Enter the price for all {quantity}. Who’s each one for?</Text>
+          <Text variant="small">Who’s each one for?</Text>
           <View style={[styles.wrap, styles.tagRow]}>
             {tags.map((id, index) => (
               <Chip
@@ -1248,7 +1259,7 @@ function AdjustmentRow({
           value={value}
           onChangeText={onChange}
           placeholder={amountPlaceholder}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={colors.placeholder}
           keyboardType="decimal-pad"
           accessibilityLabel={`${label} amount`}
           style={[styles.input, styles.amountInput]}
@@ -1268,6 +1279,7 @@ function Summary({
   nameOf,
   me,
   hasErrors,
+  sharedWith,
 }: {
   totalCents: number | null;
   myShare: number;
@@ -1276,6 +1288,8 @@ function Summary({
   nameOf: (id: string) => string;
   me: string;
   hasErrors: boolean;
+  /** The group's name, or null for your Personal group. */
+  sharedWith: string | null;
 }) {
   if (totalCents === null) {
     return (
@@ -1286,12 +1300,10 @@ function Summary({
     );
   }
 
-  // Everyone who'll see this expense through their own share, i.e. not the payer.
-  const viewers = owed.filter((d) => d.from !== me).map((d) => nameOf(d.from));
-  const privacy =
-    viewers.length === 0
-      ? 'Only you can see this expense.'
-      : `${joinNames(viewers)} ${viewers.length === 1 ? 'sees' : 'each see'} only their own items and amount, never the total.`;
+  // Groups are transparent: everyone in the group sees the whole receipt.
+  const privacy = sharedWith
+    ? `Everyone in ${sharedWith} can see this receipt and how each share was worked out.`
+    : 'Only you can see this expense.';
 
   return (
     <KeyBlock>

@@ -337,3 +337,30 @@ textarea {
   user-select: all;
   -webkit-user-select: all;
 }
+
+.breakdown {
+  padding: 10px 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 14px;
+  padding-top: 6px;
+}
+
+.receipt summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.receipt[open] summary {
+  padding-bottom: 4px;
+}

@@ -27,6 +27,7 @@ import {
 } from '@/lib/data';
 import { formatDate, todayLocal } from '@/lib/dates';
 import { useInvites } from '@/lib/invites';
+import { expenseListNote } from '@/lib/labels';
 import { buildPeopleView } from '@/lib/people';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
@@ -197,7 +198,7 @@ export default function Home() {
                     subtitle={[
                       formatDate(expense.expenseDate),
                       groupNames[expense.groupId],
-                      expense.view === 'share' ? 'your share' : null,
+                      expenseListNote(expense),
                     ]
                       .filter(Boolean)
                       .join(' · ')}

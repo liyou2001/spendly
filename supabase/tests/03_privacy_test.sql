@@ -1,7 +1,7 @@
 -- Rule 5: each person sees only their own share. Nothing is readable signed out.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(35);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -68,10 +68,10 @@ select throws_ok('select * from public.my_spending()', '42501', null, 'Signed ou
 -- A second, unrelated user --------------------------------------------------------
 select tests.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 
-select is_empty('select * from public.expenses', 'Sam cannot read any of Leo''s expenses, or the $140 total');
+select is_empty('select id, total_cents from public.expenses', 'Sam cannot read any of Leo''s expenses, or the $140 total');
 select is_empty('select * from public.expense_items', 'Sam cannot read Leo''s items, personal or shared');
 select is_empty('select * from public.item_assignments', 'Sam cannot read item assignments');
-select is_empty('select * from public.shares', 'Sam cannot read shares');
+select is_empty('select expense_id, amount_cents from public.shares', 'Sam cannot read shares');
 select is_empty('select * from public.balances()', 'Sam has no balances');
 select is_empty('select * from public.get_my_shares()', 'Sam has no shares');
 select results_eq(
@@ -91,9 +91,21 @@ select is_empty(
 -- Jeff, now with an account, in the apartment group ---------------------------------
 select tests.as_user('aaaaaaaa-0000-0000-0000-000000000002');
 
-select is_empty('select * from public.expenses', 'Jeff cannot read the Costco expense row (or its $140 total)');
-select is_empty('select * from public.expense_items', 'Jeff cannot read the Costco items directly');
-select is_empty('select * from public.shares', 'Jeff cannot read anyone''s shares directly');
+-- Groups are transparent (Rule 5): Jeff sees the whole Costco bill, though Leo paid.
+select results_eq(
+  $$select merchant, total_cents from public.expenses$$,
+  $$values ('Costco', 14000::bigint)$$,
+  'Jeff, in the group, reads the Costco expense and its $140 total'
+);
+select is(
+  (select count(*)::int from public.expense_items), 9, 'and all 9 items, Leo’s and Maya’s too'
+);
+select results_eq(
+  $$select p.display_name, s.amount_cents from public.shares s
+    join public.participants p on p.id = s.participant_id order by p.display_name$$,
+  $$values ('Jeff', 1500::bigint), ('Leo', 8300::bigint), ('Maya', 4200::bigint)$$,
+  'and everyone’s shares'
+);
 
 select results_eq(
   $$select merchant, payer_name, amount_cents from public.get_my_shares()$$,
@@ -120,8 +132,21 @@ select results_eq(
   $$select f.display_name, t.display_name, b.amount_cents from public.balances() b
     join public.participants f on f.id = b.from_participant
     join public.participants t on t.id = b.to_participant$$,
-  $$values ('Jeff', 'Leo', 1500::bigint)$$,
-  'Jeff sees only his own balance, not what Maya owes Leo'
+  $$values ('Jeff', 'Leo', 1500::bigint), ('Maya', 'Leo', 4200::bigint)$$,
+  'Jeff sees the whole group’s balances, including what Maya owes Leo'
+);
+-- Categories stay private: only your own, through my_category_for().
+select throws_ok(
+  'select category_id from public.expenses', '42501', null,
+  'Jeff can’t read the payer’s category on an expense'
+);
+select throws_ok(
+  'select category_override_id from public.shares', '42501', null,
+  'or anyone’s category on their share'
+);
+select is(
+  public.my_category_for('44444444-4444-4444-4444-444444444444'), null::uuid,
+  'His own category for Costco is unset until he files it'
 );
 select is_empty('select * from public.my_spending() where amount_cents = 14000', 'Jeff''s spending never shows the total');
 select results_eq(

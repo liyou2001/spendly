@@ -1,4 +1,4 @@
-import type { Debt, ParticipantId } from '@spendly/ledger';
+import { formatCents, type Debt, type ParticipantId } from '@spendly/ledger';
 
 /** "Jeff", "Jeff and Maya", "Leo, Jeff and Maya". */
 export function joinNames(names: readonly string[]): string {
@@ -53,4 +53,20 @@ export function evenSplitMessage(input: {
   }
   const names = input.people.map((p) => p.name);
   return `Split equally between ${input.everyone ? 'everyone' : joinNames(names)}.`;
+}
+
+/**
+ * The note under an expense in a list: "your share of $140.00" when you're on part of it,
+ * "not yours · $140.00 total" when you're not on it, or null when it was all yours.
+ */
+export function expenseListNote(expense: {
+  totalCents: number | null;
+  myShareCents: number | null;
+}): string | null {
+  if (expense.totalCents === null) return 'your share';
+  if (expense.myShareCents === null) return `not yours · ${formatCents(expense.totalCents)} total`;
+  if (expense.myShareCents !== expense.totalCents) {
+    return `your share of ${formatCents(expense.totalCents)}`;
+  }
+  return null;
 }

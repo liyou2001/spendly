@@ -1,24 +1,36 @@
 // Calls to the payment page's Edge Functions. The page has no database access of its own: the
-// link token is sent to the functions, which return only what this person may see.
+// link token is sent to the functions, which return the bills behind what this person owes.
 
-export interface ShareItem {
+/** Someone on the expense, labelled p001, p002… (never their real id). */
+export interface BillPerson {
+  ref: string;
   name: string;
-  /** The line's total, for all `quantity` of it. */
-  amount_cents: number;
-  quantity: number;
-  /** How many people it's split between. */
-  split_count: number;
-  /** Tagged one by one: how many were yours, out of all of them (1 each when split evenly). */
-  my_units: number;
-  total_units: number;
+  /** The person this link is for. */
+  you: boolean;
 }
 
+/** A line of the receipt: an item with who it was for, or tax, tip or a discount. */
+export interface BillItem {
+  name: string;
+  /** The line's total, for all `quantity` of it; discounts are negative. */
+  amount_cents: number;
+  kind: 'item' | 'tax' | 'tip' | 'discount';
+  quantity: number;
+  /** Tagged one by one (units count); otherwise split evenly. */
+  by_units: boolean;
+  people: { ref: string; units: number }[];
+}
+
+/** An expense in full: groups are transparent, and so is the payment page. */
 export interface ShareExpense {
   merchant: string;
   expense_date: string;
+  total_cents: number;
   /** This person's share of it. */
   amount_cents: number;
-  items: ShareItem[];
+  people: BillPerson[];
+  items: BillItem[];
+  shares: { ref: string; amount_cents: number }[];
 }
 
 export interface SharePage {

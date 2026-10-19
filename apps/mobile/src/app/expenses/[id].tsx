@@ -1,3 +1,4 @@
+import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
@@ -30,11 +31,12 @@ import {
   type ShareOfExpense,
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
+import { explainShare, type Explained } from '@/lib/breakdown';
 import { debtLabel, itemTitle, yourPartOf } from '@/lib/labels';
 import { useSession } from '@/lib/session';
-import { labelForIds, owedToPayer, type SplitPeople } from '@/lib/split';
+import { canEditExpense, labelForIds, owedToPayer, type SplitPeople } from '@/lib/split';
 import { useLoad } from '@/lib/useLoad';
-import { space } from '@/theme';
+import { colors, sizes, space } from '@/theme';
 
 async function fetchDetail(expenseId: string, userId: string) {
   const [expense, categories] = await Promise.all([
@@ -70,7 +72,7 @@ export default function ExpenseDetail() {
       categories={categories}
       userId={userId}
       onBack={back}
-      onVoided={detail.reload}
+      onChanged={detail.reload}
       stale={detail.refreshFailed}
     />
   ) : (
@@ -91,7 +93,7 @@ function FullView({
   categories,
   userId,
   onBack,
-  onVoided,
+  onChanged,
   stale,
 }: {
   expense: FullExpense;
@@ -99,24 +101,31 @@ function FullView({
   categories: Category[];
   userId: string;
   onBack: () => void;
-  onVoided: () => void;
+  onChanged: () => void;
   stale: boolean;
 }) {
   const [voiding, setVoiding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whose breakdown is open in the Split list.
+  const [openPerson, setOpenPerson] = useState<string | null>(null);
 
   const me = group.people.find((p) => p.userId === userId)?.id ?? '';
   const people: SplitPeople = { me, everyone: group.people.map((p) => p.id) };
   const names = Object.fromEntries(group.people.map((p) => [p.id, p.displayName]));
   const nameOf = (id: string) => (id === me ? 'You' : (names[id] ?? 'Someone'));
 
-  const myShare = expense.shares.find((s) => s.participantId === me);
-  const myCategoryId =
-    expense.paidBy === me ? expense.categoryId : (myShare?.categoryOverrideId ?? null);
+  const iPaid = expense.paidBy === me;
+  const canEdit = canEditExpense(expense, me, userId);
+  const myShare = expense.shares.find((s) => s.participantId === me)?.amountCents ?? null;
+  const myCategoryId = expense.myCategoryId;
   const myCategory = categories.find((c) => c.id === myCategoryId)?.name;
   const owed = owedToPayer(expense.shares, expense.paidBy);
   const lines = expense.items.filter((i) => i.kind === 'item');
   const adjustments = expense.items.filter((i) => i.kind !== 'item');
+  const mine = myShare ? explainShare(expense.items, me, myShare) : null;
+  const shares = [...expense.shares].sort(
+    (a, b) => people.everyone.indexOf(a.participantId) - people.everyone.indexOf(b.participantId),
+  );
 
   function confirmVoid() {
     Alert.alert(
@@ -134,7 +143,7 @@ function FullView({
     setError(null);
     try {
       await voidExpense(expense.id);
-      onVoided();
+      onChanged();
     } catch (e) {
       setError(friendlyError(e as Error));
     } finally {
@@ -147,7 +156,7 @@ function FullView({
       {stale ? <FormMessage message={STALE_MESSAGE} /> : null}
       <Text variant="small">
         {formatDate(expense.expenseDate)} · {group.name} · paid by{' '}
-        {expense.paidBy === me ? 'you' : nameOf(expense.paidBy)}
+        {iPaid ? 'you' : nameOf(expense.paidBy)}
       </Text>
 
       {expense.replacedById ? (
@@ -170,11 +179,10 @@ function FullView({
       ) : null}
 
       <KeyBlock>
-        <Text variant="sectionHeading">Your share</Text>
-        <Money cents={myShare?.amountCents ?? 0} variant="bigNumber" />
-        {myShare && myShare.amountCents > 0 ? (
-          <Tag label={myCategory ?? 'Uncategorized'} tone="white" />
-        ) : null}
+        <Text variant="sectionHeading">{myShare !== null ? 'Your share' : 'Total'}</Text>
+        <Money cents={myShare ?? expense.totalCents} variant="bigNumber" />
+        {myShare ? <Tag label={myCategory ?? 'Uncategorized'} tone="white" /> : null}
+        {myShare === null ? <Text variant="body">You’re not on this one.</Text> : null}
         <View style={styles.rows}>
           {owed.map((debt) => (
             <View key={debt.from} style={styles.row}>
@@ -184,53 +192,96 @@ function FullView({
               <Money cents={debt.amountCents} variant="bodyMedium" />
             </View>
           ))}
-          <View style={styles.row}>
-            <Text variant="body" style={styles.flex}>
-              Total
-            </Text>
-            <Money cents={expense.totalCents} variant="bodyMedium" />
-          </View>
+          {myShare !== null ? (
+            <View style={styles.row}>
+              <Text variant="body" style={styles.flex}>
+                Total
+              </Text>
+              <Money cents={expense.totalCents} variant="bodyMedium" />
+            </View>
+          ) : null}
         </View>
       </KeyBlock>
 
+      {mine && myShare ? (
+        <Section title={`How your ${formatCents(myShare)} was worked out`}>
+          <Breakdown explained={mine} whose="Your" />
+        </Section>
+      ) : null}
+
       {lines.length > 0 ? (
-        <Section title="Items">
+        <Section title="Receipt" description={`Everyone in ${group.name} sees this receipt.`}>
           <View>
-            {[...lines, ...adjustments].map((item, index, all) => (
+            {[...lines, ...adjustments].map((item) => (
               <ListRow
                 key={item.id}
                 title={itemTitle(item.name, item.quantity)}
                 {...(item.kind === 'item'
                   ? { subtitle: labelForIds(item.participantIds, people, names, item.units) }
-                  : { subtitle: 'Split in proportion' })}
+                  : { subtitle: 'Split in proportion to items' })}
                 trailing={<Money cents={item.amountCents} />}
-                divider={index < all.length - 1}
               />
             ))}
+            <ListRow
+              title="Total"
+              trailing={<Money cents={expense.totalCents} variant="bodyMedium" />}
+              divider={false}
+            />
           </View>
         </Section>
-      ) : (
-        <Section title="Split">
-          <View>
-            {[...expense.shares]
-              .sort(
-                (a, b) =>
-                  people.everyone.indexOf(a.participantId) -
-                  people.everyone.indexOf(b.participantId),
-              )
-              .map((share, index, all) => (
-                <ListRow
-                  key={share.participantId}
-                  title={nameOf(share.participantId)}
-                  trailing={<Money cents={share.amountCents} />}
-                  divider={index < all.length - 1}
-                />
-              ))}
-          </View>
-        </Section>
-      )}
+      ) : null}
 
-      {expense.voidedAt ? null : (
+      <Section
+        title="Split"
+        {...(lines.length > 0
+          ? { description: 'Tap someone to see how theirs was worked out.' }
+          : {})}
+      >
+        <View>
+          {shares.map((share, index) => {
+            const open = openPerson === share.participantId;
+            const theirs = open
+              ? explainShare(expense.items, share.participantId, share.amountCents)
+              : null;
+            return (
+              <View key={share.participantId}>
+                <ListRow
+                  title={nameOf(share.participantId)}
+                  {...(share.participantId === expense.paidBy ? { subtitle: 'Paid' } : {})}
+                  trailing={<Money cents={share.amountCents} />}
+                  {...(lines.length > 0
+                    ? {
+                        onPress: () => setOpenPerson(open ? null : share.participantId),
+                      }
+                    : {})}
+                  divider={index < shares.length - 1 && !open}
+                />
+                {theirs ? (
+                  <View style={styles.expanded}>
+                    <Breakdown
+                      explained={theirs}
+                      whose={
+                        share.participantId === me ? 'Your' : `${nameOf(share.participantId)}’s`
+                      }
+                    />
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      </Section>
+
+      {!iPaid && myShare && !expense.voidedAt ? (
+        <FileShare
+          expenseId={expense.id}
+          categories={categories}
+          current={myCategoryId}
+          onChanged={onChanged}
+        />
+      ) : null}
+
+      {canEdit && !expense.voidedAt ? (
         <View style={styles.stack}>
           {error ? <FormMessage message={error} /> : null}
           <View style={styles.row}>
@@ -260,8 +311,96 @@ function FullView({
             </Text>
           ) : null}
         </View>
-      )}
+      ) : null}
     </Screen>
+  );
+}
+
+/** One person's share, line by line, adding up to it. */
+function Breakdown({ explained, whose }: { explained: Explained; whose: string }) {
+  return (
+    <View>
+      {explained.items.map((row, index) => (
+        <ListRow
+          key={`item-${index}`}
+          title={row.title}
+          {...(row.detail ? { subtitle: row.detail } : {})}
+          trailing={<Money cents={row.cents} />}
+        />
+      ))}
+      {explained.adjustments.length > 0 ? (
+        <>
+          <ListRow
+            title={`${whose} items`}
+            subtitle={`${explained.percentOfItems} of all items, so ${explained.percentOfItems} of the rest`}
+            trailing={<Money cents={explained.itemsCents} />}
+          />
+          {explained.adjustments.map((row, index) => (
+            <ListRow
+              key={`adjustment-${index}`}
+              title={row.title}
+              {...(row.detail ? { subtitle: row.detail } : {})}
+              trailing={<Money cents={row.cents} />}
+            />
+          ))}
+        </>
+      ) : null}
+      <ListRow
+        title={`${whose} share`}
+        trailing={<Money cents={explained.totalCents} variant="bodyMedium" />}
+        divider={false}
+      />
+    </View>
+  );
+}
+
+/** "Category for your share", for someone else's expense: only you see it. */
+function FileShare({
+  expenseId,
+  categories,
+  current,
+  onChanged,
+}: {
+  expenseId: string;
+  categories: Category[];
+  current: string | null;
+  onChanged: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function file(categoryId: string | null) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setShareCategory(expenseId, categoryId);
+      onChanged();
+    } catch (e) {
+      setError(friendlyError(e as Error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section
+      title="Category for your share"
+      description="Where your share counts in your budget. Only you see this."
+    >
+      <View style={styles.wrap}>
+        {categories.map((c) => (
+          <Chip
+            key={c.id}
+            label={c.name}
+            selected={c.id === current}
+            disabled={busy}
+            onPress={() => void file(c.id === current ? null : c.id)}
+          />
+        ))}
+      </View>
+      {error ? <FormMessage message={error} /> : null}
+    </Section>
   );
 }
 
@@ -341,12 +480,6 @@ function ShareView({
         </View>
         {error ? <FormMessage message={error} /> : null}
       </Section>
-      <View style={styles.note}>
-        <Tag label="Private" />
-        <Text variant="small" style={styles.flex}>
-          You see only your own items and amount. Tax and tip are included in your share.
-        </Text>
-      </View>
     </Screen>
   );
 }
@@ -374,9 +507,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: space.sm,
   },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
+  expanded: {
+    paddingLeft: space.lg,
+    borderLeftWidth: sizes.hairline,
+    borderLeftColor: colors.divider,
+    marginBottom: space.sm,
   },
 });

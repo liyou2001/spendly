@@ -1,14 +1,23 @@
 import { formatCents, parseCents, paymentAppLinks } from '@spendly/ledger';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
-import { ApiError, claimPayment, flagProblem, getShare, setTextOptIn, type SharePage } from './api';
+import {
+  ApiError,
+  claimPayment,
+  flagProblem,
+  getShare,
+  setTextOptIn,
+  type ShareExpense,
+  type SharePage,
+} from './api';
 import {
   amountDue,
   firstName,
   formatDay,
   formatZelle,
-  itemNote,
+  explainYours,
   itemTitle,
+  whoFor,
   paymentNote,
   tokenFromHash,
 } from './view';
@@ -163,28 +172,7 @@ function Share({
         ) : (
           <ul className="list">
             {page.expenses.map((expense, index) => (
-              <li key={index} className="expense">
-                <div className="row">
-                  <span className="body-medium">{expense.merchant}</span>
-                  <span className="body-medium money">{formatCents(expense.amount_cents)}</span>
-                </div>
-                <p className="small">{formatDay(expense.expense_date)} · your share</p>
-                {expense.items.length > 0 ? (
-                  <ul className="items">
-                    {expense.items.map((item, i) => (
-                      <li key={i} className="row">
-                        <span className="small-ink">
-                          {itemTitle(item)}
-                          {itemNote(item) ? (
-                            <span className="small"> · {itemNote(item)}</span>
-                          ) : null}
-                        </span>
-                        <span className="small money">{formatCents(item.amount_cents)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
+              <Expense key={index} expense={expense} />
             ))}
           </ul>
         )}
@@ -196,8 +184,7 @@ function Share({
           </p>
         ) : null}
         <p className="small">
-          Only you see this: your items and your share, with tax and tip included. Shared items show
-          their full price.
+          Everyone in {page.group_name} sees the same receipts. Shared items show their full price.
         </p>
       </section>
 
@@ -251,6 +238,107 @@ function ZelleRow({ contact }: { contact: string }) {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** One expense: how your share was worked out, then the whole receipt. */
+function Expense({ expense }: { expense: ShareExpense }) {
+  const yours = explainYours(expense);
+  const lines = expense.items.filter((item) => item.kind === 'item');
+  const extras = expense.items.filter((item) => item.kind !== 'item');
+  return (
+    <li className="expense">
+      <div className="row">
+        <span className="body-medium">{expense.merchant}</span>
+        <span className="body-medium money">{formatCents(expense.amount_cents)}</span>
+      </div>
+      <p className="small">
+        {formatDay(expense.expense_date)} · your share of {formatCents(expense.total_cents)}
+      </p>
+
+      {yours ? (
+        <div className="breakdown">
+          <p className="label">How your {formatCents(yours.totalCents)} was worked out</p>
+          <ul className="items">
+            {yours.items.map((row, i) => (
+              <Line key={i} title={row.title} detail={row.detail} cents={row.cents} />
+            ))}
+            {yours.adjustments.length > 0 ? (
+              <>
+                <Line
+                  title="Your items"
+                  detail={`${yours.percent} of all items, so ${yours.percent} of the rest`}
+                  cents={yours.itemsCents}
+                />
+                {yours.adjustments.map((row, i) => (
+                  <Line key={`a${i}`} title={row.title} detail={row.detail} cents={row.cents} />
+                ))}
+              </>
+            ) : null}
+            <Line title="Your share" detail={null} cents={yours.totalCents} strong />
+          </ul>
+        </div>
+      ) : null}
+
+      <details className="receipt">
+        <summary>The whole receipt · {formatCents(expense.total_cents)}</summary>
+        <ul className="items">
+          {lines.map((item, i) => (
+            <Line
+              key={i}
+              title={itemTitle(item)}
+              detail={whoFor(item, expense)}
+              cents={item.amount_cents}
+            />
+          ))}
+          {extras.map((item, i) => (
+            <Line
+              key={`x${i}`}
+              title={item.name}
+              detail="Split in proportion to items"
+              cents={item.amount_cents}
+            />
+          ))}
+          <Line title="Total" detail={null} cents={expense.total_cents} strong />
+        </ul>
+        <p className="label">Everyone’s shares</p>
+        <ul className="items">
+          {expense.shares.map((share) => {
+            const person = expense.people.find((p) => p.ref === share.ref);
+            return (
+              <Line
+                key={share.ref}
+                title={person?.you ? `${person.name} (you)` : (person?.name ?? 'Someone')}
+                detail={null}
+                cents={share.amount_cents}
+              />
+            );
+          })}
+        </ul>
+      </details>
+    </li>
+  );
+}
+
+function Line({
+  title,
+  detail,
+  cents,
+  strong = false,
+}: {
+  title: string;
+  detail: string | null;
+  cents: number;
+  strong?: boolean;
+}) {
+  return (
+    <li className="row">
+      <span className={strong ? 'body-medium' : 'small-ink'}>
+        {title}
+        {detail ? <span className="small"> · {detail}</span> : null}
+      </span>
+      <span className={strong ? 'body-medium money' : 'small money'}>{formatCents(cents)}</span>
+    </li>
   );
 }
 

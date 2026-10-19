@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { debtLabel, evenSplitMessage, itemTitle, joinNames, yourPartOf } from './labels';
+import {
+  debtLabel,
+  evenSplitMessage,
+  expenseListNote,
+  itemTitle,
+  joinNames,
+  yourPartOf,
+} from './labels';
 
 describe('joinNames', () => {
   it('joins with commas and a final "and"', () => {
@@ -52,5 +59,18 @@ describe('evenSplitMessage', () => {
 
   it('goes by who you are, not by name', () => {
     expect(message([{ name: 'You', you: false }])).toBe('You is paying for this.');
+  });
+});
+
+describe('expenseListNote', () => {
+  it('says whose it is: part yours, not yours, or all yours', () => {
+    expect(expenseListNote({ totalCents: 14000, myShareCents: 1500 })).toBe(
+      'your share of $140.00',
+    );
+    expect(expenseListNote({ totalCents: 14000, myShareCents: null })).toBe(
+      'not yours · $140.00 total',
+    );
+    expect(expenseListNote({ totalCents: 1400, myShareCents: 1400 })).toBeNull();
+    expect(expenseListNote({ totalCents: null, myShareCents: 1500 })).toBe('your share');
   });
 });

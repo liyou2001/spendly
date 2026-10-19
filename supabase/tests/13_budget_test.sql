@@ -64,8 +64,8 @@ select throws_ok(
 select tests.as_user('aaaaaaaa-0000-0000-0000-000000000002');
 select results_eq(
   $$select amount_cents, total_cents, category_id from public.my_spending_items('2026-10-01')$$,
-  $$values (1500::bigint, null::bigint, null::uuid)$$,
-  'Jeff sees his $15 share, uncategorized, and never the $140 total'
+  $$values (1500::bigint, 14000::bigint, null::uuid)$$,
+  'Jeff sees his $15 share, uncategorized, of the $140 total'
 );
 select lives_ok(
   $$select public.set_share_category('44444444-4444-4444-4444-444444444444', tests.category_of(auth.uid(), 'Rent'))$$,

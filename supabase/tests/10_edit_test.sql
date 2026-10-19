@@ -59,7 +59,7 @@ select is(
   'The blocked edit leaves the original untouched'
 );
 select is_empty(
-  $$select * from public.expenses where merchant = 'Snacks (edited)'$$,
+  $$select id from public.expenses where merchant = 'Snacks (edited)'$$,
   'and saves no replacement'
 );
 

@@ -17,7 +17,7 @@ export function TextField({ label, hint, error, ...inputProps }: TextFieldProps)
       <Text variant="sectionHeading">{label}</Text>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={colors.placeholder}
         style={styles.input}
         {...inputProps}
       />

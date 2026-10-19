@@ -16,6 +16,7 @@ describe('package exports', () => {
       'netBalances',
       'parseCents',
       'paymentAppLinks',
+      'shareBreakdown',
       'spendingByCategory',
       'splitEvenly',
     ]);

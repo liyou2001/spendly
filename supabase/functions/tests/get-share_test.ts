@@ -1,6 +1,7 @@
 // End-to-end: Jeff's link, through the get-share Edge Function, against local Supabase with
-// the seed data (npm run test:functions). The response must never contain Maya's items, Leo's
-// own items or the $140 total.
+// the seed data (npm run test:functions). Groups are transparent (Rule 5): the link shows the
+// whole bill, with people as p001, p002… rather than real ids. Unknown or revoked links get
+// nothing.
 import { assertEquals, assertFalse } from 'jsr:@std/assert@1.0.13';
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 
@@ -27,7 +28,7 @@ async function getShare(token: string) {
 }
 
 Deno.test(
-  'Jeff’s link shows only his 3 shared items and $15.00, until Leo revokes it',
+  'Jeff’s link shows the whole Costco bill and his $15.00, until Leo revokes it',
   network,
   async () => {
     const token = crypto.randomUUID().replaceAll('-', '');
@@ -46,20 +47,22 @@ Deno.test(
       assertEquals(page.payer_name, 'Leo');
       const costco = page.expenses.find((e: { merchant: string }) => e.merchant === 'Costco');
       assertEquals(costco.amount_cents, 1500);
+      assertEquals(costco.total_cents, 14000);
+      assertEquals(costco.items.length, 9);
       assertEquals(
-        costco.items.map((i: { name: string }) => i.name),
-        ['Paper towels', 'Dish soap', 'Trash bags'],
+        costco.people.map((p: { name: string; you: boolean }) => [p.name, p.you]),
+        [
+          ['Leo', false],
+          ['Jeff', true],
+          ['Maya', false],
+        ],
       );
-      for (const secret of [
-        'Protein powder',
-        'Graphic tee',
-        'Oat milk',
-        'Hummus',
-        'Maya',
-        '14000',
-      ]) {
-        assertFalse(text.includes(secret), `response mentions ${secret}`);
-      }
+      assertEquals(
+        costco.shares.map((s: { amount_cents: number }) => s.amount_cents),
+        [8300, 1500, 4200],
+      );
+      // No real participant ids leave the database.
+      assertFalse(/[0-9a-f]{8}-[0-9a-f]{4}-/.test(text), 'response has a uuid');
 
       await admin
         .from('share_links')

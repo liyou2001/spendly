@@ -39,7 +39,7 @@ Result: Leo's spending is $83.00 (Groceries). Jeff owes Leo $15.00. Maya owes Le
 - Splitting an expense by item, with shared items split among a subset of people.
 - A who-owes-whom ledger calculated from history.
 - Repayments: recorded by the person who got paid (counts immediately), or claimed by the payer and confirmed by the recipient.
-- Privacy: each person sees only their own share, never the payer's total or other people's items.
+- Transparency: everyone in a group sees each expense in full (items, who each was for, the total and every share) and how each share was worked out. Nothing is visible outside the group except through a payment link.
 
 ### Out of scope for now
 
@@ -83,7 +83,7 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 2. **History is append-only.** Never update or delete expenses, items, shares or payments. A correction voids the old expense (`voided_at`) and adds a replacement (`replaces_expense_id`). Payment claims change status, recording who and when.
 3. **Shares always add up.** An expense's shares sum exactly to its total. Leftover cents go to participants in a fixed order (for example, sorted by participant id), so the same input always gives the same result.
 4. **Balances are calculated, not stored by hand.** They come from shares and confirmed payments.
-5. **Each person sees only their own share.** Enforce this in the database and Edge Functions, not just the UI.
+5. **Groups are transparent; nothing leaves the group.** Group members see every expense in full. People outside a group see nothing of it. Enforce this in the database and Edge Functions, not just the UI. Payment links show the full bill of the expenses behind what's owed.
 6. **AI output is only a draft.** Code checks the math, and the user reviews before anything enters the ledger. The AI never does money math.
 7. **Repayments never count as income or spending** in budgets.
 8. **Texting needs the recipient's own consent.** Never text a number that hasn't opted in itself. Keep proof of consent and honor STOP. All texting goes through `sendText()`.
@@ -92,7 +92,7 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 
 ### Design
 
-- **Colors:** white `#FFFFFF` background. Pale coral `#F8DFD9` for the one key block per screen, the active tab, "You" tags, avatars and open dropdowns. Coral `#E58C76` for primary buttons, selected chips, the + (add expense) button, progress bars and attention dots, with ink text and icons on it (ink is 6.1:1; white would be only 2.5:1). Bars and dots always sit beside text that says the same thing. Ink `#2B2420` for text. Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
+- **Colors:** white `#FFFFFF` background. Pale coral `#F8DFD9` for the one key block per screen, the active tab, "You" tags, avatars and open dropdowns. Coral `#E58C76` for primary buttons, selected chips, the + (add expense) button, progress bars and attention dots, with ink text and icons on it (ink is 6.1:1; white would be only 2.5:1). Bars and dots always sit beside text that says the same thing. Ink `#2B2420` for text. Muted `#6B5F57` for secondary text. Placeholder text in empty fields `#AEA39B`, lighter than muted. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
 - **Type:** Hanken Grotesk, weights 300/400/500/600. Big numbers 52px at weight 300, letter-spacing -0.03em, tabular figures. Screen titles 24–28px/500. Section headings 15px/600. Body 15–16px/400. Small text 13–14px in muted.
 - **Layout:** 24px side margins, about 28px between sections. Lists separated by thin dividers, not cards. Key block corner radius 24px. Buttons radius 14px, at least 44px tall. Tags fully rounded.
 - **Tabs:** Home, Budget, + (orange circle, adds an expense), People, Me.
@@ -130,13 +130,13 @@ Database functions (called with `supabase.rpc`):
 - `void_expense(id)`: marks an expense voided; never deletes it.
 - `balances()`: for each pair of participants in a group, the shares owed to the payer minus confirmed payments and forgiveness.
 - `my_spending()`: for each user, category and month, the sum of their own shares plus any debts they forgave. A share's category is the user's `category_override_id` if set; otherwise the payer's own share uses the expense's category and anyone else's is uncategorized. Must match `spendingByCategory` in `packages/ledger`.
-- `get_my_shares()`: what an account holder sees of expenses someone else paid: only their items and their amount.
+- `get_my_shares()`: an account holder's shares of expenses someone else paid, with their own category for each.
 
-Privacy rules:
+Visibility rules:
 
-- Full expense rows, items and shares are readable only by the payer.
-- Other account holders read only through `get_my_shares()`.
-- People without accounts read only through the `get-share` Edge Function with a valid link token.
+- Expense rows, items, assignments and shares are readable by every member of the expense's group (groups are transparent), and by whoever entered it.
+- People outside the group read nothing of it.
+- People without accounts read only through the `get-share` Edge Function with a valid link token: the full bills behind what they owe.
 - Nothing is readable without signing in.
 
 Splitting rules:
@@ -356,10 +356,10 @@ Splitting rules:
 
 **Done when:**
 
-- Jeff's link, opened in a phone browser without an account, shows only the 3 shared items and $15.00.
+- Jeff's link, opened in a phone browser without an account, shows the full Costco receipt and how his $15.00 was worked out.
 - Tapping "I paid Leo" creates a claim, and Leo gets a push and confirms it. The balance drops.
 - A revoked link stops working.
-- Tests confirm the `get-share` response never contains Maya's items, Leo's personal items or the $140 total.
+- Tests confirm the `get-share` response holds the full bill, with people labelled rather than by id, and that unknown or revoked links get nothing.
 
 **Not yet:** backend texts.
 

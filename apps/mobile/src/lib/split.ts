@@ -492,7 +492,8 @@ export interface SavedExpense {
   merchant: string;
   expenseDate: string;
   totalCents: Cents;
-  categoryId: string | null;
+  /** Your category for it (the expense's if you paid, otherwise your share's). */
+  myCategoryId: string | null;
   items: {
     name: string;
     amountCents: Cents;
@@ -504,7 +505,7 @@ export interface SavedExpense {
     /** Tagged one by one (units saved), rather than split evenly or for one person. */
     byUnits: boolean;
   }[];
-  shares: { participantId: ParticipantId; amountCents: Cents; categoryOverrideId: string | null }[];
+  shares: { participantId: ParticipantId; amountCents: Cents }[];
 }
 
 export interface EditableExpense {
@@ -567,8 +568,7 @@ export function draftFromExpense(
     merchant: expense.merchant,
     expenseDate: expense.expenseDate,
     paidBy: expense.paidBy,
-    categoryId:
-      expense.paidBy === people.me ? expense.categoryId : (myShare?.categoryOverrideId ?? null),
+    categoryId: expense.myCategoryId,
   };
   const empty: Draft = {
     mode: 'items',
@@ -658,4 +658,16 @@ export function toggleEvenSplit(
   const ids = sharing.includes(id) ? sharing.filter((x) => x !== id) : [...sharing, id];
   if (people.everyone.every((x) => ids.includes(x))) return { kind: 'all' };
   return { kind: 'custom', participantIds: people.everyone.filter((x) => ids.includes(x)) };
+}
+
+/**
+ * Whether you can edit or void an expense: you paid it or entered it. Everyone in the group can
+ * see it (groups are transparent), but only they can change it; save_expense checks the same.
+ */
+export function canEditExpense(
+  expense: { paidBy: ParticipantId; createdBy: string },
+  me: ParticipantId,
+  userId: string,
+): boolean {
+  return expense.paidBy === me || expense.createdBy === userId;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { LedgerError } from './errors';
-import { computeShares } from './shares';
+import { computeShares, shareBreakdown } from './shares';
 import { costcoLines, JEFF, LEO, MAYA, seededRandom } from './testing/fixtures';
 import type { ExpenseLine } from './types';
 
@@ -223,6 +223,95 @@ describe('computeShares', () => {
         };
       });
       expect(computeShares({ lines: reordered })).toEqual(result);
+    }
+  });
+});
+
+describe('shareBreakdown', () => {
+  it('shows Jeff’s $15.00 on the Costco receipt, item by item', () => {
+    const jeff = shareBreakdown({ lines: costcoLines }, JEFF);
+    expect(jeff.items).toEqual([
+      { lineIndex: 3, cents: 766 },
+      { lineIndex: 4, cents: 383 },
+      { lineIndex: 5, cents: 351 },
+    ]);
+    expect(jeff).toMatchObject({ itemsCents: 1500, totalCents: 1500, adjustments: [] });
+    expect(jeff.percentOfItems).toBeCloseTo(1500 / 14000);
+  });
+
+  it('splits a tagged line by units', () => {
+    const drinks: ExpenseLine = {
+      kind: 'item',
+      amountCents: 750,
+      participantIds: [JEFF, MAYA],
+      units: [2, 1],
+    };
+    expect(shareBreakdown({ lines: [drinks] }, JEFF).items).toEqual([{ lineIndex: 0, cents: 500 }]);
+  });
+
+  it('gives each tax, tip and discount line its part, adding up to the share', () => {
+    const lines: ExpenseLine[] = [
+      ...costcoLines,
+      { kind: 'tax', amountCents: 1157 },
+      { kind: 'tip', amountCents: 200 },
+      { kind: 'discount', amountCents: -500 },
+    ];
+    const shares = computeShares({ lines }).shares;
+    for (const { participantId, amountCents } of shares) {
+      const breakdown = shareBreakdown({ lines }, participantId);
+      expect(breakdown.totalCents).toBe(amountCents);
+      expect(breakdown.adjustments.map((a) => a.kind)).toEqual(['tax', 'tip', 'discount']);
+      const sum =
+        breakdown.items.reduce((total, i) => total + i.cents, 0) +
+        breakdown.adjustments.reduce((total, a) => total + a.cents, 0);
+      expect(sum).toBe(amountCents);
+    }
+    const jeff = shareBreakdown({ lines }, JEFF);
+    expect(jeff.adjustments.find((a) => a.kind === 'discount')?.cents).toBeLessThan(0);
+  });
+
+  it('is empty for someone not on the expense', () => {
+    expect(shareBreakdown({ lines: costcoLines }, 'p-sam')).toMatchObject({
+      items: [],
+      itemsCents: 0,
+      totalCents: 0,
+      percentOfItems: 0,
+    });
+  });
+
+  it('randomized: every person’s breakdown adds up to exactly their share', () => {
+    const random = seededRandom(20261020);
+    const int = (min: number, max: number) => min + Math.floor(random() * (max - min + 1));
+    for (let run = 0; run < 1000; run++) {
+      const people = Array.from({ length: int(1, 6) }, (_, i) => `p${i}`);
+      const lines: ExpenseLine[] = [];
+      let itemsTotal = 0;
+      for (let i = int(1, 10); i > 0; i--) {
+        const amountCents = int(1, 20_000);
+        itemsTotal += amountCents;
+        const participantIds = people.filter(() => random() < 0.6);
+        if (participantIds.length === 0) participantIds.push(people[0] ?? 'p0');
+        lines.push({
+          kind: 'item',
+          amountCents,
+          participantIds,
+          ...(random() < 0.3 ? { units: participantIds.map(() => int(1, 4)) } : {}),
+        });
+      }
+      if (random() < 0.6) lines.push({ kind: 'tax', amountCents: int(1, 3_000) });
+      if (random() < 0.4) lines.push({ kind: 'tip', amountCents: int(1, 3_000) });
+      if (random() < 0.4)
+        lines.push({ kind: 'discount', amountCents: -int(1, itemsTotal - 1 || 1) });
+      if (lines.reduce((sum, l) => sum + l.amountCents, 0) <= 0) continue;
+
+      for (const { participantId, amountCents } of computeShares({ lines }).shares) {
+        const breakdown = shareBreakdown({ lines }, participantId);
+        const sum =
+          breakdown.items.reduce((total, i) => total + i.cents, 0) +
+          breakdown.adjustments.reduce((total, a) => total + a.cents, 0);
+        expect(breakdown.totalCents).toBe(amountCents);
+        expect(sum).toBe(amountCents);
+      }
     }
   });
 });

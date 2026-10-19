@@ -69,12 +69,12 @@ describe('splitNote', () => {
     expect(splitNote([costco])).toBe('Includes your $83 share of the $140 Costco trip');
   });
 
-  it('names the payer when someone else paid (their total stays private)', () => {
+  it('names the payer and the total when someone else paid', () => {
     expect(
       splitNote([
-        { ...costco, amountCents: 1500, totalCents: null, paidByName: 'Leo', youPaid: false },
+        { ...costco, amountCents: 1500, totalCents: 14000, paidByName: 'Leo', youPaid: false },
       ]),
-    ).toBe('Includes your $15 share of Leo’s Costco trip');
+    ).toBe('Includes your $15 share of Leo’s $140 Costco trip');
   });
 
   it('says nothing for purchases that were all yours', () => {

@@ -79,7 +79,8 @@ select tests.as_user('11111111-1111-1111-1111-111111111111');
 select lives_ok($$select tests.save('Costco run 2')$$, 'Leo saves the Costco receipt');
 
 select results_eq(
-  $$select total_cents, source, created_by, category_id = tests.leo_category('Groceries')
+  $$select total_cents, source, created_by,
+      public.my_category_for(id) = tests.leo_category('Groceries')
     from public.expenses where merchant = 'Costco run 2'$$,
   $$values (14000::bigint, 'manual', '11111111-1111-1111-1111-111111111111'::uuid, true)$$,
   'The expense row has the total, source, creator and Leo''s category'

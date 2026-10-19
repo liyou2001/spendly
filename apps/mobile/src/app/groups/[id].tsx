@@ -27,7 +27,7 @@ import {
   renameGroup,
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
-import { debtLabel } from '@/lib/labels';
+import { debtLabel, expenseListNote } from '@/lib/labels';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 import { colors, space } from '@/theme';
@@ -75,33 +75,48 @@ export default function GroupDetail() {
                     </Text>
                   </>
                 ) : balances.length === 0 ? (
-                  // balances() only covers pairs that include you, so this can't speak for others.
                   <>
-                    <Text variant="sectionHeading">You’re all settled</Text>
-                    <Text variant="body">Nobody here owes you, and you don’t owe anyone.</Text>
+                    <Text variant="sectionHeading">Everyone’s settled up</Text>
+                    <Text variant="body">Nobody in this group owes anyone.</Text>
                   </>
                 ) : (
+                  // Groups are transparent: every pair, yours first.
                   <View style={styles.stack}>
-                    <Text variant="sectionHeading">Your balances</Text>
-                    {balances.map((balance) => {
-                      const other = balance.from === me ? balance.to : balance.from;
-                      return (
-                        <Pressable
-                          key={`${balance.from}-${balance.to}`}
-                          onPress={() =>
-                            router.push({ pathname: '/people/[id]', params: { id: other } })
-                          }
-                          accessibilityRole="button"
-                          style={({ pressed }) => [styles.balance, pressed && styles.pressed]}
-                        >
-                          <Text variant="body" style={styles.flex}>
-                            {debtLabel(balance, me, nameOf)}
-                          </Text>
-                          <Money cents={balance.amountCents} variant="bodyMedium" />
-                          <Feather name="chevron-right" size={18} color={colors.muted} />
-                        </Pressable>
-                      );
-                    })}
+                    <Text variant="sectionHeading">Who owes whom</Text>
+                    {[...balances]
+                      .sort(
+                        (a, b) =>
+                          Number(b.from === me || b.to === me) -
+                          Number(a.from === me || a.to === me),
+                      )
+                      .map((balance) => {
+                        const mine = balance.from === me || balance.to === me;
+                        const other = balance.from === me ? balance.to : balance.from;
+                        return mine ? (
+                          <Pressable
+                            key={`${balance.from}-${balance.to}`}
+                            onPress={() =>
+                              router.push({ pathname: '/people/[id]', params: { id: other } })
+                            }
+                            accessibilityRole="button"
+                            style={({ pressed }) => [styles.balance, pressed && styles.pressed]}
+                          >
+                            <Text variant="body" style={styles.flex}>
+                              {debtLabel(balance, me, nameOf)}
+                            </Text>
+                            <Money cents={balance.amountCents} variant="bodyMedium" />
+                            <Feather name="chevron-right" size={18} color={colors.muted} />
+                          </Pressable>
+                        ) : (
+                          <View key={`${balance.from}-${balance.to}`} style={styles.balance}>
+                            <Text variant="body" style={styles.flex}>
+                              {debtLabel(balance, me, nameOf)}
+                            </Text>
+                            <Money cents={balance.amountCents} variant="bodyMedium" />
+                            <View style={styles.chevronSpace} />
+                          </View>
+                        );
+                      })}
                   </View>
                 )}
               </KeyBlock>
@@ -122,11 +137,9 @@ export default function GroupDetail() {
                       <ListRow
                         key={expense.id}
                         title={expense.merchant}
-                        subtitle={
-                          expense.view === 'share'
-                            ? `${formatDate(expense.expenseDate)} · your share`
-                            : formatDate(expense.expenseDate)
-                        }
+                        subtitle={[formatDate(expense.expenseDate), expenseListNote(expense)]
+                          .filter(Boolean)
+                          .join(' · ')}
                         trailing={
                           expense.voided ? (
                             <Tag label="Voided" />
@@ -271,6 +284,9 @@ function OneOffHeader({
 }
 
 const styles = StyleSheet.create({
+  chevronSpace: {
+    width: 18,
+  },
   oneOff: {
     flexDirection: 'row',
     alignItems: 'center',

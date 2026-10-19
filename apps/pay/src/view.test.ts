@@ -6,25 +6,44 @@ import {
   firstName,
   formatDay,
   formatZelle,
-  itemNote,
+  explainYours,
   itemTitle,
   paymentNote,
   tokenFromHash,
+  whoFor,
 } from './view';
 
+const person = (ref: string, name: string, you = false) => ({ ref, name, you });
+const line = (name: string, amount_cents: number, refs: string[], extra = {}) => ({
+  name,
+  amount_cents,
+  kind: 'item' as const,
+  quantity: 1,
+  by_units: false,
+  people: refs.map((ref) => ({ ref, units: 1 })),
+  ...extra,
+});
 const costco = {
   merchant: 'Costco',
   expense_date: '2026-10-17',
+  total_cents: 14000,
   amount_cents: 1500,
+  people: [person('p001', 'Leo'), person('p002', 'Jeff', true), person('p003', 'Maya')],
   items: [
-    {
-      name: 'Paper towels',
-      amount_cents: 2299,
-      quantity: 1,
-      split_count: 3,
-      my_units: 1,
-      total_units: 3,
-    },
+    line('Protein powder', 4799, ['p001']),
+    line('Graphic tee', 1299, ['p001']),
+    line('Granola bars', 702, ['p001']),
+    line('Paper towels', 2299, ['p001', 'p002', 'p003']),
+    line('Dish soap', 1149, ['p001', 'p002', 'p003']),
+    line('Trash bags', 1052, ['p001', 'p002', 'p003']),
+    line('Oat milk', 1249, ['p003']),
+    line('Hummus', 899, ['p003']),
+    line('Veggie chips', 552, ['p003']),
+  ],
+  shares: [
+    { ref: 'p001', amount_cents: 8300 },
+    { ref: 'p002', amount_cents: 1500 },
+    { ref: 'p003', amount_cents: 4200 },
   ],
 };
 
@@ -44,21 +63,48 @@ describe('view', () => {
     expect(amountDue({ owed_cents: -300, pending_cents: 0 })).toBe(0);
   });
 
-  it('formats names, days and item notes', () => {
+  it('formats names and days', () => {
     expect(firstName('Jeff Kim')).toBe('Jeff');
     expect(formatDay('2026-10-17')).toBe('Oct 17');
-    const towels = { name: 'Paper towels', amount_cents: 2299, quantity: 1 };
-    expect(itemNote({ ...towels, split_count: 3, my_units: 1, total_units: 3 })).toBe(
-      'Split 3 ways',
-    );
-    expect(itemNote({ ...towels, split_count: 1, my_units: 1, total_units: 1 })).toBeNull();
   });
 
-  it('shows quantities, and how many were yours when tagged one by one', () => {
-    const drinks = { name: 'Soft drink', amount_cents: 750, quantity: 3, split_count: 2 };
+  it('explains Jeff’s $15.00 from the whole Costco receipt', () => {
+    const jeff = explainYours(costco);
+    expect(jeff?.items).toEqual([
+      { title: 'Paper towels', detail: '$22.99 split 3 ways', cents: 766 },
+      { title: 'Dish soap', detail: '$11.49 split 3 ways', cents: 383 },
+      { title: 'Trash bags', detail: '$10.52 split 3 ways', cents: 351 },
+    ]);
+    expect(jeff?.totalCents).toBe(1500);
+  });
+
+  it('adds tax by percent and still matches the share', () => {
+    const withTax = {
+      ...costco,
+      items: [...costco.items, { ...line('Tax', 700, []), kind: 'tax' as const }],
+    };
+    const jeff = explainYours(withTax);
+    expect(jeff?.percent).toBe('10.7%');
+    expect(jeff?.adjustments[0]).toMatchObject({ title: 'Tax', detail: '10.7% of $7.00' });
+    expect(jeff?.totalCents).toBe(1500 + (jeff?.adjustments[0]?.cents ?? 0));
+  });
+
+  it('says who each item was for', () => {
+    const [protein, , , towels] = costco.items;
+    if (!protein || !towels) throw new Error('missing items');
+    expect(whoFor(protein, costco)).toBe('Leo');
+    expect(whoFor(towels, costco)).toBe('All 3');
+    expect(whoFor(line('Gift', 500, ['p001', 'p003']), costco)).toBe('Leo and Maya');
+    const drinks = line('Soft drink', 750, [], {
+      quantity: 3,
+      by_units: true,
+      people: [
+        { ref: 'p002', units: 2 },
+        { ref: 'p003', units: 1 },
+      ],
+    });
+    expect(whoFor(drinks, costco)).toBe('Jeff 2, Maya 1');
     expect(itemTitle(drinks)).toBe('3 × Soft drink');
-    expect(itemTitle({ name: 'Hat', quantity: 1 })).toBe('Hat');
-    expect(itemNote({ ...drinks, my_units: 1, total_units: 3 })).toBe('Your 1 of 3');
   });
 
   it('shows Zelle phone numbers the familiar way', () => {

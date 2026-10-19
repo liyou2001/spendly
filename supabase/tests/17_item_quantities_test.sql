@@ -2,7 +2,7 @@
 -- Apartment: Leo ...0001, Jeff ...0002, Maya ...0003.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(11);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -101,7 +101,7 @@ select throws_ok(
   '22023', null, 'Quantities start at 1'
 );
 
--- Jeff sees how many were his, and how many there were, but not who had the rest.
+-- Jeff's own share shows how many were his, and how many there were.
 select tests.as_user('aaaaaaaa-0000-0000-0000-000000000002');
 select results_eq(
   $$select item->>'name', (item->>'quantity')::int, (item->>'my_units')::int, (item->>'total_units')::int,
@@ -111,11 +111,6 @@ select results_eq(
   $$values ('Soft drink', 3, 2, 3, 2)$$,
   'Jeff’s share shows 3 × Soft drink, 2 of them his'
 );
-select ok(
-  (select bool_and(items::text !~* 'maya|33333333-3333-3333-3333-333333330003')
-   from public.get_my_shares() where merchant = 'Pizza place'),
-  'and nothing about whose the other one was'
-);
 
 -- Maya's payment link shows her 1 of the 3.
 select tests.as_user('11111111-1111-1111-1111-111111111111');
@@ -124,13 +119,14 @@ create temp table maya_link as
 grant select on maya_link to public;
 reset role;
 select results_eq(
-  $$select (item->>'quantity')::int, (item->>'my_units')::int, (item->>'total_units')::int
+  $$select (item->>'quantity')::int, (item->>'by_units')::boolean,
+           (select string_agg(x->>'units', ',' order by x->>'ref') from jsonb_array_elements(item->'people') x)
     from jsonb_array_elements(
       public.link_share(encode(extensions.digest((select token from maya_link), 'sha256'), 'hex'))->'expenses'
     ) e, jsonb_array_elements(e->'items') item
     where e->>'merchant' = 'Pizza place' and item->>'name' = 'Soft drink'$$,
-  $$values (3, 1, 3)$$,
-  'Maya’s payment page shows 3 × Soft drink, 1 of them hers'
+  $$values (3, true, '2,1')$$,
+  'Maya’s payment page shows 3 × Soft drink tagged Jeff 2, Maya 1'
 );
 
 select * from finish();

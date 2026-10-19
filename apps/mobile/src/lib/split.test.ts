@@ -4,6 +4,7 @@ import {
   assignedTo,
   assignmentLabel,
   assignmentOptions,
+  canEditExpense,
   buildSplit,
   draftFromExpense,
   effectiveAssignment,
@@ -246,6 +247,15 @@ describe('quantities and one tag per unit', () => {
   });
 });
 
+describe('canEditExpense', () => {
+  it('lets the payer or whoever entered it edit, not everyone who can see it', () => {
+    const costcoRow = { paidBy: LEO, createdBy: 'u-leo' };
+    expect(canEditExpense(costcoRow, LEO, 'u-leo')).toBe(true);
+    expect(canEditExpense({ paidBy: JEFF, createdBy: 'u-leo' }, LEO, 'u-leo')).toBe(true);
+    expect(canEditExpense(costcoRow, JEFF, 'u-jeff')).toBe(false);
+  });
+});
+
 describe('tag and Split evenly changes', () => {
   it('retags one unit and keeps the rest', () => {
     expect(retag([LEO, LEO, LEO], 1, JEFF)).toEqual({ kind: 'each', people: [LEO, JEFF, LEO] });
@@ -481,7 +491,11 @@ describe('draftFromExpense', () => {
       merchant: 'Costco',
       expenseDate: '2026-10-17',
       totalCents: result.totalCents!,
-      categoryId: payload.p_category_id,
+      // What my_category_for returns: the expense's if Leo paid, otherwise his share's.
+      myCategoryId:
+        payload.p_category_id ??
+        payload.p_shares.find((s) => s.participant_id === LEO)?.category_override_id ??
+        null,
       items: result.items.map((i) => ({
         name: i.name,
         amountCents: i.amount_cents,
@@ -494,7 +508,6 @@ describe('draftFromExpense', () => {
       shares: payload.p_shares.map((s) => ({
         participantId: s.participant_id,
         amountCents: s.amount_cents,
-        categoryOverrideId: s.category_override_id ?? null,
       })),
     };
   };
