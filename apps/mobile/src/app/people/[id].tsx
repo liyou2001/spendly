@@ -7,6 +7,7 @@ import { Share, StyleSheet, View } from 'react-native';
 
 import {
   AmountForm,
+  Breakdown,
   Button,
   FormMessage,
   KeyBlock,
@@ -46,6 +47,7 @@ import {
   type Payment,
   type PaymentHandles,
 } from '@/lib/data';
+import { explainShare } from '@/lib/breakdown';
 import { formatDate } from '@/lib/dates';
 import { payPageUrl } from '@/lib/payPage';
 import { normalizePhone } from '@/lib/phone';
@@ -53,7 +55,7 @@ import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 import { useUsernameCheck } from '@/lib/useUsernameCheck';
-import { space } from '@/theme';
+import { colors, sizes, space } from '@/theme';
 
 const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null, zelle: null };
 
@@ -356,8 +358,59 @@ function PersonView({
         <PaymentLinkStatus name={firstName} onRevoke={() => act(() => revokeShareLinks(them.id))} />
       ) : null}
 
+      {netCents !== 0 ? (
+        <WhatItsFor
+          expenses={
+            netCents > 0 ? expensesBehind(owedToMe, netCents) : expensesBehind(iOwe, -netCents)
+          }
+          whose={netCents > 0 ? `${firstName}’s` : 'Your'}
+        />
+      ) : null}
+
       <History expenses={expenses} payments={payments} me={me.id} name={firstName} />
     </>
+  );
+}
+
+/**
+ * The expenses behind what's owed now (newest first, until they cover it), each with how the
+ * owing person's part was worked out. Tap one for the whole receipt.
+ */
+function WhatItsFor({ expenses, whose }: { expenses: PairExpense[]; whose: string }) {
+  if (expenses.length === 0) return null;
+  return (
+    <Section title="What it’s for" description="Tap an expense to see the whole receipt.">
+      <View style={styles.bills}>
+        {expenses.map((expense) => {
+          const explained = explainShare(expense.lines, expense.owing, expense.amountCents);
+          return (
+            <View key={expense.id}>
+              <ListRow
+                title={expense.merchant}
+                subtitle={[
+                  formatDate(expense.expenseDate),
+                  expense.totalCents !== null
+                    ? `${whose} share of ${formatCents(expense.totalCents)}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                trailing={<Money cents={expense.amountCents} variant="bodyMedium" />}
+                onPress={() =>
+                  router.push({ pathname: '/expenses/[id]', params: { id: expense.id } })
+                }
+                divider={explained === null}
+              />
+              {explained ? (
+                <View style={styles.breakdown}>
+                  <Breakdown explained={explained} whose={whose} />
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    </Section>
   );
 }
 
@@ -694,6 +747,14 @@ function History({
 }
 
 const styles = StyleSheet.create({
+  bills: {
+    gap: space.sm,
+  },
+  breakdown: {
+    paddingLeft: space.lg,
+    borderLeftWidth: sizes.hairline,
+    borderLeftColor: colors.divider,
+  },
   actions: {
     gap: space.md,
   },

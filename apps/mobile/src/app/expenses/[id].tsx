@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import {
+  Breakdown,
   Button,
   Chip,
   FormMessage,
@@ -31,7 +32,7 @@ import {
   type ShareOfExpense,
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
-import { explainShare, type Explained } from '@/lib/breakdown';
+import { explainShare } from '@/lib/breakdown';
 import { debtLabel, itemTitle, yourPartOf } from '@/lib/labels';
 import { useSession } from '@/lib/session';
 import { canEditExpense, labelForIds, owedToPayer, type SplitPeople } from '@/lib/split';
@@ -313,44 +314,6 @@ function FullView({
         </View>
       ) : null}
     </Screen>
-  );
-}
-
-/** One person's share, line by line, adding up to it. */
-function Breakdown({ explained, whose }: { explained: Explained; whose: string }) {
-  return (
-    <View>
-      {explained.items.map((row, index) => (
-        <ListRow
-          key={`item-${index}`}
-          title={row.title}
-          {...(row.detail ? { subtitle: row.detail } : {})}
-          trailing={<Money cents={row.cents} />}
-        />
-      ))}
-      {explained.adjustments.length > 0 ? (
-        <>
-          <ListRow
-            title={`${whose} items`}
-            subtitle={`${explained.percentOfItems} of all items, so ${explained.percentOfItems} of the rest`}
-            trailing={<Money cents={explained.itemsCents} />}
-          />
-          {explained.adjustments.map((row, index) => (
-            <ListRow
-              key={`adjustment-${index}`}
-              title={row.title}
-              {...(row.detail ? { subtitle: row.detail } : {})}
-              trailing={<Money cents={row.cents} />}
-            />
-          ))}
-        </>
-      ) : null}
-      <ListRow
-        title={`${whose} share`}
-        trailing={<Money cents={explained.totalCents} variant="bodyMedium" />}
-        divider={false}
-      />
-    </View>
   );
 }
 

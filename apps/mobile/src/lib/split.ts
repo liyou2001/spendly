@@ -563,7 +563,6 @@ export function draftFromExpense(
   const typed = (cents: Cents) => formatAmount(cents).replace('.', options.decimalSeparator);
   const sum = (kind: string) =>
     expense.items.filter((i) => i.kind === kind).reduce((total, i) => total + i.amountCents, 0);
-  const myShare = expense.shares.find((s) => s.participantId === people.me);
   const base = {
     merchant: expense.merchant,
     expenseDate: expense.expenseDate,

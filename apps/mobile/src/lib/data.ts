@@ -5,6 +5,7 @@ import type { Cents, Debt } from '@spendly/ledger';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 import type { BudgetRow, SpendingItem } from './budget';
+import type { BillLine } from './breakdown';
 import { toSummaries, type ExpenseSummary } from './expenseList';
 import type { KnownPerson } from './oneOff';
 import { profileColumns, toForm, type ProfileFields, type ProfileForm } from './profile';
@@ -665,6 +666,11 @@ export interface PairExpense {
   amountCents: Cents;
   /** The items the owing person had a part in. */
   itemNames: string[];
+  /** The whole bill, for showing how the owing person's part was worked out. */
+  totalCents: Cents | null;
+  /** Who owes on it: them if you paid, you if they did. */
+  owing: string;
+  lines: BillLine[];
 }
 
 /** Expenses behind the balance between you (`me`) and `them` in a group, newest first. */
@@ -677,7 +683,7 @@ export async function fetchPairExpenses(
     supabase
       .from('expenses')
       .select(
-        'id, merchant, expense_date, created_at, voided_at, paid_by, shares(participant_id, amount_cents), expense_items(name, kind, position, item_assignments(participant_id))',
+        'id, merchant, expense_date, created_at, voided_at, paid_by, total_cents, shares(participant_id, amount_cents), expense_items(name, kind, position, amount_cents, quantity, by_units, item_assignments(participant_id, units))',
       )
       .eq('group_id', groupId)
       .in('paid_by', [me, them])
@@ -708,6 +714,19 @@ export async function fetchPairExpenses(
         )
         .sort((a, b) => a.position - b.position)
         .map((i) => i.name),
+      totalCents: row.total_cents,
+      owing,
+      lines: [...row.expense_items]
+        .sort((a, b) => a.position - b.position)
+        .map((i) => ({
+          name: i.name,
+          amountCents: i.amount_cents,
+          kind: i.kind,
+          quantity: i.quantity,
+          participantIds: i.item_assignments.map((a) => a.participant_id),
+          units: i.item_assignments.map((a) => a.units),
+          byUnits: i.by_units,
+        })),
     });
   }
 
@@ -723,6 +742,9 @@ export async function fetchPairExpenses(
       direction: 'iOwe',
       amountCents: row.amount_cents,
       itemNames: items.map((i) => i.name),
+      totalCents: null,
+      owing: me,
+      lines: [],
     });
   }
   return result.sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));

@@ -17,11 +17,11 @@ export interface OwedExpense {
  * The expenses a balance most likely comes from: newest first, until their amounts cover it.
  * Payments aren't tied to expenses, so the newest ones are taken as the unpaid ones.
  */
-export function expensesBehind(
-  newestFirst: readonly OwedExpense[],
+export function expensesBehind<T extends OwedExpense>(
+  newestFirst: readonly T[],
   owedCents: Cents,
-): OwedExpense[] {
-  const behind: OwedExpense[] = [];
+): T[] {
+  const behind: T[] = [];
   let covered = 0;
   for (const expense of newestFirst) {
     if (covered >= owedCents) break;

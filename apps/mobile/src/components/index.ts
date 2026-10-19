@@ -1,6 +1,7 @@
 export { AddPersonForm } from './AddPersonForm';
 export { AmountForm } from './AmountForm';
 export { Avatar } from './Avatar';
+export { Breakdown } from './Breakdown';
 export { Button } from './Button';
 export { CalendarPicker } from './CalendarPicker';
 export { Chip } from './Chip';
