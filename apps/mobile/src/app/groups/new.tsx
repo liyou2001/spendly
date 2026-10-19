@@ -20,6 +20,7 @@ interface NewPerson {
   key: number;
   displayName: string;
   phone: string | null;
+  inviteUserId: string | null;
 }
 
 export default function NewGroup() {
@@ -80,7 +81,11 @@ export default function NewGroup() {
               <ListRow
                 key={person.key}
                 title={person.displayName}
-                {...(person.phone ? { subtitle: person.phone } : {})}
+                {...(person.inviteUserId
+                  ? { subtitle: 'Will be invited to Spendly' }
+                  : person.phone
+                    ? { subtitle: person.phone }
+                    : {})}
                 leading={<Avatar name={person.displayName} size={36} />}
                 trailing={
                   <IconButton
@@ -98,8 +103,8 @@ export default function NewGroup() {
             setPendingPerson(pending);
             if (!pending) setError(null);
           }}
-          onAdd={async (displayName, phone) => {
-            setPeople((prev) => [...prev, { key: Date.now(), displayName, phone }]);
+          onAdd={async (displayName, phone, inviteUserId) => {
+            setPeople((prev) => [...prev, { key: Date.now(), displayName, phone, inviteUserId }]);
           }}
         />
       </Section>

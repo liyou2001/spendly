@@ -13,6 +13,8 @@ interface ListRowProps {
   trailing?: ReactNode;
   /** Makes the row tappable and shows a chevron. */
   onPress?: () => void;
+  /** Hide the chevron, e.g. on a row that expands in place and shows its own arrow. */
+  chevron?: boolean;
   /** Thin divider under the row. Turn off for the last row in a list. */
   divider?: boolean;
 }
@@ -24,6 +26,7 @@ export function ListRow({
   leading,
   trailing,
   onPress,
+  chevron = true,
   divider = true,
 }: ListRowProps) {
   const content = (
@@ -40,7 +43,7 @@ export function ListRow({
         ) : null}
       </View>
       {trailing}
-      {onPress ? <Feather name="chevron-right" size={20} color={colors.muted} /> : null}
+      {onPress && chevron ? <Feather name="chevron-right" size={20} color={colors.muted} /> : null}
     </>
   );
 

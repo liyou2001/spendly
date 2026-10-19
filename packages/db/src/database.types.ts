@@ -169,11 +169,51 @@ export type Database = {
           },
         ];
       };
+      group_invites: {
+        Row: {
+          created_at: string;
+          decided_at: string | null;
+          id: string;
+          invited_by: string;
+          invited_user_id: string;
+          participant_id: string;
+          status: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          decided_at?: string | null;
+          id?: string;
+          invited_by: string;
+          invited_user_id: string;
+          participant_id: string;
+          status?: string;
+        };
+        Update: {
+          created_at?: string;
+          decided_at?: string | null;
+          id?: string;
+          invited_by?: string;
+          invited_user_id?: string;
+          participant_id?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'group_invites_participant_id_fkey';
+            columns: ['participant_id'];
+            isOneToOne: false;
+            referencedRelation: 'participants';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       groups: {
         Row: {
           created_at: string;
           created_by: string;
           id: string;
+          is_one_off: boolean;
           is_personal: boolean;
           name: string;
         };
@@ -182,6 +222,7 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           id?: string;
+          is_one_off?: boolean;
           is_personal?: boolean;
           name: string;
         };
@@ -189,6 +230,7 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           id?: string;
+          is_one_off?: boolean;
           is_personal?: boolean;
           name?: string;
         };
@@ -408,6 +450,7 @@ export type Database = {
           display_name: string;
           id: string;
           paypal_username: string | null;
+          username: string;
           venmo_username: string | null;
         };
         ComputedFields: never;
@@ -417,6 +460,7 @@ export type Database = {
           display_name: string;
           id: string;
           paypal_username?: string | null;
+          username: string;
           venmo_username?: string | null;
         };
         Update: {
@@ -425,6 +469,7 @@ export type Database = {
           display_name?: string;
           id?: string;
           paypal_username?: string | null;
+          username?: string;
           venmo_username?: string | null;
         };
         Relationships: [];
@@ -625,6 +670,15 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      add_person: {
+        Args: {
+          p_display_name: string;
+          p_group_id: string;
+          p_invite_user_id?: string;
+          p_phone?: string;
+        };
+        Returns: string;
+      };
       balances: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -634,12 +688,24 @@ export type Database = {
           to_participant: string;
         }[];
       };
+      cancel_invite: { Args: { p_invite_id: string }; Returns: undefined };
       claim_payment: {
         Args: { p_amount_cents: number; p_group_id: string; p_method?: string; p_to: string };
         Returns: string;
       };
-      create_group: { Args: { p_name: string; p_people?: Json }; Returns: string };
+      create_group: {
+        Args: { p_name: string; p_one_off?: boolean; p_people?: Json };
+        Returns: string;
+      };
       decide_payment: { Args: { p_accept: boolean; p_payment_id: string }; Returns: undefined };
+      find_user: {
+        Args: { p_username: string };
+        Returns: {
+          display_name: string;
+          user_id: string;
+          username: string;
+        }[];
+      };
       forgive_debt: {
         Args: { p_amount_cents: number; p_debtor: string; p_group_id: string };
         Returns: undefined;
@@ -657,6 +723,19 @@ export type Database = {
           paid_by: string;
           participant_id: string;
           payer_name: string;
+        }[];
+      };
+      invite_to_group: { Args: { p_participant_id: string; p_user_id: string }; Returns: string };
+      my_invites: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          added_as: string;
+          created_at: string;
+          group_id: string;
+          group_name: string;
+          invite_id: string;
+          invited_by_name: string;
+          invited_by_username: string;
         }[];
       };
       my_spending: {
@@ -677,6 +756,7 @@ export type Database = {
         };
         Returns: string;
       };
+      respond_to_invite: { Args: { p_accept: boolean; p_invite_id: string }; Returns: string };
       save_expense: {
         Args: {
           p_category_id?: string;
@@ -692,6 +772,7 @@ export type Database = {
         };
         Returns: string;
       };
+      username_available: { Args: { p_username: string }; Returns: boolean };
       void_expense: { Args: { p_expense_id: string }; Returns: undefined };
     };
     Enums: {

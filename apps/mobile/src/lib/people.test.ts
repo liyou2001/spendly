@@ -7,26 +7,59 @@ const apartment: Group = {
   id: 'g-apt',
   name: 'Apartment',
   isPersonal: false,
+  isOneOff: false,
   people: [
-    { id: 'leo', displayName: 'Leo', userId: 'u-leo', phone: null },
-    { id: 'jeff', displayName: 'Jeff', userId: null, phone: '+16085551234' },
-    { id: 'maya', displayName: 'Maya', userId: null, phone: null },
+    { id: 'leo', displayName: 'Leo', userId: 'u-leo', phone: null, username: null, invite: null },
+    {
+      id: 'jeff',
+      displayName: 'Jeff',
+      userId: null,
+      phone: '+16085551234',
+      username: null,
+      invite: null,
+    },
+    { id: 'maya', displayName: 'Maya', userId: null, phone: null, username: null, invite: null },
   ],
 };
 const trip: Group = {
   id: 'g-trip',
   name: 'Ski trip',
   isPersonal: false,
+  isOneOff: false,
   people: [
-    { id: 'leo-trip', displayName: 'Leo', userId: 'u-leo', phone: null },
-    { id: 'priya', displayName: 'Priya', userId: 'u-priya', phone: null },
+    {
+      id: 'leo-trip',
+      displayName: 'Leo',
+      userId: 'u-leo',
+      phone: null,
+      username: null,
+      invite: null,
+    },
+    {
+      id: 'priya',
+      displayName: 'Priya',
+      userId: 'u-priya',
+      phone: null,
+      username: null,
+      invite: null,
+    },
   ],
 };
 const personal: Group = {
   id: 'g-personal',
   name: 'Personal',
   isPersonal: true,
-  people: [{ id: 'leo-solo', displayName: 'Leo', userId: 'u-leo', phone: null }],
+  isOneOff: false,
+  people: [
+    {
+      id: 'leo-solo',
+      displayName: 'Leo',
+      userId: 'u-leo',
+      phone: null,
+      username: null,
+      invite: null,
+    },
+  ],
 };
 
 const now = new Date('2026-10-20T12:00:00Z');

@@ -88,7 +88,7 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 
 ### Design
 
-- **Colors:** white `#FFFFFF` background. Pale coral `#F8DFD9` for the one key block per screen, the active tab, "You" tags and avatars. Coral `#E58C76` for primary buttons, selected chips, the + (add expense) button, progress bars and attention dots, with ink text and icons on it (ink is 6.1:1; white would be only 2.5:1). Bars and dots always sit beside text that says the same thing. Ink `#2B2420` for text. Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
+- **Colors:** white `#FFFFFF` background. Pale coral `#F8DFD9` for the one key block per screen, the active tab, "You" tags, avatars and open dropdowns. Coral `#E58C76` for primary buttons, selected chips, the + (add expense) button, progress bars and attention dots, with ink text and icons on it (ink is 6.1:1; white would be only 2.5:1). Bars and dots always sit beside text that says the same thing. Ink `#2B2420` for text. Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
 - **Type:** Hanken Grotesk, weights 300/400/500/600. Big numbers 52px at weight 300, letter-spacing -0.03em, tabular figures. Screen titles 24–28px/500. Section headings 15px/600. Body 15–16px/400. Small text 13–14px in muted.
 - **Layout:** 24px side margins, about 28px between sections. Lists separated by thin dividers, not cards. Key block corner radius 24px. Buttons radius 14px, at least 44px tall. Tags fully rounded.
 - **Tabs:** Home, Budget, + (orange circle, adds an expense), People, Me.

@@ -201,9 +201,9 @@ describe('buildSplit (quick)', () => {
 });
 
 describe('item tags', () => {
-  it('offer All, You, then each other person in the dropdown', () => {
+  it('offer All (split evenly), You, then each other person in the dropdown', () => {
     expect(assignmentOptions(apartment, names).map((o) => [o.label, o.assignment])).toEqual([
-      ['All', { kind: 'all' }],
+      ['All (split evenly)', { kind: 'all' }],
       ['You', { kind: 'you' }],
       ['Jeff', { kind: 'person', participantId: JEFF }],
       ['Maya', { kind: 'person', participantId: MAYA }],

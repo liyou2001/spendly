@@ -4,6 +4,7 @@ import type { BottomTabBarProps } from 'expo-router/tabs';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useInvites } from '@/lib/invites';
 import { colors, radius, sizes, space } from '@/theme';
 
 import { Text } from './Text';
@@ -19,6 +20,7 @@ const icons: Record<string, IconName> = {
 
 /** Home, Budget, +, People, Me. The + opens Add expense instead of being a tab of its own. */
 export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+  const { invites } = useInvites();
   const tabs = state.routes.map((route, index) => {
     const focused = state.index === index;
     const label = descriptors[route.key]?.options.title ?? route.name;
@@ -37,7 +39,11 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
         key={route.key}
         onPress={onPress}
         accessibilityRole="tab"
-        accessibilityLabel={label}
+        accessibilityLabel={
+          route.name === 'people' && invites.length > 0
+            ? `${label}, ${invites.length} ${invites.length === 1 ? 'invite' : 'invites'}`
+            : label
+        }
         accessibilityState={{ selected: focused }}
         style={styles.tab}
       >
@@ -47,6 +53,7 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
             size={sizes.icon}
             color={focused ? colors.ink : colors.muted}
           />
+          {route.name === 'people' && invites.length > 0 ? <View style={styles.dot} /> : null}
         </View>
         <Text variant="caption" style={focused ? styles.labelActive : undefined}>
           {label}
@@ -101,6 +108,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dot: {
+    position: 'absolute',
+    top: 3,
+    right: 14,
+    width: 8,
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
   },
   iconPillActive: {
     backgroundColor: colors.accentPale,

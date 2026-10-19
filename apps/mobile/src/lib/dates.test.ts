@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, formatDate, todayLocal } from './dates';
+import { addDays, formatDate, monthDay, todayLocal } from './dates';
 
 describe('todayLocal', () => {
   it('uses the phone’s local calendar date', () => {
@@ -32,5 +32,12 @@ describe('formatDate', () => {
   it('shows weekday and date this year, and the year otherwise', () => {
     expect(formatDate('2026-10-16', today)).toBe('Fri, Oct 16');
     expect(formatDate('2025-12-31', today)).toBe('Dec 31, 2025');
+  });
+});
+
+describe('monthDay', () => {
+  it('always gives the short month and day', () => {
+    expect(monthDay('2026-10-19')).toBe('Oct 19');
+    expect(monthDay('2025-01-02')).toBe('Jan 2');
   });
 });

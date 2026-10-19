@@ -16,8 +16,16 @@ import {
   Tag,
   Text,
   TextButton,
+  TextField,
 } from '@/components';
-import { addPerson, fetchBalances, fetchExpenses, fetchGroup, friendlyError } from '@/lib/data';
+import {
+  addPerson,
+  fetchBalances,
+  fetchExpenses,
+  fetchGroup,
+  friendlyError,
+  renameGroup,
+} from '@/lib/data';
 import { formatDate } from '@/lib/dates';
 import { debtLabel } from '@/lib/labels';
 import { useSession } from '@/lib/session';
@@ -55,6 +63,9 @@ export default function GroupDetail() {
 
           return (
             <>
+              {group.isOneOff ? (
+                <OneOffHeader groupId={group.id} name={group.name} onRenamed={detail.reload} />
+              ) : null}
               <KeyBlock>
                 {group.isPersonal ? (
                   <>
@@ -143,7 +154,15 @@ export default function GroupDetail() {
                           ? `${person.displayName} (you)`
                           : person.displayName
                       }
-                      subtitle={person.phone ?? (person.userId ? 'Has the app' : 'No phone number')}
+                      subtitle={
+                        person.userId
+                          ? person.username
+                            ? `@${person.username}`
+                            : 'Has the app'
+                          : person.invite
+                            ? `Invited${person.invite.username ? ` @${person.invite.username}` : ''}`
+                            : (person.phone ?? 'No phone number')
+                      }
                       leading={<Avatar name={person.displayName} size={36} />}
                       {...(person.userId === userId
                         ? { trailing: <Tag label="You" tone="accent" /> }
@@ -155,9 +174,9 @@ export default function GroupDetail() {
                 {group.isPersonal ? null : adding ? (
                   <AddPersonForm
                     onCancel={() => setAdding(false)}
-                    onAdd={async (displayName, phone) => {
+                    onAdd={async (displayName, phone, inviteUserId) => {
                       try {
-                        await addPerson(group.id, displayName, phone);
+                        await addPerson(group.id, displayName, phone, inviteUserId);
                       } catch (e) {
                         throw new Error(friendlyError(e as Error));
                       }
@@ -177,7 +196,90 @@ export default function GroupDetail() {
   );
 }
 
+/** "Quick split" tag and renaming, for a quick split whose automatic name doesn't fit. */
+function OneOffHeader({
+  groupId,
+  name,
+  onRenamed,
+}: {
+  groupId: string;
+  name: string;
+  onRenamed: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const next = text.trim();
+    if (!next) {
+      setError('Give it a name.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await renameGroup(groupId, next);
+      setEditing(false);
+      onRenamed();
+    } catch (e) {
+      setError(friendlyError(e as Error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <View style={styles.oneOff}>
+        <Tag label="Quick split" />
+        <TextButton
+          label="Rename"
+          icon="edit-2"
+          onPress={() => {
+            setText(name);
+            setError(null);
+            setEditing(true);
+          }}
+        />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.stack}>
+      <TextField
+        label="Name"
+        value={text}
+        onChangeText={(next) => {
+          setText(next);
+          setError(null);
+        }}
+        error={error}
+        maxLength={80}
+        autoFocus
+      />
+      <View style={styles.actions}>
+        <View style={styles.flex}>
+          <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
+        </View>
+        <View style={styles.flex}>
+          <Button label="Save" onPress={() => void save()} loading={saving} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  oneOff: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: space.md,
+  },
   stack: {
     gap: space.sm,
   },

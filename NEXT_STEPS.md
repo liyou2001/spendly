@@ -138,3 +138,17 @@ For each question, the **How to test** line suggests something to ask or a task 
 - **Now:** phone is optional when adding a person. Step 6 uses it to open a prefilled payment request in Messages.
 - **Why it matters:** payment requests and reminders depend on it. If people skip it, Step 6 should ask for it at the moment it's needed instead.
 - **How to test:** see whether they fill it in while creating a group, and ask why or why not.
+
+### 18. Do quick splits work for a random night out?
+
+- **Status:** Open
+- **Now:** Add expense has a **Quick split** chip. You pick who was there (suggestions from people you've split with before, or add new people) and split like a group. It's kept out of the Groups list, and named after who was there and the date ("Jeff and Maya · Oct 19").
+- **Why it matters:** for casual outings, making a full group is too much work, so people may not log the expense at all.
+- **How to test:** "You had dinner with two classmates tonight and paid. Split it." Watch whether they find Quick split, and whether they confuse it with the "Just a total" mode. Check whether the suggestions help and whether the name makes sense later in the People tab. Also ask whether they'd want to turn a quick split into a regular group.
+
+### 19. Can people find each other by username, and do they notice invites?
+
+- **Status:** Open
+- **Now:** everyone gets a username at sign-up (from their email name), shown on the Me tab and changeable in Profile & payments. You invite someone by typing their exact username. They see a dot on the People tab and the invite at the top of People (two at most, then "See all"). There's no push notification yet (Step 8).
+- **Why it matters:** if people don't know their own username, or never notice the invite, their roommate's app stays name-only and "I paid" / "Got it" can't be used.
+- **How to test:** ask someone to add a friend who uses Spendly, and watch whether they know where to find their username. Then check how long the friend takes to notice and accept the invite without being told. Ask whether the automatic usernames (like "liyou2001") feel fine or they'd change them.

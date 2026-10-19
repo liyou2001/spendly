@@ -31,3 +31,9 @@ export function formatDate(date: string, today: string = todayLocal()): string {
   if (date.slice(0, 4) !== today.slice(0, 4)) return `${monthDay}, ${d.getUTCFullYear()}`;
   return `${WEEKDAYS[d.getUTCDay()]}, ${monthDay}`;
 }
+
+/** "Oct 19" from "2026-10-19", whatever today is. */
+export function monthDay(date: string): string {
+  const d = toUtc(date);
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}

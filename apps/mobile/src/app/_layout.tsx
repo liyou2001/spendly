@@ -3,6 +3,7 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { InvitesProvider } from '@/lib/invites';
 import { SessionProvider, useSession } from '@/lib/session';
 import { colors, fontFiles } from '@/theme';
 
@@ -33,22 +34,26 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   // Signed-out users can only reach sign-in; signed-in users can't. Signing in or out flips the
   // guards, and Expo Router moves to the first screen that's allowed.
   return (
-    <Stack
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
-    >
-      <Stack.Protected guard={session !== null}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="add-expense" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="groups/new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="groups/[id]" />
-        <Stack.Screen name="expenses/[id]" />
-        <Stack.Screen name="settings/profile" />
-        <Stack.Screen name="settings/categories" />
-        <Stack.Screen name="people/[id]" />
-      </Stack.Protected>
-      <Stack.Protected guard={session === null}>
-        <Stack.Screen name="sign-in" />
-      </Stack.Protected>
-    </Stack>
+    // Keyed by account, so signing in as someone else starts with their invites.
+    <InvitesProvider key={session?.user.id ?? 'signed-out'}>
+      <Stack
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
+      >
+        <Stack.Protected guard={session !== null}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="add-expense" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="groups/new" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="groups/[id]" />
+          <Stack.Screen name="expenses/[id]" />
+          <Stack.Screen name="settings/profile" />
+          <Stack.Screen name="settings/categories" />
+          <Stack.Screen name="people/[id]" />
+          <Stack.Screen name="invites" />
+        </Stack.Protected>
+        <Stack.Protected guard={session === null}>
+          <Stack.Screen name="sign-in" />
+        </Stack.Protected>
+      </Stack>
+    </InvitesProvider>
   );
 }

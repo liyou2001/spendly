@@ -4,6 +4,7 @@
 import type { Cents, Debt } from '@spendly/ledger';
 import type { PostgrestError } from '@supabase/supabase-js';
 
+import type { KnownPerson } from './oneOff';
 import { profileColumns, toForm, type ProfileFields, type ProfileForm } from './profile';
 import type { SaveItem } from './split';
 import { supabase } from './supabase';
@@ -13,12 +14,18 @@ export interface Person {
   displayName: string;
   userId: string | null;
   phone: string | null;
+  /** Their Spendly username, when they have an account in this group. */
+  username: string | null;
+  /** A pending invite for an account to become this person. */
+  invite: { id: string; username: string | null } | null;
 }
 
 export interface Group {
   id: string;
   name: string;
   isPersonal: boolean;
+  /** A group for a single outing, kept out of group lists. */
+  isOneOff: boolean;
   /** In the order they were added; the creator comes first. */
   people: Person[];
 }
@@ -58,12 +65,13 @@ function unwrap<R extends { data: unknown; error: PostgrestError | null }>(
 }
 
 const groupColumns =
-  'id, name, is_personal, created_by, created_at, participants(id, display_name, user_id, phone, created_at)';
+  'id, name, is_personal, is_one_off, created_by, created_at, participants(id, display_name, user_id, phone, created_at, group_invites(id, status, invited_user_id))';
 
 interface GroupRow {
   id: string;
   name: string;
   is_personal: boolean;
+  is_one_off: boolean;
   created_by: string;
   participants: {
     id: string;
@@ -71,6 +79,7 @@ interface GroupRow {
     user_id: string | null;
     phone: string | null;
     created_at: string;
+    group_invites: { id: string; status: string; invited_user_id: string }[];
   }[];
 }
 
@@ -78,19 +87,50 @@ interface GroupRow {
  * People in the order they were added. Groups made before participants got distinct
  * timestamps can have ties; the creator then comes first, then a stable order by id.
  */
-function toGroup(row: GroupRow): Group {
+function toGroup(row: GroupRow, usernames: ReadonlyMap<string, string>): Group {
   const rank = (p: GroupRow['participants'][number]) => (p.user_id === row.created_by ? 0 : 1);
   return {
     id: row.id,
     name: row.name,
     isPersonal: row.is_personal,
+    isOneOff: row.is_one_off,
     people: [...row.participants]
       .sort(
         (a, b) =>
           a.created_at.localeCompare(b.created_at) || rank(a) - rank(b) || a.id.localeCompare(b.id),
       )
-      .map((p) => ({ id: p.id, displayName: p.display_name, userId: p.user_id, phone: p.phone })),
+      .map((p) => {
+        const invite = p.group_invites.find((i) => i.status === 'pending');
+        return {
+          id: p.id,
+          displayName: p.display_name,
+          userId: p.user_id,
+          phone: p.phone,
+          username: p.user_id ? (usernames.get(p.user_id) ?? null) : null,
+          invite: invite
+            ? { id: invite.id, username: usernames.get(invite.invited_user_id) ?? null }
+            : null,
+        };
+      }),
   };
+}
+
+/** Usernames for the accounts in these groups, including people invited to them. */
+async function usernamesFor(rows: readonly GroupRow[]): Promise<Map<string, string>> {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    for (const p of row.participants) {
+      if (p.user_id) ids.add(p.user_id);
+      for (const i of p.group_invites) if (i.status === 'pending') ids.add(i.invited_user_id);
+    }
+  }
+  return fetchUsernames([...ids]);
+}
+
+async function fetchUsernames(userIds: string[]): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const rows = unwrap(await supabase.from('profiles').select('id, username').in('id', userIds));
+  return new Map(rows.map((r) => [r.id, r.username]));
 }
 
 /** Every group you're in: shared groups, newest first, then your Personal group. */
@@ -98,42 +138,82 @@ export async function fetchGroups(): Promise<Group[]> {
   const rows = unwrap(
     await supabase.from('groups').select(groupColumns).order('created_at', { ascending: false }),
   );
-  return rows.map(toGroup).sort((a, b) => Number(a.isPersonal) - Number(b.isPersonal));
+  const usernames = await usernamesFor(rows);
+  return rows
+    .map((row) => toGroup(row, usernames))
+    .sort((a, b) => Number(a.isPersonal) - Number(b.isPersonal));
 }
 
 /** One group you're in. Throws if it doesn't exist or you can't see it. */
 export async function fetchGroup(groupId: string): Promise<Group> {
-  return toGroup(
-    unwrap(await supabase.from('groups').select(groupColumns).eq('id', groupId).single()),
-  );
+  const row = unwrap(await supabase.from('groups').select(groupColumns).eq('id', groupId).single());
+  return toGroup(row, await usernamesFor([row]));
 }
 
 export async function createGroup(
   name: string,
-  people: { displayName: string; phone: string | null }[],
+  people: { displayName: string; phone: string | null; inviteUserId?: string | null }[],
+  options: { oneOff?: boolean } = {},
 ): Promise<string> {
   return unwrap(
     await supabase.rpc('create_group', {
       p_name: name,
-      p_people: people.map((p) => ({ display_name: p.displayName, phone: p.phone })),
+      p_people: people.map((p) => ({
+        display_name: p.displayName,
+        phone: p.phone,
+        invite_user_id: p.inviteUserId ?? null,
+      })),
+      p_one_off: options.oneOff ?? false,
     }),
   );
 }
 
-/** Adds a name-only person to a group you're in. */
+/** Renames a group you're in. */
+export async function renameGroup(groupId: string, name: string): Promise<void> {
+  const { error } = await supabase.from('groups').update({ name }).eq('id', groupId);
+  if (error) throw error;
+}
+
+/**
+ * Everyone in your groups except you, every copy (one per group), for suggesting people to
+ * split with. Merge copies with dedupePeople.
+ */
+export async function fetchKnownPeople(userId: string): Promise<KnownPerson[]> {
+  const rows = unwrap(
+    await supabase
+      .from('participants')
+      .select('display_name, phone, created_at, user_id')
+      .order('created_at', { ascending: false })
+      .limit(300),
+  );
+  const others = rows.filter((row) => row.user_id !== userId);
+  const usernames = await fetchUsernames([
+    ...new Set(others.map((r) => r.user_id).filter((id): id is string => id !== null)),
+  ]);
+  return others.map((row) => ({
+    displayName: row.display_name,
+    phone: row.phone,
+    addedAt: row.created_at,
+    userId: row.user_id,
+    username: row.user_id ? (usernames.get(row.user_id) ?? null) : null,
+  }));
+}
+
+/** Adds a person to a group you're in, and invites an account to be them if one is given. */
 export async function addPerson(
   groupId: string,
   displayName: string,
   phone: string | null,
-): Promise<Person> {
-  const row = unwrap(
-    await supabase
-      .from('participants')
-      .insert({ group_id: groupId, display_name: displayName, phone })
-      .select('id, display_name, user_id, phone')
-      .single(),
+  inviteUserId: string | null = null,
+): Promise<string> {
+  return unwrap(
+    await supabase.rpc('add_person', {
+      p_group_id: groupId,
+      p_display_name: displayName,
+      ...(phone ? { p_phone: phone } : {}),
+      ...(inviteUserId ? { p_invite_user_id: inviteUserId } : {}),
+    }),
   );
-  return { id: row.id, displayName: row.display_name, userId: row.user_id, phone: row.phone };
 }
 
 export async function fetchCategories(userId: string): Promise<Category[]> {
@@ -157,6 +237,8 @@ export async function fetchProfile(userId: string): Promise<ProfileForm> {
 /** Saves your editable profile fields. Validate them with validateProfile first. */
 export async function updateProfile(userId: string, values: ProfileFields): Promise<void> {
   const { error } = await supabase.from('profiles').update(values).eq('id', userId);
+  if (error?.code === '23505')
+    throw new UserFacingError('That username was just taken. Try another.');
   if (error) throw error;
 }
 
@@ -640,4 +722,70 @@ export async function fetchGroupOf(participantId: string): Promise<Group> {
     await supabase.from('participants').select('group_id').eq('id', participantId).single(),
   );
   return fetchGroup(row.group_id);
+}
+
+// Usernames and invites -------------------------------------------------------
+
+export interface FoundUser {
+  userId: string;
+  displayName: string;
+  username: string;
+}
+
+/** The account with exactly this username (ignoring case and a leading @), or null. */
+export async function findUser(username: string): Promise<FoundUser | null> {
+  const { data, error } = await supabase.rpc('find_user', { p_username: username }).maybeSingle();
+  if (error) throw error;
+  return data
+    ? { userId: data.user_id, displayName: data.display_name, username: data.username }
+    : null;
+}
+
+/** Whether a username is free for you. Your own current one counts as free. */
+export async function usernameAvailable(username: string): Promise<boolean> {
+  return unwrap(await supabase.rpc('username_available', { p_username: username }));
+}
+
+/** Invites an account to be this person in their group. */
+export async function inviteToGroup(participantId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('invite_to_group', {
+    p_participant_id: participantId,
+    p_user_id: userId,
+  });
+  if (error) throw error;
+}
+
+export async function cancelInvite(inviteId: string): Promise<void> {
+  const { error } = await supabase.rpc('cancel_invite', { p_invite_id: inviteId });
+  if (error) throw error;
+}
+
+/** Accepts or declines an invite sent to you. Returns the group's id. */
+export async function respondToInvite(inviteId: string, accept: boolean): Promise<string> {
+  return unwrap(
+    await supabase.rpc('respond_to_invite', { p_invite_id: inviteId, p_accept: accept }),
+  );
+}
+
+export interface Invite {
+  id: string;
+  groupId: string;
+  groupName: string;
+  invitedByName: string;
+  invitedByUsername: string;
+  addedAs: string;
+  createdAt: string;
+}
+
+/** Your pending invites, newest first. */
+export async function fetchMyInvites(): Promise<Invite[]> {
+  return unwrap(await supabase.rpc('my_invites')).map((row) => ({
+    id: row.invite_id,
+    groupId: row.group_id,
+    groupName: row.group_name,
+    invitedByName: row.invited_by_name,
+    invitedByUsername: row.invited_by_username,
+    addedAs: row.added_as,
+    createdAt: row.created_at,
+  }));
 }

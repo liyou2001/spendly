@@ -27,10 +27,13 @@ erDiagram
     groups ||--o{ payments : "has"
     participants ||--o{ payments : "from / to"
     expenses |o--o{ payments : "forgiveness only"
+    participants ||--o{ group_invites : "invite to be"
+    users ||--o{ group_invites : "invited"
 
     profiles {
         uuid id PK "= users.id"
         text display_name
+        text username UK "how people find you to invite you"
         text venmo_username
         text paypal_username
         text cashapp_tag
@@ -40,6 +43,7 @@ erDiagram
         text name
         uuid created_by FK
         boolean is_personal "one per user"
+        boolean is_one_off "a quick split: one outing, kept out of group lists"
     }
     participants {
         uuid id PK
@@ -92,6 +96,14 @@ erDiagram
         text method "venmo | paypal | cashapp | cash | other"
         uuid recorded_by FK
         uuid decided_by FK
+        timestamptz decided_at
+    }
+    group_invites {
+        uuid id PK
+        uuid participant_id FK "the person they become"
+        uuid invited_user_id FK
+        uuid invited_by FK
+        text status "pending | accepted | declined | cancelled"
         timestamptz decided_at
     }
 ```
@@ -234,6 +246,7 @@ Nothing is readable without signing in. Signed-in users see:
 | Groups and their participants                          | Members of the group                                                                                     |
 | Profiles                                               | You, and people who share a group with you                                                               |
 | Payments                                               | The two people involved, and whoever recorded it                                                         |
+| Invites                                                | The person who sent it, the person invited, and members of that group                                    |
 | Categories, budgets, push tokens                       | Their owner                                                                                              |
 | Payment links, text consents, messages, inbound emails | Edge Functions only                                                                                      |
 
@@ -241,17 +254,23 @@ People without accounts see their share only through the `get-share` Edge Functi
 
 ## Database functions
 
-| Function                              | What it does                                                                                                                                                     |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `save_expense(...)`                   | Inserts an expense with its items, assignments and shares in one transaction. Rejects shares that don't sum to the total. Can replace (void) an earlier expense. |
-| `create_group(name, people)`          | Creates a group with you in it plus any name-only people, in one transaction.                                                                                    |
-| `void_expense(id)`                    | Marks an expense voided. Never deletes it.                                                                                                                       |
-| `record_payment(...)`                 | A repayment that counts right away: recorded by the person who got paid, or by the payer when the person paid has no account.                                    |
-| `claim_payment(...)`                  | "I paid" to someone with the app. Doesn't count until they confirm it.                                                                                           |
-| `decide_payment(id, accept)`          | "Got it" or "Didn't get it" on a claim made to you.                                                                                                              |
-| `forgive_debt(group, debtor, amount)` | Forgives up to what someone owes you, spread over the expenses behind it, newest first.                                                                          |
-| `balances()`                          | Net who-owes-whom for every pair that includes you.                                                                                                              |
-| `my_spending()`                       | Your spending by month and category.                                                                                                                             |
-| `get_my_shares()`                     | Your items and amount on expenses other people paid.                                                                                                             |
-| Signup trigger                        | Creates your profile, Personal group and default categories.                                                                                                     |
-| Name sync trigger                     | Renaming yourself updates your name in every group you're in.                                                                                                    |
+| Function                                         | What it does                                                                                                                                                     |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `save_expense(...)`                              | Inserts an expense with its items, assignments and shares in one transaction. Rejects shares that don't sum to the total. Can replace (void) an earlier expense. |
+| `create_group(name, people)`                     | Creates a group with you in it plus any name-only people, in one transaction.                                                                                    |
+| `void_expense(id)`                               | Marks an expense voided. Never deletes it.                                                                                                                       |
+| `record_payment(...)`                            | A repayment that counts right away: recorded by the person who got paid, or by the payer when the person paid has no account.                                    |
+| `claim_payment(...)`                             | "I paid" to someone with the app. Doesn't count until they confirm it.                                                                                           |
+| `decide_payment(id, accept)`                     | "Got it" or "Didn't get it" on a claim made to you.                                                                                                              |
+| `forgive_debt(group, debtor, amount)`            | Forgives up to what someone owes you, spread over the expenses behind it, newest first.                                                                          |
+| `find_user(username)`                            | The account with exactly that username, or nothing. No partial search, so nobody can browse users.                                                               |
+| `username_available(username)`                   | Whether a username is free for you.                                                                                                                              |
+| `add_person(group, name, phone, invite_user_id)` | Adds a person to a group, and invites an account to be them if given.                                                                                            |
+| `invite_to_group(participant, user)`             | Invites an account to be a name-only person in your group.                                                                                                       |
+| `respond_to_invite(invite, accept)`              | Accepting makes you that person, so the group's expenses, including earlier ones, show in your account.                                                          |
+| `cancel_invite(invite)`, `my_invites()`          | Cancel an invite you sent; list the ones waiting for you.                                                                                                        |
+| `balances()`                                     | Net who-owes-whom for every pair that includes you.                                                                                                              |
+| `my_spending()`                                  | Your spending by month and category.                                                                                                                             |
+| `get_my_shares()`                                | Your items and amount on expenses other people paid.                                                                                                             |
+| Signup trigger                                   | Creates your profile, Personal group and default categories.                                                                                                     |
+| Name sync trigger                                | Renaming yourself updates your name in every group you're in.                                                                                                    |

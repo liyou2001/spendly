@@ -18,8 +18,10 @@ import {
   Tag,
   Text,
   TextButton,
+  UsernameField,
 } from '@/components';
 import {
+  cancelInvite,
   claimPayment,
   decidePayment,
   fetchBalances,
@@ -29,8 +31,10 @@ import {
   fetchPayments,
   forgiveDebt,
   friendlyError,
+  inviteToGroup,
   recordPayment,
   type PairExpense,
+  type Person,
   type Payment,
   type PaymentHandles,
 } from '@/lib/data';
@@ -38,6 +42,7 @@ import { formatDate } from '@/lib/dates';
 import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/requests';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
+import { useUsernameCheck } from '@/lib/useUsernameCheck';
 import { space } from '@/theme';
 
 const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null };
@@ -162,8 +167,14 @@ function PersonView({
   return (
     <>
       <Text variant="small">
-        {group.name} · {hasApp ? 'Has the app' : (them.phone ?? 'No phone number')}
+        {group.name} ·{' '}
+        {hasApp
+          ? them.username
+            ? `@${them.username}`
+            : 'Has the app'
+          : (them.phone ?? 'No phone number')}
       </Text>
+      {hasApp ? null : <InviteToSpendly person={them} onChanged={onChanged} />}
 
       <KeyBlock>
         <Text variant="sectionHeading">
@@ -271,6 +282,84 @@ function PersonView({
 
       <History expenses={expenses} payments={payments} me={me.id} name={firstName} />
     </>
+  );
+}
+
+/** For someone without the app here: invite their Spendly account, or see the pending invite. */
+function InviteToSpendly({ person, onChanged }: { person: Person; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [username, setUsername] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const check = useUsernameCheck(username, 'find');
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      setOpen(false);
+      setUsername('');
+      onChanged();
+    } catch (e) {
+      setError(friendlyError(e as Error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (person.invite) {
+    const invite = person.invite;
+    return (
+      <View style={styles.claim}>
+        <Text variant="small">
+          Invited{invite.username ? ` @${invite.username}` : ''} · waiting for them to accept
+        </Text>
+        {error ? <FormMessage message={error} /> : null}
+        <TextButton
+          label="Cancel invite"
+          icon="x"
+          onPress={() => void run(() => cancelInvite(invite.id))}
+          disabled={busy}
+        />
+      </View>
+    );
+  }
+  if (!open) {
+    return <TextButton label="Invite to Spendly" icon="user-plus" onPress={() => setOpen(true)} />;
+  }
+  return (
+    <View style={styles.claim}>
+      <UsernameField
+        label={`${person.displayName}’s Spendly username`}
+        value={username}
+        onChangeText={(text) => {
+          setUsername(text);
+          setError(null);
+        }}
+        check={check}
+        hint="They’ll get an invite, and once they accept, see their share in their app."
+      />
+      {error ? <FormMessage message={error} /> : null}
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <Button label="Cancel" variant="secondary" onPress={() => setOpen(false)} />
+        </View>
+        <View style={styles.flex}>
+          <Button
+            label="Invite"
+            onPress={() => {
+              if (check.status === 'found') {
+                const userId = check.user.userId;
+                void run(() => inviteToGroup(person.id, userId));
+              }
+            }}
+            disabled={check.status !== 'found'}
+            loading={busy}
+          />
+        </View>
+      </View>
+    </View>
   );
 }
 

@@ -2,11 +2,20 @@ import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, FormMessage, Loadable, Screen, Text, TextField } from '@/components';
+import {
+  Button,
+  FormMessage,
+  Loadable,
+  Screen,
+  Text,
+  TextField,
+  UsernameField,
+} from '@/components';
 import { fetchProfile, friendlyError, updateProfile } from '@/lib/data';
 import { toForm, validateProfile, type ProfileErrors, type ProfileForm } from '@/lib/profile';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
+import { useUsernameCheck } from '@/lib/useUsernameCheck';
 import { space } from '@/theme';
 
 export default function ProfileSettings() {
@@ -59,6 +68,8 @@ function ProfileEditor({ userId, initial }: { userId: string; initial: ProfileFo
     }
   }
 
+  // Your saved username counts as available, so an unchanged one never blocks saving.
+  const usernameCheck = useUsernameCheck(form.username, 'available', saved.username);
   const dirty = (Object.keys(form) as (keyof ProfileForm)[]).some(
     (key) => form[key] !== saved[key],
   );
@@ -75,6 +86,15 @@ function ProfileEditor({ userId, initial }: { userId: string; initial: ProfileFo
         textContentType="name"
         maxLength={80}
       />
+
+      <UsernameField
+        label="Username"
+        value={form.username}
+        onChangeText={(text) => edit('username', text)}
+        check={usernameCheck}
+      />
+      {errors.username ? <FormMessage message={errors.username} /> : null}
+      <Text variant="small">People add you to their groups with your username.</Text>
 
       <View style={styles.section}>
         <View style={styles.sectionIntro}>
@@ -115,7 +135,12 @@ function ProfileEditor({ userId, initial }: { userId: string; initial: ProfileFo
         />
         {saveError ? <FormMessage message={saveError} /> : null}
         {justSaved ? <Text variant="small">Saved.</Text> : null}
-        <Button label="Save" onPress={() => void save()} loading={saving} disabled={!dirty} />
+        <Button
+          label="Save"
+          onPress={() => void save()}
+          loading={saving}
+          disabled={!dirty || usernameCheck.status !== 'available'}
+        />
       </View>
     </>
   );

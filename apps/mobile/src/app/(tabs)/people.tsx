@@ -1,11 +1,13 @@
-import { router } from 'expo-router';
-import { useCallback } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import Feather from '@expo/vector-icons/Feather';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
   Avatar,
   Button,
   IconButton,
+  InviteRow,
   KeyBlock,
   ListRow,
   Loadable,
@@ -17,10 +19,11 @@ import {
 import { fetchBalances, fetchGroups, fetchPayments, type Group } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
 import { joinNames } from '@/lib/labels';
+import { useInvites } from '@/lib/invites';
 import { buildPeopleView, statusLine, type PersonBalance } from '@/lib/people';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
-import { space } from '@/theme';
+import { colors, space } from '@/theme';
 
 /** "You, Jeff and Maya", "You, Jeff and 3 others", or "Just you". */
 function memberSummary(group: Group, userId: string | undefined): string {
@@ -39,6 +42,11 @@ async function fetchPeople(userId: string) {
   return { groups, view: buildPeopleView({ userId, groups, balances, payments, now: new Date() }) };
 }
 
+/** At most this many invites on the People tab; the rest are one tap away on the Invites screen. */
+const INVITES_SHOWN = 2;
+
+const openGroup = (id: string) => router.push({ pathname: '/groups/[id]', params: { id } });
+
 const openPerson = (person: PersonBalance) =>
   router.push({ pathname: '/people/[id]', params: { id: person.participantId } });
 
@@ -47,15 +55,47 @@ export default function People() {
   const userId = session?.user.id ?? '';
   const people = useLoad(useCallback(() => fetchPeople(userId), [userId]));
   const newGroup = () => router.push('/groups/new');
+  const [showOneOffs, setShowOneOffs] = useState(false);
+  const { invites, refresh: refreshInvites } = useInvites();
+  useFocusEffect(useCallback(() => refreshInvites(), [refreshInvites]));
 
   return (
     <Screen
       title="People"
       headerRight={<IconButton icon="plus" label="New group" onPress={newGroup} />}
     >
+      {invites.length > 0 ? (
+        <Section title="Invites">
+          <View>
+            {invites.slice(0, INVITES_SHOWN).map((invite, index) => (
+              <InviteRow
+                key={invite.id}
+                invite={invite}
+                onAccepted={(groupId) => {
+                  refreshInvites();
+                  people.reload();
+                  openGroup(groupId);
+                }}
+                onDeclined={refreshInvites}
+                divider={index < INVITES_SHOWN - 1 || invites.length > INVITES_SHOWN}
+              />
+            ))}
+            {invites.length > INVITES_SHOWN ? (
+              <ListRow
+                title={`See all ${invites.length} invites`}
+                onPress={() => router.push('/invites')}
+                divider={false}
+              />
+            ) : null}
+          </View>
+        </Section>
+      ) : null}
+
       <Loadable load={people} errorMessage="Couldn’t load your balances.">
         {({ groups, view }) => {
           const shared = groups.filter((g) => !g.isPersonal);
+          const regular = groups.filter((g) => !g.isOneOff);
+          const oneOffs = groups.filter((g) => g.isOneOff);
           return (
             <>
               {shared.length === 0 ? (
@@ -121,18 +161,44 @@ export default function People() {
 
               <Section title="Groups">
                 <View>
-                  {groups.map((group, index) => (
+                  {regular.map((group, index) => (
                     <ListRow
                       key={group.id}
                       title={group.name}
                       subtitle={memberSummary(group, userId)}
                       leading={<Avatar name={group.name} size={36} />}
-                      onPress={() =>
-                        router.push({ pathname: '/groups/[id]', params: { id: group.id } })
-                      }
-                      divider={index < groups.length - 1}
+                      onPress={() => openGroup(group.id)}
+                      divider={index < regular.length - 1 || oneOffs.length > 0}
                     />
                   ))}
+                  {oneOffs.length > 0 ? (
+                    <ListRow
+                      title="Quick splits"
+                      subtitle={`${oneOffs.length} ${oneOffs.length === 1 ? 'outing' : 'outings'} without a group`}
+                      trailing={
+                        <Feather
+                          name={showOneOffs ? 'chevron-up' : 'chevron-down'}
+                          size={20}
+                          color={colors.muted}
+                        />
+                      }
+                      onPress={() => setShowOneOffs(!showOneOffs)}
+                      chevron={false}
+                      divider={showOneOffs}
+                    />
+                  ) : null}
+                  {showOneOffs
+                    ? oneOffs.map((group, index) => (
+                        <ListRow
+                          key={group.id}
+                          title={group.name}
+                          subtitle={memberSummary(group, userId)}
+                          leading={<Avatar name={group.name} size={36} />}
+                          onPress={() => openGroup(group.id)}
+                          divider={index < oneOffs.length - 1}
+                        />
+                      ))
+                    : null}
                 </View>
               </Section>
             </>

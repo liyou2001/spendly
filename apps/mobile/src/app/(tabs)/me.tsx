@@ -11,7 +11,11 @@ import { space } from '@/theme';
 
 async function fetchSummary(userId: string) {
   const [profile, categories] = await Promise.all([fetchProfile(userId), fetchCategories(userId)]);
-  return { displayName: profile.display_name, categoryCount: categories.length };
+  return {
+    displayName: profile.display_name,
+    username: profile.username,
+    categoryCount: categories.length,
+  };
 }
 
 export default function Me() {
@@ -23,6 +27,7 @@ export default function Me() {
 
   const displayName = summary.status === 'ready' ? summary.data.displayName : null;
   const categoryCount = summary.status === 'ready' ? summary.data.categoryCount : null;
+  const username = summary.status === 'ready' ? summary.data.username : null;
 
   async function signOut() {
     setSigningOut(true);
@@ -39,6 +44,11 @@ export default function Me() {
           <Text variant="bodyMedium" numberOfLines={1}>
             {displayName ?? ' '}
           </Text>
+          {username ? (
+            <Text variant="body" numberOfLines={1} selectable>
+              @{username}
+            </Text>
+          ) : null}
           <Text variant="small" numberOfLines={1}>
             {email}
           </Text>
@@ -49,7 +59,7 @@ export default function Me() {
         <View>
           <ListRow
             title="Profile & payments"
-            subtitle="Name, Venmo, PayPal, Cash App"
+            subtitle="Name, username, Venmo, PayPal, Cash App"
             onPress={() => router.push('/settings/profile')}
           />
           <ListRow

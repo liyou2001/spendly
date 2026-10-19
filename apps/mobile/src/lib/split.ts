@@ -80,7 +80,7 @@ export interface AssignmentOption {
 }
 
 /**
- * The dropdown's single choices, in order: All, You, then each other person by name.
+ * The dropdown's single choices, in order: All (split evenly), You, then each other person.
  * "Choose people" (a custom set) is offered separately. Alone in a group, only You.
  */
 export function assignmentOptions(
@@ -90,7 +90,7 @@ export function assignmentOptions(
   const others = people.everyone.filter((id) => id !== people.me);
   return [
     ...(others.length > 0
-      ? [{ key: 'all', label: 'All', assignment: { kind: 'all' } as const }]
+      ? [{ key: 'all', label: 'All (split evenly)', assignment: { kind: 'all' } as const }]
       : []),
     { key: 'you', label: 'You', assignment: { kind: 'you' } as const },
     ...others.map((participantId) => ({

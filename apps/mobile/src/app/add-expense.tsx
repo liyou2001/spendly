@@ -23,9 +23,12 @@ import {
 import { addDays, formatDate, todayLocal } from '@/lib/dates';
 import {
   addPerson,
+  createGroup,
   fetchCategories,
   fetchExpense,
+  fetchGroup,
   fetchGroups,
+  fetchKnownPeople,
   friendlyError,
   saveExpense,
   UserFacingError,
@@ -34,6 +37,7 @@ import {
 } from '@/lib/data';
 import { debtLabel, joinNames } from '@/lib/labels';
 import { deviceDecimalSeparator } from '@/lib/locale';
+import { dedupePeople, oneOffName, type KnownPerson } from '@/lib/oneOff';
 import { useSession } from '@/lib/session';
 import {
   assignedTo,
@@ -54,12 +58,14 @@ import { useLoad } from '@/lib/useLoad';
 import { colors, radius, sizes, space, type } from '@/theme';
 
 async function fetchForm(userId: string, editId: string | undefined) {
-  const [groups, categories, expense] = await Promise.all([
+  const [groups, categories, expense, known] = await Promise.all([
     fetchGroups(),
     fetchCategories(userId),
     editId ? fetchExpense(editId) : Promise.resolve(null),
+    editId ? Promise.resolve([]) : fetchKnownPeople(userId),
   ]);
-  if (!editId) return { groups, categories, editing: null };
+  const knownPeople = dedupePeople(known);
+  if (!editId) return { groups, categories, knownPeople, editing: null };
 
   const group = groups.find((g) => g.id === expense?.groupId);
   const me = group?.people.find((p) => p.userId === userId);
@@ -72,6 +78,7 @@ async function fetchForm(userId: string, editId: string | undefined) {
   return {
     groups,
     categories,
+    knownPeople,
     editing: { expenseId: expense.id, groupId: group.id, ...form.value },
   };
 }
@@ -113,6 +120,7 @@ export default function AddExpense() {
       userId={userId}
       initialGroupId={loaded.data.editing?.groupId ?? groupId}
       editing={loaded.data.editing}
+      knownPeople={loaded.data.knownPeople}
       onGroupsChanged={loaded.reload}
       onClose={close}
     />
@@ -121,7 +129,12 @@ export default function AddExpense() {
 
 /** The group to start in: the one asked for, else your newest shared group, else Personal. */
 function startingGroup(groups: Group[], requested: string | undefined): Group | undefined {
-  return groups.find((g) => g.id === requested) ?? groups.find((g) => !g.isPersonal) ?? groups[0];
+  return (
+    groups.find((g) => g.id === requested) ??
+    groups.find((g) => !g.isPersonal && !g.isOneOff) ??
+    groups.find((g) => g.isPersonal) ??
+    groups[0]
+  );
 }
 
 function emptyDraft(everyone: string[]): Draft {
@@ -144,19 +157,29 @@ interface ExpenseFormProps {
   initialGroupId: string | undefined;
   /** Set when editing: the form starts from this expense and saving replaces it. */
   editing: (EditableExpense & { expenseId: string }) | null;
+  /** People from your other groups, suggested when starting a quick split. */
+  knownPeople: KnownPerson[];
   onGroupsChanged: () => void;
   onClose: () => void;
 }
 
 function ExpenseForm({
-  groups,
+  groups: loadedGroups,
   categories,
   userId,
   initialGroupId,
   editing,
+  knownPeople,
   onGroupsChanged,
   onClose,
 }: ExpenseFormProps) {
+  // A quick split made here is used straight away, before the reloaded group list arrives.
+  const [madeHere, setMadeHere] = useState<Group[]>([]);
+  const groups = useMemo(
+    () => [...loadedGroups, ...madeHere.filter((m) => !loadedGroups.some((g) => g.id === m.id))],
+    [loadedGroups, madeHere],
+  );
+  const [choosingOneOff, setChoosingOneOff] = useState(false);
   // Rows the form starts with are numbered first; rows added later count up from there.
   const nextKey = useRef(editing ? editing.draft.items.length : 1);
   const newItem = (): DraftItem => ({
@@ -254,14 +277,18 @@ function ExpenseForm({
     }));
   }
 
-  async function addPersonToGroup(displayName: string, phone: string | null) {
-    let person;
+  async function addPersonToGroup(
+    displayName: string,
+    phone: string | null,
+    inviteUserId: string | null,
+  ) {
+    let personId: string;
     try {
-      person = await addPerson(group!.id, displayName, phone);
+      personId = await addPerson(group!.id, displayName, phone, inviteUserId);
     } catch (e) {
       throw new Error(friendlyError(e as Error));
     }
-    setDraft((prev) => ({ ...prev, quickPeople: [...prev.quickPeople, person.id] }));
+    setDraft((prev) => ({ ...prev, quickPeople: [...prev.quickPeople, personId] }));
     setAddingPerson(false);
     onGroupsChanged();
   }
@@ -312,273 +339,296 @@ function ExpenseForm({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}
         >
-          {groups.map((g) => (
-            <Chip
-              key={g.id}
-              label={g.name}
-              icon={g.isPersonal ? 'user' : 'users'}
-              selected={g.id === group.id}
-              onPress={() => switchGroup(g)}
-            />
-          ))}
+          {groups
+            .filter((g) => !g.isOneOff || g.id === group.id)
+            .sort(
+              (a, b) =>
+                Number(b.id === group.id && b.isOneOff) - Number(a.id === group.id && a.isOneOff),
+            )
+            .map((g) => (
+              <Chip
+                key={g.id}
+                label={g.name}
+                icon={g.isPersonal ? 'user' : g.isOneOff ? 'zap' : 'users'}
+                selected={g.id === group.id && !choosingOneOff}
+                onPress={() => {
+                  setChoosingOneOff(false);
+                  switchGroup(g);
+                }}
+              />
+            ))}
+          <Chip
+            label="Quick split"
+            icon="plus"
+            selected={choosingOneOff}
+            onPress={() => setChoosingOneOff(true)}
+            accessibilityHint="Split with people just this once, without making a group"
+          />
         </ScrollView>
       )}
 
-      <View style={styles.stack}>
-        <TextField
-          label="Where"
-          value={merchant}
-          onChangeText={setMerchant}
-          placeholder="Costco"
-          error={visible('merchant')}
-          autoCapitalize="words"
-          maxLength={200}
+      {choosingOneOff ? (
+        <OneOffPicker
+          knownPeople={knownPeople}
+          date={date}
+          onCancel={() => setChoosingOneOff(false)}
+          onStarted={async (groupId) => {
+            const made = await fetchGroup(groupId);
+            setMadeHere((prev) => [...prev, made]);
+            setChoosingOneOff(false);
+            switchGroup(made);
+            onGroupsChanged();
+          }}
         />
-        <View style={styles.dateRow}>
-          <Text variant="sectionHeading" style={styles.flex}>
-            Date
-          </Text>
-          <IconButton
-            icon="chevron-left"
-            label="Day before"
-            onPress={() => setDate(addDays(date, -1))}
-          />
-          <Text variant="body" style={styles.dateText}>
-            {formatDate(date, today)}
-          </Text>
-          {date < today ? (
-            <IconButton
-              icon="chevron-right"
-              label="Day after"
-              onPress={() => setDate(addDays(date, 1))}
+      ) : (
+        <>
+          <View style={styles.stack}>
+            <TextField
+              label="Where"
+              value={merchant}
+              onChangeText={setMerchant}
+              placeholder="Costco"
+              error={visible('merchant')}
+              autoCapitalize="words"
+              maxLength={200}
             />
-          ) : (
-            <View style={styles.iconSpacer} />
-          )}
-        </View>
-      </View>
-
-      {shared ? (
-        <Section title="Paid by">
-          <View style={styles.wrap}>
-            {group.people.map((p) => (
-              <Chip
-                key={p.id}
-                label={nameOf(p.id)}
-                selected={p.id === paidBy}
-                onPress={() => setPaidBy(p.id)}
+            <View style={styles.dateRow}>
+              <Text variant="sectionHeading" style={styles.flex}>
+                Date
+              </Text>
+              <IconButton
+                icon="chevron-left"
+                label="Day before"
+                onPress={() => setDate(addDays(date, -1))}
               />
-            ))}
-          </View>
-        </Section>
-      ) : null}
-
-      {shared ? (
-        <Section
-          title="People"
-          {...(draft.mode === 'quick'
-            ? { description: 'Tap people to include or leave them out.' }
-            : {})}
-        >
-          <View style={styles.wrap}>
-            {group.people.map((p) =>
-              draft.mode === 'quick' ? (
-                <Chip
-                  key={p.id}
-                  label={nameOf(p.id)}
-                  selected={draft.quickPeople.includes(p.id)}
-                  onPress={() =>
-                    update({
-                      quickPeople: draft.quickPeople.includes(p.id)
-                        ? draft.quickPeople.filter((id) => id !== p.id)
-                        : [...draft.quickPeople, p.id],
-                    })
-                  }
+              <Text variant="body" style={styles.dateText}>
+                {formatDate(date, today)}
+              </Text>
+              {date < today ? (
+                <IconButton
+                  icon="chevron-right"
+                  label="Day after"
+                  onPress={() => setDate(addDays(date, 1))}
                 />
               ) : (
-                <Tag
-                  key={p.id}
-                  label={nameOf(p.id)}
-                  tone={p.id === people.me ? 'accent' : 'neutral'}
-                />
-              ),
-            )}
-          </View>
-          {addingPerson ? (
-            <AddPersonForm onAdd={addPersonToGroup} onCancel={() => setAddingPerson(false)} />
-          ) : (
-            <TextButton label="Add person" icon="user-plus" onPress={() => setAddingPerson(true)} />
-          )}
-        </Section>
-      ) : null}
-
-      <View style={styles.wrap}>
-        <Chip
-          label="Itemized"
-          icon="list"
-          selected={draft.mode === 'items'}
-          onPress={() => update({ mode: 'items' })}
-        />
-        <Chip
-          label="Just a total"
-          icon="hash"
-          selected={draft.mode === 'quick'}
-          onPress={() => update({ mode: 'quick' })}
-        />
-      </View>
-
-      {draft.mode === 'items' ? (
-        <Section title="Items">
-          <View>
-            {draft.items.map((item) => (
-              <ItemRow
-                key={item.key}
-                item={item}
-                people={people}
-                names={names}
-                nameOf={nameOf}
-                error={visible(item.key)}
-                onChange={(patch) => updateItem(item.key, patch)}
-                onRemove={
-                  draft.items.length > 1
-                    ? () => update({ items: draft.items.filter((i) => i.key !== item.key) })
-                    : undefined
-                }
-                amountPlaceholder={amountPlaceholder}
-                open={openItem === item.key}
-                onToggle={() => setOpenItem(openItem === item.key ? null : item.key)}
-              />
-            ))}
-          </View>
-          <TextButton
-            label="Add item"
-            icon="plus"
-            onPress={() => update({ items: [...draft.items, newItem()] })}
-          />
-          {(['tax', 'tip'] as const).map((kind) =>
-            draft[kind] === null ? null : (
-              <AdjustmentRow
-                key={kind}
-                label={kind === 'tax' ? 'Tax' : 'Tip'}
-                value={draft[kind] ?? ''}
-                error={visible(kind)}
-                onChange={(value) => update({ [kind]: value })}
-                onRemove={() => update({ [kind]: null })}
-                amountPlaceholder={amountPlaceholder}
-              />
-            ),
-          )}
-          {draft.tax === null || draft.tip === null ? (
-            <View style={styles.wrap}>
-              {draft.tax === null ? (
-                <TextButton label="Add tax" icon="plus" onPress={() => update({ tax: '' })} />
-              ) : null}
-              {draft.tip === null ? (
-                <TextButton label="Add tip" icon="plus" onPress={() => update({ tip: '' })} />
-              ) : null}
+                <View style={styles.iconSpacer} />
+              )}
             </View>
-          ) : (
-            <Text variant="small">Tax and tip are split in proportion to each person’s items.</Text>
-          )}
-        </Section>
-      ) : (
-        <Section title="Total">
-          <TextField
-            label="Total"
-            value={draft.quickTotal}
-            onChangeText={(quickTotal) => update({ quickTotal })}
-            placeholder={amountPlaceholder}
-            keyboardType="decimal-pad"
-            error={visible('quickTotal')}
-          />
+          </View>
+
           {shared ? (
-            <View style={styles.wrap}>
-              <Chip
-                label="Split evenly"
-                selected={draft.quickSplit === 'even'}
-                onPress={() => update({ quickSplit: 'even' })}
-              />
-              <Chip
-                label="By amount"
-                selected={draft.quickSplit === 'amounts'}
-                onPress={() => update({ quickSplit: 'amounts' })}
-              />
-            </View>
+            <Section title="Paid by">
+              <View style={styles.wrap}>
+                {group.people.map((p) => (
+                  <Chip
+                    key={p.id}
+                    label={nameOf(p.id)}
+                    selected={p.id === paidBy}
+                    onPress={() => setPaidBy(p.id)}
+                  />
+                ))}
+                {addingPerson ? null : (
+                  <Chip label="Add person" icon="user-plus" onPress={() => setAddingPerson(true)} />
+                )}
+              </View>
+              {addingPerson ? (
+                <AddPersonForm onAdd={addPersonToGroup} onCancel={() => setAddingPerson(false)} />
+              ) : null}
+            </Section>
           ) : null}
-          {shared && draft.quickSplit === 'amounts'
-            ? people.everyone
-                .filter((id) => draft.quickPeople.includes(id))
-                .map((id) => (
-                  <View key={id} style={styles.stack}>
-                    <View style={styles.amountRow}>
-                      <Text variant="body" style={styles.flex}>
-                        {nameOf(id)}
-                      </Text>
-                      <TextInput
-                        value={draft.quickAmounts[id] ?? ''}
-                        onChangeText={(text) =>
-                          update({ quickAmounts: { ...draft.quickAmounts, [id]: text } })
-                        }
-                        placeholder={amountPlaceholder}
-                        placeholderTextColor={colors.muted}
-                        keyboardType="decimal-pad"
-                        accessibilityLabel={`${nameOf(id)}’s amount`}
-                        style={[styles.input, styles.amountInput]}
-                      />
-                    </View>
-                    {visible(`amount:${id}`) ? (
-                      <FormMessage message={visible(`amount:${id}`)!} />
-                    ) : null}
-                  </View>
-                ))
-            : null}
-          {visible('quickAmounts') || visible('form') ? (
-            <FormMessage message={(visible('quickAmounts') ?? visible('form'))!} />
-          ) : null}
-        </Section>
-      )}
 
-      <Section title={shared ? 'Category for your share' : 'Category'}>
-        <View style={styles.wrap}>
-          {categories.map((c) => (
+          <View style={styles.wrap}>
             <Chip
-              key={c.id}
-              label={c.name}
-              selected={c.id === categoryId}
-              onPress={() => setCategoryId(c.id)}
+              label="Itemized"
+              icon="list"
+              selected={draft.mode === 'items'}
+              onPress={() => update({ mode: 'items' })}
             />
-          ))}
-        </View>
-        {visible('category') ? <FormMessage message={visible('category')!} /> : null}
-      </Section>
+            <Chip
+              label="Just a total"
+              icon="hash"
+              selected={draft.mode === 'quick'}
+              onPress={() => update({ mode: 'quick' })}
+            />
+          </View>
 
-      <Summary
-        totalCents={result.totalCents}
-        myShare={myShare}
-        categoryName={category?.name}
-        owed={owedToPayer(result.shares, paidBy)}
-        nameOf={nameOf}
-        me={people.me}
-        hasErrors={Object.keys(result.errors).length > 0}
-      />
+          {draft.mode === 'items' ? (
+            <Section title="Items">
+              <View>
+                {draft.items.map((item) => (
+                  <ItemRow
+                    key={item.key}
+                    item={item}
+                    people={people}
+                    names={names}
+                    nameOf={nameOf}
+                    error={visible(item.key)}
+                    onChange={(patch) => updateItem(item.key, patch)}
+                    onRemove={
+                      draft.items.length > 1
+                        ? () => update({ items: draft.items.filter((i) => i.key !== item.key) })
+                        : undefined
+                    }
+                    amountPlaceholder={amountPlaceholder}
+                    open={openItem === item.key}
+                    onToggle={() => setOpenItem(openItem === item.key ? null : item.key)}
+                  />
+                ))}
+              </View>
+              <TextButton
+                label="Add item"
+                icon="plus"
+                onPress={() => update({ items: [...draft.items, newItem()] })}
+              />
+              {(['tax', 'tip'] as const).map((kind) =>
+                draft[kind] === null ? null : (
+                  <AdjustmentRow
+                    key={kind}
+                    label={kind === 'tax' ? 'Tax' : 'Tip'}
+                    value={draft[kind] ?? ''}
+                    error={visible(kind)}
+                    onChange={(value) => update({ [kind]: value })}
+                    onRemove={() => update({ [kind]: null })}
+                    amountPlaceholder={amountPlaceholder}
+                  />
+                ),
+              )}
+              {draft.tax === null || draft.tip === null ? (
+                <View style={styles.wrap}>
+                  {draft.tax === null ? (
+                    <TextButton label="Add tax" icon="plus" onPress={() => update({ tax: '' })} />
+                  ) : null}
+                  {draft.tip === null ? (
+                    <TextButton label="Add tip" icon="plus" onPress={() => update({ tip: '' })} />
+                  ) : null}
+                </View>
+              ) : (
+                <Text variant="small">
+                  Tax and tip are split in proportion to each person’s items.
+                </Text>
+              )}
+            </Section>
+          ) : (
+            <Section title="Total">
+              <TextField
+                label="Total"
+                value={draft.quickTotal}
+                onChangeText={(quickTotal) => update({ quickTotal })}
+                placeholder={amountPlaceholder}
+                keyboardType="decimal-pad"
+                error={visible('quickTotal')}
+              />
+              {shared ? (
+                <View style={styles.stack}>
+                  <Text variant="small">Split between</Text>
+                  <View style={styles.wrap}>
+                    {group.people.map((p) => (
+                      <Chip
+                        key={p.id}
+                        label={nameOf(p.id)}
+                        selected={draft.quickPeople.includes(p.id)}
+                        onPress={() =>
+                          update({
+                            quickPeople: draft.quickPeople.includes(p.id)
+                              ? draft.quickPeople.filter((id) => id !== p.id)
+                              : [...draft.quickPeople, p.id],
+                          })
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {shared ? (
+                <View style={styles.wrap}>
+                  <Chip
+                    label="Split evenly"
+                    selected={draft.quickSplit === 'even'}
+                    onPress={() => update({ quickSplit: 'even' })}
+                  />
+                  <Chip
+                    label="By amount"
+                    selected={draft.quickSplit === 'amounts'}
+                    onPress={() => update({ quickSplit: 'amounts' })}
+                  />
+                </View>
+              ) : null}
+              {shared && draft.quickSplit === 'amounts'
+                ? people.everyone
+                    .filter((id) => draft.quickPeople.includes(id))
+                    .map((id) => (
+                      <View key={id} style={styles.stack}>
+                        <View style={styles.amountRow}>
+                          <Text variant="body" style={styles.flex}>
+                            {nameOf(id)}
+                          </Text>
+                          <TextInput
+                            value={draft.quickAmounts[id] ?? ''}
+                            onChangeText={(text) =>
+                              update({ quickAmounts: { ...draft.quickAmounts, [id]: text } })
+                            }
+                            placeholder={amountPlaceholder}
+                            placeholderTextColor={colors.muted}
+                            keyboardType="decimal-pad"
+                            accessibilityLabel={`${nameOf(id)}’s amount`}
+                            style={[styles.input, styles.amountInput]}
+                          />
+                        </View>
+                        {visible(`amount:${id}`) ? (
+                          <FormMessage message={visible(`amount:${id}`)!} />
+                        ) : null}
+                      </View>
+                    ))
+                : null}
+              {visible('quickAmounts') || visible('form') ? (
+                <FormMessage message={(visible('quickAmounts') ?? visible('form'))!} />
+              ) : null}
+            </Section>
+          )}
 
-      <View style={styles.stack}>
-        {showErrors && Object.keys(errors).length > 0 ? (
-          <FormMessage
-            message={
-              draft.mode === 'items' && errors.form
-                ? errors.form
-                : 'Fix the highlighted details to save.'
-            }
+          <Section title={shared ? 'Category for your share' : 'Category'}>
+            <View style={styles.wrap}>
+              {categories.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.name}
+                  selected={c.id === categoryId}
+                  onPress={() => setCategoryId(c.id)}
+                />
+              ))}
+            </View>
+            {visible('category') ? <FormMessage message={visible('category')!} /> : null}
+          </Section>
+
+          <Summary
+            totalCents={result.totalCents}
+            myShare={myShare}
+            categoryName={category?.name}
+            owed={owedToPayer(result.shares, paidBy)}
+            nameOf={nameOf}
+            me={people.me}
+            hasErrors={Object.keys(result.errors).length > 0}
           />
-        ) : null}
-        {saveError ? <FormMessage message={saveError} /> : null}
-        <Button
-          label={editing ? 'Save changes' : 'Save expense'}
-          onPress={() => void save()}
-          loading={saving}
-        />
-      </View>
+
+          <View style={styles.stack}>
+            {showErrors && Object.keys(errors).length > 0 ? (
+              <FormMessage
+                message={
+                  draft.mode === 'items' && errors.form
+                    ? errors.form
+                    : 'Fix the highlighted details to save.'
+                }
+              />
+            ) : null}
+            {saveError ? <FormMessage message={saveError} /> : null}
+            <Button
+              label={editing ? 'Save changes' : 'Save expense'}
+              onPress={() => void save()}
+              loading={saving}
+            />
+          </View>
+        </>
+      )}
     </Screen>
   );
 }
@@ -734,6 +784,141 @@ function DropdownRow({
       </Text>
       {selected ? <Feather name="check" size={18} color={colors.ink} /> : null}
     </Pressable>
+  );
+}
+
+interface ChosenPerson {
+  key: string;
+  displayName: string;
+  phone: string | null;
+  /** Their account, when they use Spendly: they're invited when the quick split starts. */
+  inviteUserId: string | null;
+}
+
+const personKey = (p: { displayName: string; phone: string | null; userId?: string | null }) =>
+  (p.userId ? `user:${p.userId}` : null) ?? p.phone ?? `name:${p.displayName.trim().toLowerCase()}`;
+
+/** "Who was there?": picks people for a quick split and creates it. */
+function OneOffPicker({
+  knownPeople,
+  date,
+  onCancel,
+  onStarted,
+}: {
+  knownPeople: KnownPerson[];
+  date: string;
+  onCancel: () => void;
+  onStarted: (groupId: string) => Promise<void>;
+}) {
+  const [chosen, setChosen] = useState<ChosenPerson[]>([]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const suggestions = knownPeople
+    .filter((p) => !chosen.some((c) => c.key === personKey(p)))
+    .slice(0, 12);
+  const add = (person: {
+    displayName: string;
+    phone: string | null;
+    inviteUserId: string | null;
+  }) => {
+    const key = personKey({ ...person, userId: person.inviteUserId });
+    setChosen((prev) => (prev.some((c) => c.key === key) ? prev : [...prev, { key, ...person }]));
+    setError(null);
+  };
+
+  async function start() {
+    if (pending) {
+      setError('You typed a person but didn’t add them. Tap Add, or clear their name.');
+      return;
+    }
+    if (chosen.length === 0) {
+      setError('Add at least one person to split with.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const id = await createGroup(
+        oneOffName(
+          chosen.map((c) => c.displayName),
+          date,
+        ),
+        chosen.map(({ displayName, phone, inviteUserId }) => ({
+          displayName,
+          phone,
+          inviteUserId,
+        })),
+        { oneOff: true },
+      );
+      await onStarted(id);
+    } catch (e) {
+      setError(friendlyError(e as Error));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section
+      title="Who was there?"
+      description="Split with people just this once. It won’t be added to your groups."
+    >
+      {chosen.length > 0 ? (
+        <View style={styles.wrap}>
+          {chosen.map((person) => (
+            <Chip
+              key={person.key}
+              label={person.displayName}
+              selected
+              trailingIcon="x"
+              onPress={() => setChosen((prev) => prev.filter((c) => c.key !== person.key))}
+              accessibilityLabel={`Remove ${person.displayName}`}
+            />
+          ))}
+        </View>
+      ) : null}
+      {suggestions.length > 0 ? (
+        <View style={styles.stack}>
+          <Text variant="small">People you’ve split with</Text>
+          <View style={styles.wrap}>
+            {suggestions.map((person) => (
+              <Chip
+                key={personKey(person)}
+                label={
+                  person.username ? `${person.displayName} @${person.username}` : person.displayName
+                }
+                icon="plus"
+                onPress={() =>
+                  add({
+                    displayName: person.displayName,
+                    phone: person.phone,
+                    inviteUserId: person.userId ?? null,
+                  })
+                }
+                accessibilityLabel={`Add ${person.displayName}`}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+      <AddPersonForm
+        submitLabel="Add"
+        onPendingChange={setPending}
+        onAdd={async (displayName, phone, inviteUserId) =>
+          add({ displayName, phone, inviteUserId })
+        }
+      />
+      {error ? <FormMessage message={error} /> : null}
+      <View style={styles.amountRow}>
+        <View style={styles.flex}>
+          <Button label="Cancel" variant="secondary" onPress={onCancel} />
+        </View>
+        <View style={styles.flex}>
+          <Button label="Start split" onPress={() => void start()} loading={busy} />
+        </View>
+      </View>
+    </Section>
   );
 }
 
@@ -901,8 +1086,7 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   dropdown: {
-    borderWidth: sizes.hairline,
-    borderColor: colors.controlBorder,
+    backgroundColor: colors.accentPale,
     borderRadius: radius.button,
     paddingHorizontal: space.md,
   },
@@ -914,7 +1098,7 @@ const styles = StyleSheet.create({
   },
   dropdownDivider: {
     borderBottomWidth: sizes.hairline,
-    borderBottomColor: colors.divider,
+    borderBottomColor: colors.background,
   },
   pressed: {
     opacity: 0.6,

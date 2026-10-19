@@ -8,7 +8,7 @@ import type { TextStyle } from 'react-native';
 
 export const colors = {
   background: '#FFFFFF',
-  /** The one key block per screen, the active tab, "You" tags and avatars. */
+  /** The one key block per screen, the active tab, "You" tags, avatars and open dropdowns. */
   accentPale: '#F8DFD9',
   /**
    * Coral: primary buttons, selected chips, the + button, progress bars and attention dots.
