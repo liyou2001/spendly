@@ -307,6 +307,8 @@ export interface SaveExpenseInput {
   categoryId: string | null;
   /** Set when editing: the expense this one replaces, which is voided in the same save. */
   replacesExpenseId?: string;
+  /** "photo" when it was filled in from a scanned receipt. */
+  source?: 'manual' | 'photo';
 }
 
 /** Saves through save_expense, which checks everything adds up. Returns the new expense id. */
@@ -322,7 +324,7 @@ export async function saveExpense(input: SaveExpenseInput): Promise<string> {
       p_items: input.items,
       ...(input.categoryId ? { p_category_id: input.categoryId } : {}),
       ...(input.replacesExpenseId ? { p_replaces_expense_id: input.replacesExpenseId } : {}),
-      p_source: 'manual',
+      p_source: input.source ?? 'manual',
     }),
   );
 }

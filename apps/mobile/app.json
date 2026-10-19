@@ -33,6 +33,14 @@
         {
           "color": "#E58C76"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Spendly uses the camera to scan receipts you want to split.",
+          "photosPermission": "Spendly opens your photos so you can pick a receipt to scan.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

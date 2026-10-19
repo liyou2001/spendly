@@ -26,7 +26,8 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local --schema public > packages/db/src/database.types.ts && prettier --write packages/db/src/database.types.ts",
-    "test:functions": "scripts/test-functions.sh"
+    "test:functions": "scripts/test-functions.sh",
+    "receipts:accuracy": "deno run --no-lock --env-file=supabase/functions/.env --allow-read --allow-net --allow-env scripts/receipt-accuracy.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

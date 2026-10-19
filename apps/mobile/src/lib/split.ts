@@ -37,6 +37,8 @@ export interface Draft {
   /** null when the line hasn't been added. */
   tax: string | null;
   tip: string | null;
+  /** Coupons and savings, typed as a positive amount. null when the line hasn't been added. */
+  discount: string | null;
   quickTotal: string;
   quickSplit: 'even' | 'amounts';
   quickPeople: ParticipantId[];
@@ -54,7 +56,7 @@ export interface SplitPeople {
 export type SaveItem = {
   name: string;
   amount_cents: Cents;
-  kind: 'item' | 'tax' | 'tip';
+  kind: 'item' | 'tax' | 'tip' | 'discount';
   participant_ids: ParticipantId[];
 };
 
@@ -191,6 +193,8 @@ function readAmount(
 
 const TOO_LARGE = 'These amounts are too large to split.';
 
+const ADJUSTMENT_NAMES = { tax: 'Tax', tip: 'Tip', discount: 'Discount' } as const;
+
 /** Works out the shares for what's on screen so far. Rows left completely blank are ignored. */
 export function buildSplit(
   draft: Draft,
@@ -245,7 +249,7 @@ function buildItemsSplit(draft: Draft, people: SplitPeople, options: SplitOption
     });
   }
 
-  for (const kind of ['tax', 'tip'] as const) {
+  for (const kind of ['tax', 'tip', 'discount'] as const) {
     const typed = draft[kind]?.trim();
     if (!typed) continue;
     const amount = readAmount(typed, options, '1.23');
@@ -253,10 +257,12 @@ function buildItemsSplit(draft: Draft, people: SplitPeople, options: SplitOption
       errors[kind] = `${amount.ok ? hint(options, '1.23') : amount.error}, or remove the line`;
       continue;
     }
-    lines.push({ kind, amountCents: amount.cents });
+    // Discounts are stored and split as negative lines.
+    const cents = kind === 'discount' ? -amount.cents : amount.cents;
+    lines.push({ kind, amountCents: cents });
     items.push({
-      name: kind === 'tax' ? 'Tax' : 'Tip',
-      amount_cents: amount.cents,
+      name: ADJUSTMENT_NAMES[kind],
+      amount_cents: cents,
       kind,
       participant_ids: [],
     });
@@ -264,6 +270,15 @@ function buildItemsSplit(draft: Draft, people: SplitPeople, options: SplitOption
 
   if (!lines.some((line) => line.kind === 'item')) {
     errors.form = 'Add at least one item';
+    return { totalCents: null, shares: [], items: [], errors };
+  }
+  const itemsCents = lines.reduce((sum, l) => sum + (l.kind === 'item' ? l.amountCents : 0), 0);
+  const discountCents = -lines.reduce(
+    (sum, l) => sum + (l.kind === 'discount' ? l.amountCents : 0),
+    0,
+  );
+  if (discountCents >= itemsCents) {
+    errors.discount = 'The discount has to be less than the items';
     return { totalCents: null, shares: [], items: [], errors };
   }
 
@@ -403,9 +418,6 @@ export function draftFromExpense(
   people: SplitPeople,
   options: SplitOptions = { decimalSeparator: '.' },
 ): { ok: true; value: EditableExpense } | { ok: false; reason: string } {
-  if (expense.items.some((i) => i.kind === 'discount')) {
-    return { ok: false, reason: 'This expense has a discount, which the editor can’t show yet.' };
-  }
   const typed = (cents: Cents) => formatAmount(cents).replace('.', options.decimalSeparator);
   const sum = (kind: string) =>
     expense.items.filter((i) => i.kind === kind).reduce((total, i) => total + i.amountCents, 0);
@@ -422,6 +434,7 @@ export function draftFromExpense(
     items: [],
     tax: null,
     tip: null,
+    discount: null,
     quickTotal: '',
     quickSplit: 'even',
     quickPeople: [...people.everyone],
@@ -444,6 +457,7 @@ export function draftFromExpense(
           })),
           tax: sum('tax') > 0 ? typed(sum('tax')) : null,
           tip: sum('tip') > 0 ? typed(sum('tip')) : null,
+          discount: sum('discount') < 0 ? typed(-sum('discount')) : null,
         },
       },
     };

@@ -21,6 +21,12 @@ For each question, the **How to test** line suggests something to ask or a task 
   - Home now shows the same "Owed to you / You owe" totals, plus "Needs you" (claims and invites), which overlaps with the People page.
 - **To decide before changing it:** is the page about **people** (one row per person across groups) or **groups**? Should groups move to their own place? What stays on Home versus People?
 
+### Turn on receipt scanning and measure it
+
+- **Status:** To do (2026-10-19)
+- **What's left:** add a Gemini or Anthropic API key to `supabase/functions/.env` (README, "Receipt scanning"), then run about 20 real receipts through `npm run receipts:accuracy`. If the first model often needs the retry, or long receipts come back wrong, adjust the photo size (`LONG_EDGE` in `apps/mobile/src/lib/scan.ts`) or the prompt.
+- **Before anyone else scans:** switch off Gemini's free tier. On it, Google may use what's sent to improve its products, and receipts show what people buy and where. Use Gemini's paid tier or Claude (the plan's choice, `RECEIPT_PROVIDER=claude`), and say in the privacy policy (Step 11) who reads receipts.
+
 ### Turn on push notifications and deploy the payment page
 
 - **Status:** To do (2026-10-19)
@@ -198,3 +204,19 @@ For each question, the **How to test** line suggests something to ask or a task 
 - **Now:** Profile & payments has a Zelle field (email or US phone). Zelle has no usernames or payment links, so the number or email is shown as is to people in your groups and on payment links, with a copy button. A warning under the field says so.
 - **Why it matters:** many students use Zelle through their bank, but some won't want their phone number on a link that can be forwarded. If the warning scares everyone off, Zelle users have no easy way to get paid.
 - **How to test:** ask Zelle users to set up their profile and watch whether they add it after reading the warning. Ask payers whether copying the address into their bank app feels like too many steps.
+
+## Receipt scanning
+
+### 23. Is scanning faster than typing, and do people check the draft?
+
+- **Status:** Open
+- **Now:** Add expense has Take photo / Choose photo at the top. The draft fills in the store, date, items, tax, tip and discount, with every item set to You. If the lines don't add up to the receipt's total, the form says by how much until they do.
+- **Why it matters:** if fixing the draft takes longer than typing, people stop scanning. If they trust it blindly, a misread price ends up in someone's balance.
+- **How to test:** give someone a long grocery receipt and time scanning against typing. Watch whether they read the lines before saving, and whether the "add up to" message makes sense.
+
+### 24. Should scanned item names be cleaned up or kept as printed?
+
+- **Status:** Open
+- **Now:** Claude rewrites names the way a person would say them ("KS PAPER TWL" becomes "Paper towels").
+- **Why it matters:** cleaned names are easier to assign, but people may want to match lines against the paper receipt.
+- **How to test:** show both versions of the same receipt and ask which they'd rather split from.

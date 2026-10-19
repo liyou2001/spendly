@@ -152,6 +152,8 @@ erDiagram
 
 These tables are read and written by Edge Functions (Steps 8–11), not by the app directly. The exceptions: the app makes and revokes your payment links through `create_share_link` / `revoke_share_links`, reads problem reports sent to you, and saves its push token with `register_push_token`.
 
+Receipt photos live in the private Storage bucket `receipts`, at `<user id>/<file>.jpg`. You can upload to and read only your own folder; `extract-receipt` reads them with the service role and logs every attempt (model, status, the draft or the error) in `receipt_extractions`. Your own extractions are readable by you.
+
 ```mermaid
 erDiagram
     participants ||--o{ share_links : "private link for"
@@ -274,13 +276,14 @@ People without accounts see their share only through the `get-share` Edge Functi
 
 ## Edge Functions
 
-| Function        | Who calls it                  | What it does                                                                                                |
-| --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `get-share`     | The payment page (no sign-in) | What a link shows (`link_share`). 60 a minute per address, 30 per link.                                     |
-| `claim-payment` | The payment page              | "I paid Leo" (`link_claim`), then a push to Leo. 5 an hour per link.                                        |
-| `flag-problem`  | The payment page              | "Something looks wrong" (`link_flag`), then a push. 5 an hour per link.                                     |
-| `text-opt-in`   | The payment page              | Saves or revokes the text consent, with the number the person typed (`link_text_opt_in`).                   |
-| `notify-claim`  | The app, after "I paid"       | Pushes "Jeff says they paid you $15.00" to the person paid, for a claim the caller made in the last 10 min. |
+| Function          | Who calls it                     | What it does                                                                                                                                                                                                                |
+| ----------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get-share`       | The payment page (no sign-in)    | What a link shows (`link_share`). 60 a minute per address, 30 per link.                                                                                                                                                     |
+| `claim-payment`   | The payment page                 | "I paid Leo" (`link_claim`), then a push to Leo. 5 an hour per link.                                                                                                                                                        |
+| `flag-problem`    | The payment page                 | "Something looks wrong" (`link_flag`), then a push. 5 an hour per link.                                                                                                                                                     |
+| `text-opt-in`     | The payment page                 | Saves or revokes the text consent, with the number the person typed (`link_text_opt_in`).                                                                                                                                   |
+| `notify-claim`    | The app, after "I paid"          | Pushes "Jeff says they paid you $15.00" to the person paid, for a claim the caller made in the last 10 min.                                                                                                                 |
+| `extract-receipt` | The app, after uploading a photo | Reads a receipt photo from your folder with Gemini (3.5 Flash-Lite, then 3.8 Flash) or Claude (Haiku 5.5, then Sonnet 5.5) if the lines don't add up, checks the math in code, and returns a draft. Monthly limit per user. |
 
 ## Database functions
 
@@ -307,6 +310,7 @@ People without accounts see their share only through the `get-share` Edge Functi
 | `resolve_problem(report)`                                   | Dismisses a "Something looks wrong" note sent to you.                                                                                                            |
 | `register_push_token(token)`                                | Saves this phone's Expo push token to your account (moving it from whoever used the phone before).                                                               |
 | `link_share`, `link_claim`, `link_flag`, `link_text_opt_in` | Edge Functions only: the payment page's reads and writes, by the hash of a link token.                                                                           |
+| `receipt_scans_this_month(user)`                            | Edge Functions only: photos scanned this month, for the monthly limit (a retry counts once).                                                                     |
 | `hit_rate_limit(key, max, seconds)`                         | Edge Functions only: counts a hit and says whether it's within the limit.                                                                                        |
 | Auto-confirm job (`pg_cron`, hourly)                        | Confirms claims older than the recipient's `auto_confirm_days`, for people who turned it on.                                                                     |
 | `balances()`                                                | Net who-owes-whom for every pair that includes you.                                                                                                              |

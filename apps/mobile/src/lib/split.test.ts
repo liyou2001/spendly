@@ -28,6 +28,7 @@ const draft = (overrides: Partial<Draft> = {}): Draft => ({
   items: [],
   tax: null,
   tip: null,
+  discount: null,
   quickTotal: '',
   quickSplit: 'even',
   quickPeople: [LEO, JEFF, MAYA],
@@ -85,6 +86,27 @@ describe('buildSplit (items)', () => {
       },
       { name: 'Tax', amount_cents: 150, kind: 'tax', participant_ids: [] },
     ]);
+  });
+
+  it('takes a discount off in proportion, saved as a negative line', () => {
+    const result = buildSplit(draft({ items: costco, discount: '14.00' }), apartment);
+    expect(result.totalCents).toBe(12600);
+    expect(amounts(result.shares)).toEqual({ [LEO]: 7470, [JEFF]: 1350, [MAYA]: 3780 });
+    expect(result.items.at(-1)).toEqual({
+      name: 'Discount',
+      amount_cents: -1400,
+      kind: 'discount',
+      participant_ids: [],
+    });
+  });
+
+  it('refuses a discount as large as the items', () => {
+    const result = buildSplit(
+      draft({ items: [item('Gum', '1.00', you)], discount: '1.00' }),
+      apartment,
+    );
+    expect(result.errors.discount).toBe('The discount has to be less than the items');
+    expect(result.totalCents).toBeNull();
   });
 
   it('splits tax and tip in proportion and still sums to the total', () => {
@@ -442,17 +464,19 @@ describe('draftFromExpense', () => {
     });
   });
 
-  it('uses the phone’s decimal separator, and refuses discounts it can’t show', () => {
+  it('uses the phone’s decimal separator', () => {
     const saved = save(draft({ items: [item('Brot', '2.50', you)] }));
     const comma = draftFromExpense(saved, apartment, { decimalSeparator: ',' });
     expect(comma.ok && comma.value.draft.items[0]?.amount).toBe('2,50');
-    const withDiscount = {
-      ...saved,
-      items: [
-        ...saved.items,
-        { name: 'Coupon', amountCents: -50, kind: 'discount', participantIds: [] },
-      ],
-    };
-    expect(draftFromExpense(withDiscount, apartment).ok).toBe(false);
+  });
+
+  it('round-trips a discount', () => {
+    const withCoupon = draft({ items: costco, tax: '1.57', discount: '5.00' });
+    const edit = draftFromExpense(save(withCoupon), apartment);
+    if (!edit.ok) throw new Error(edit.reason);
+    expect(edit.value.draft.discount).toBe('5.00');
+    expect(buildSplit(edit.value.draft, apartment).shares).toEqual(
+      buildSplit(withCoupon, apartment).shares,
+    );
   });
 });

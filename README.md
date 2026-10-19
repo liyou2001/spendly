@@ -190,6 +190,19 @@ The app builds links to the page's dev server on the same computer as Expo, so a
 2. Add the environment variable `VITE_SUPABASE_URL` (your hosted project's URL) and optionally `VITE_GET_APP_URL`.
 3. Deploy the functions with `npx supabase functions deploy`, and put the page's URL in the app's `EXPO_PUBLIC_PAY_PAGE_URL`.
 
+### Receipt scanning
+
+Scanning reads a receipt photo with Gemini or Claude and fills in Add expense. The API key stays on the server. Put one of these in `supabase/functions/.env` (see `.env.example`):
+
+- **Gemini (free tier, for development):** `GEMINI_API_KEY` from https://aistudio.google.com. It reads with Gemini 3.5 Flash-Lite, then 3.8 Flash if the lines don't add up. On the free tier Google may use what you send to improve its products, so scan only your own receipts with it.
+- **Claude (the plan's choice):** `ANTHROPIC_API_KEY` from https://console.anthropic.com (needs API credits; a Claude subscription doesn't include them). It reads with Haiku 5.5, then Sonnet 5.5.
+
+With both set, Gemini is used unless `RECEIPT_PROVIDER=claude`. `RECEIPT_SCANS_PER_MONTH` sets the monthly limit per person (default 50). `functions serve` reloads when the file changes. Hosted: `npx supabase secrets set --env-file supabase/functions/.env`.
+
+Without a key, scanning says it isn't set up yet and you enter the expense by hand.
+
+To measure accuracy, put about 20 real receipt photos (`.jpg` or `.png`) in `receipts/` (git-ignored). Optionally add `<name>.json` next to a photo with what's right, e.g. `{"total_cents": 14000, "items": 9}`. Then run `npm run receipts:accuracy`. It uses the same key and provider, and reports per model how often the lines add up, the total is right and the item count is right.
+
 ### Push notifications
 
 Pushes ("Jeff says they paid you $15.00") need the app linked to an EAS project, once:

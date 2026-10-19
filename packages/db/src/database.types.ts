@@ -883,6 +883,7 @@ export type Database = {
         }[];
       };
       push_tokens_for: { Args: { p_user_id: string }; Returns: string[] };
+      receipt_scans_this_month: { Args: { p_user_id: string }; Returns: number };
       record_payment: {
         Args: {
           p_amount_cents: number;

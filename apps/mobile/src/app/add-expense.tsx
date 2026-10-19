@@ -2,7 +2,14 @@ import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import {
   AddPersonForm,
@@ -38,6 +45,14 @@ import {
 import { debtLabel, joinNames } from '@/lib/labels';
 import { deviceDecimalSeparator } from '@/lib/locale';
 import { dedupePeople, oneOffName, type KnownPerson } from '@/lib/oneOff';
+import {
+  categoryForReceipt,
+  draftFromReceipt,
+  totalCheck,
+  type ScannedReceipt,
+  type ScanResult,
+} from '@/lib/receipts';
+import { pickReceiptPhoto, scanReceipt } from '@/lib/scan';
 import { useSession } from '@/lib/session';
 import {
   assignedTo,
@@ -143,6 +158,7 @@ function emptyDraft(everyone: string[]): Draft {
     items: [],
     tax: null,
     tip: null,
+    discount: null,
     quickTotal: '',
     quickSplit: 'even',
     quickPeople: everyone,
@@ -210,6 +226,7 @@ function ExpenseForm({
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [scan, setScan] = useState<ScanState>({ status: 'idle' });
 
   const people: SplitPeople = useMemo(
     () => ({ me: meInGroup?.id ?? '', everyone: group?.people.map((p) => p.id) ?? [] }),
@@ -293,6 +310,38 @@ function ExpenseForm({
     onGroupsChanged();
   }
 
+  /** Fills the form from a scanned receipt. The AI's draft is only a start: everything is editable. */
+  function applyScan(scanned: ScanResult) {
+    if (scanned.status === 'unreadable') {
+      setScan({
+        status: 'error',
+        message: `Couldn’t read that receipt (${scanned.problem}). Try a sharper photo in good light, or enter it by hand.`,
+      });
+      return;
+    }
+    const receipt = scanned.receipt;
+    if (receipt.merchant) setMerchant(receipt.merchant);
+    if (receipt.date && receipt.date <= today) setDate(receipt.date);
+    setDraft((prev) => draftFromReceipt(receipt, prev, { decimalSeparator }));
+    const suggested = categoryForReceipt(receipt.merchant, receipt.category, categories);
+    if (suggested) setCategoryId(suggested);
+    setOpenItem(null);
+    setShowErrors(false);
+    setSaveError(null);
+    setScan({ status: 'read', receipt, scansLeft: scanned.scans_left });
+  }
+
+  async function scanFrom(from: 'camera' | 'library') {
+    try {
+      const photo = await pickReceiptPhoto(from);
+      if (!photo) return;
+      setScan({ status: 'scanning' });
+      applyScan(await scanReceipt(userId, photo));
+    } catch (e) {
+      setScan({ status: 'error', message: friendlyError(e as Error) });
+    }
+  }
+
   async function save() {
     setShowErrors(true);
     if (Object.keys(errors).length > 0 || result.totalCents === null) return;
@@ -309,6 +358,7 @@ function ExpenseForm({
         items: result.items,
         shares: p_shares,
         categoryId: p_category_id,
+        source: scan.status === 'read' ? 'photo' : 'manual',
         ...(editing ? { replacesExpenseId: editing.expenseId } : {}),
       });
       if (editing) {
@@ -382,6 +432,13 @@ function ExpenseForm({
         />
       ) : (
         <>
+          {editing ? null : (
+            <ScanReceipt
+              state={scan}
+              currentTotal={draft.mode === 'items' ? result.totalCents : null}
+              onScan={(from) => void scanFrom(from)}
+            />
+          )}
           <View style={styles.stack}>
             <TextField
               label="Where"
@@ -480,11 +537,11 @@ function ExpenseForm({
                 icon="plus"
                 onPress={() => update({ items: [...draft.items, newItem()] })}
               />
-              {(['tax', 'tip'] as const).map((kind) =>
+              {ADJUSTMENTS.map(({ kind, label }) =>
                 draft[kind] === null ? null : (
                   <AdjustmentRow
                     key={kind}
-                    label={kind === 'tax' ? 'Tax' : 'Tip'}
+                    label={label}
                     value={draft[kind] ?? ''}
                     error={visible(kind)}
                     onChange={(value) => update({ [kind]: value })}
@@ -493,20 +550,28 @@ function ExpenseForm({
                   />
                 ),
               )}
-              {draft.tax === null || draft.tip === null ? (
+              {ADJUSTMENTS.some(({ kind }) => draft[kind] === null) ? (
                 <View style={styles.wrap}>
-                  {draft.tax === null ? (
-                    <TextButton label="Add tax" icon="plus" onPress={() => update({ tax: '' })} />
-                  ) : null}
-                  {draft.tip === null ? (
-                    <TextButton label="Add tip" icon="plus" onPress={() => update({ tip: '' })} />
-                  ) : null}
+                  {ADJUSTMENTS.map(({ kind, label }) =>
+                    draft[kind] === null ? (
+                      <TextButton
+                        key={kind}
+                        label={`Add ${label.toLowerCase()}`}
+                        icon="plus"
+                        onPress={() => update({ [kind]: '' })}
+                      />
+                    ) : null,
+                  )}
                 </View>
-              ) : (
+              ) : null}
+              {ADJUSTMENTS.some(({ kind }) => draft[kind] !== null) ? (
                 <Text variant="small">
-                  Tax and tip are split in proportion to each person’s items.
+                  Tax, tip and discounts are split in proportion to each person’s items.
                 </Text>
-              )}
+              ) : null}
+              {scan.status === 'read' && totalCheck(scan.receipt.total_cents, result.totalCents) ? (
+                <FormMessage message={totalCheck(scan.receipt.total_cents, result.totalCents)!} />
+              ) : null}
             </Section>
           ) : (
             <Section title="Total">
@@ -922,6 +987,73 @@ function OneOffPicker({
   );
 }
 
+const ADJUSTMENTS = [
+  { kind: 'tax', label: 'Tax' },
+  { kind: 'tip', label: 'Tip' },
+  { kind: 'discount', label: 'Discount' },
+] as const;
+
+type ScanState =
+  | { status: 'idle' }
+  | { status: 'scanning' }
+  | { status: 'read'; receipt: ScannedReceipt; scansLeft: number }
+  | { status: 'error'; message: string };
+
+/** "Scan a receipt": take or choose a photo, then how the draft compares with its total. */
+function ScanReceipt({
+  state,
+  currentTotal,
+  onScan,
+}: {
+  state: ScanState;
+  currentTotal: number | null;
+  onScan: (from: 'camera' | 'library') => void;
+}) {
+  if (state.status === 'scanning') {
+    return (
+      <View style={styles.scanRow} accessibilityLiveRegion="polite">
+        <ActivityIndicator color={colors.ink} />
+        <Text variant="body">Reading your receipt…</Text>
+      </View>
+    );
+  }
+  const buttons = (
+    <View style={styles.wrap}>
+      <TextButton
+        label={state.status === 'read' ? 'Scan again' : 'Take photo'}
+        icon="camera"
+        onPress={() => onScan('camera')}
+      />
+      <TextButton label="Choose photo" icon="image" onPress={() => onScan('library')} />
+    </View>
+  );
+  if (state.status === 'read') {
+    const matches = totalCheck(state.receipt.total_cents, currentTotal) === null;
+    return (
+      <View style={styles.stack}>
+        <Text variant="small">
+          Filled in from your receipt
+          {matches && currentTotal !== null
+            ? `, and it matches the total of ${formatCents(state.receipt.total_cents)}`
+            : ''}
+          . Check each line, then choose who each item is for.
+          {state.scansLeft <= 5
+            ? ` ${state.scansLeft} ${state.scansLeft === 1 ? 'scan' : 'scans'} left this month.`
+            : ''}
+        </Text>
+        {buttons}
+      </View>
+    );
+  }
+  return (
+    <View style={styles.stack}>
+      <Text variant="small">Have the receipt? Scan it to fill this in.</Text>
+      {buttons}
+      {state.status === 'error' ? <FormMessage message={state.message} /> : null}
+    </View>
+  );
+}
+
 function AdjustmentRow({
   label,
   value,
@@ -1032,6 +1164,12 @@ function Summary({
 }
 
 const styles = StyleSheet.create({
+  scanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    minHeight: 44,
+  },
   stack: {
     gap: space.md,
   },
