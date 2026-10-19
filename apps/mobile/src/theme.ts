@@ -9,12 +9,15 @@ import type { TextStyle } from 'react-native';
 export const colors = {
   background: '#FFFFFF',
   /** The one key block per screen, the active tab, "You" tags and avatars. */
-  accentPale: '#FAE9E2',
-  /** Primary buttons, selected chips, the + button, progress bars and attention dots. */
-  accent: '#DE6B3E',
+  accentPale: '#F8DFD9',
+  /**
+   * Coral: primary buttons, selected chips, the + button, progress bars and attention dots.
+   * Bars and dots are 2.5:1 on white, so they always sit beside text saying the same thing.
+   */
+  accent: '#E58C76',
   /** Text. */
   ink: '#2B2420',
-  /** Text and icons on `accent`. Dark, because white on it is only 3.3:1; ink is 4.6:1. */
+  /** Text and icons on `accent`. Dark, because white on it is only 2.5:1; ink is 6.1:1. */
   onAccent: '#2B2420',
   muted: '#6B5F57',
   divider: '#F1E7DF',
