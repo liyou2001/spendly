@@ -837,7 +837,7 @@ function ItemRow({
 
   return (
     <View style={styles.item}>
-      {several ? <Text variant="small">Enter the price for all {quantity}.</Text> : null}
+      {several ? <Text variant="small">Enter the total price for all {quantity}.</Text> : null}
       <View style={styles.itemLine}>
         <TextInput
           value={item.quantity}
