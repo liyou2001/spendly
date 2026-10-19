@@ -79,7 +79,7 @@ for (const photo of photos) {
     console.warn(`Skipping ${photo.name}: over 5 MB. Export it smaller.`);
     continue;
   }
-  const image = { base64: toBase64(bytes), mediaType: photo.mediaType };
+  const image = { kind: 'image' as const, base64: toBase64(bytes), mediaType: photo.mediaType };
   const expected = await expectedFor(photo.name);
 
   for (const model of reader.models) {

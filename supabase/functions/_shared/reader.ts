@@ -3,16 +3,13 @@
 //   otherwise Claude with ANTHROPIC_API_KEY.
 import { askClaude, CLAUDE_MODELS } from './claude.ts';
 import { askGemini, GEMINI_MODELS } from './gemini.ts';
+import type { ReceiptContent } from './receipt.ts';
 
 export interface ReceiptReader {
   provider: 'claude' | 'gemini';
   /** Tried in order until a draft adds up. */
   models: readonly string[];
-  ask: (
-    model: string,
-    image: { base64: string; mediaType: 'image/jpeg' | 'image/png' },
-    categories: readonly string[],
-  ) => Promise<unknown>;
+  ask: (model: string, content: ReceiptContent, categories: readonly string[]) => Promise<unknown>;
 }
 
 /** The configured reader, or null when its API key isn't set. */
@@ -26,7 +23,6 @@ export function receiptReader(
   return {
     provider,
     models: provider === 'gemini' ? GEMINI_MODELS : CLAUDE_MODELS,
-    ask: (model, image, categories) =>
-      ask({ apiKey, model, imageBase64: image.base64, mediaType: image.mediaType, categories }),
+    ask: (model, content, categories) => ask({ apiKey, model, content, categories }),
   };
 }

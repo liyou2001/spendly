@@ -56,7 +56,12 @@ Deno.serve(async (req) => {
 
   const outcome = await extractReceipt(
     reader.models,
-    (model) => reader.ask(model, { base64: imageBase64, mediaType: 'image/jpeg' }, categoryNames),
+    (model) =>
+      reader.ask(
+        model,
+        { kind: 'image', base64: imageBase64, mediaType: 'image/jpeg' },
+        categoryNames,
+      ),
     async (attempt) => {
       const { error } = await admin.from('receipt_extractions').insert({
         user_id: user.id,

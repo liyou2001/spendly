@@ -203,6 +203,25 @@ Without a key, scanning says it isn't set up yet and you enter the expense by ha
 
 To measure accuracy, put about 20 real receipt photos (`.jpg` or `.png`) in `receipts/` (git-ignored). Optionally add `<name>.json` next to a photo with what's right, e.g. `{"total_cents": 14000, "items": 9}`. Then run `npm run receipts:accuracy`. It uses the same key and provider, and reports per model how often the lines add up, the total is right and the item count is right.
 
+### Forwarded email receipts
+
+Everyone forwards receipts to one address. The sender's address says whose receipt it is: each person's sign-in email counts automatically, and they can add more in Me → Forward receipts (each confirmed with an emailed code). Gmail filters that forward automatically work too: Gmail sends them with the forwarding account as the envelope sender, which SPF checks. An address is only trusted when SPF, DKIM or DMARC passed for its own domain, so a faked From line matches no one (and gets no reply). The email itself is never stored.
+
+A forwarded receipt is read like a scanned one (a PDF or photo attachment, or the email text) and shows up under Needs you on Home, ready to split. Duplicates are skipped. Unknown senders get one reply a day explaining how to add their address.
+
+Locally (Postmark can't reach your computer):
+
+1. Put any long random string in `supabase/functions/.env` as `POSTMARK_INBOUND_SECRET`. `functions serve` reloads.
+2. `npm run email:test -- you@example.com` sends a sample Amazon order "from" that address, as Postmark would. Use an address on your account. A few seconds later it's under Needs you.
+
+Codes for added addresses are printed in the `functions serve` log while `POSTMARK_SERVER_TOKEN` is blank.
+
+Hosted, with Postmark:
+
+1. Create a Postmark server. Its inbound address (or your own domain's, later) is the receipts address: set it as `RECEIPTS_EMAIL_ADDRESS` (functions) and `EXPO_PUBLIC_RECEIPTS_EMAIL` (app), and add it as a sender signature so codes and replies can be sent from it.
+2. Set the server's inbound webhook to `https://postmark:<POSTMARK_INBOUND_SECRET>@<project-ref>.supabase.co/functions/v1/postmark-inbound`.
+3. Put `POSTMARK_SERVER_TOKEN` in the functions' secrets and deploy the functions.
+
 ### Push notifications
 
 Pushes ("Jeff says they paid you $15.00") need the app linked to an EAS project, once:

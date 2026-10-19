@@ -1,7 +1,14 @@
 // One call to the Gemini API (Google AI Studio) to read a receipt photo, as an alternative to
 // Claude. The key stays on the server (Rule 9). On Google's free tier, what's sent may be used
 // to improve Google's products, so use it for development with your own receipts only.
-import { RECEIPT_SCHEMA, SYSTEM_PROMPT, userPrompt, type AskInput } from './receipt.ts';
+import {
+  fencedEmail,
+  RECEIPT_SCHEMA,
+  SYSTEM_PROMPT,
+  userPrompt,
+  type AskInput,
+  type ReceiptContent,
+} from './receipt.ts';
 
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -39,8 +46,15 @@ export function toGeminiSchema(schema: JsonSchema): Record<string, unknown> {
 
 const RESPONSE_SCHEMA = toGeminiSchema(RECEIPT_SCHEMA as JsonSchema);
 
+/** The receipt as a Gemini part: an inline image or PDF, or the email's text. */
+function geminiPart(content: ReceiptContent) {
+  if (content.kind === 'text') return { text: fencedEmail(content.text) };
+  const mimeType = content.kind === 'pdf' ? 'application/pdf' : content.mediaType;
+  return { inlineData: { mimeType, data: content.base64 } };
+}
+
 /**
- * Asks `model` to read the photo and returns the receipt record it wrote, unchecked
+ * Asks `model` to read the receipt and returns the receipt record it wrote, unchecked
  * (parseReading checks it). The reply is constrained to the schema as JSON.
  */
 export async function askGemini(input: AskInput): Promise<unknown> {
@@ -53,10 +67,8 @@ export async function askGemini(input: AskInput): Promise<unknown> {
         {
           role: 'user',
           parts: [
-            {
-              inlineData: { mimeType: input.mediaType ?? 'image/jpeg', data: input.imageBase64 },
-            },
-            { text: userPrompt(input.categories) },
+            geminiPart(input.content),
+            { text: userPrompt(input.categories, input.content.kind) },
           ],
         },
       ],

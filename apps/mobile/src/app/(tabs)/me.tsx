@@ -73,6 +73,11 @@ export default function Me() {
                 : `${categoryCount} ${categoryCount === 1 ? 'category' : 'categories'}`
             }
             onPress={() => router.push('/settings/categories')}
+          />
+          <ListRow
+            title="Forward receipts"
+            subtitle="Email receipts to Spendly to split them"
+            onPress={() => router.push('/settings/emails')}
             divider={false}
           />
         </View>

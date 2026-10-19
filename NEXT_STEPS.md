@@ -1,10 +1,4 @@
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Next steps: open questions for user feedback
+# Next steps: open questions for user feedback
 
 Product and design choices made while building that real users should confirm. Bring these to user interviews or test sessions, record what you learn, then update the app or the plan.
 
@@ -14,39 +8,9 @@ For each question, the **How to test** line suggests something to ask or a task 
 
 ---
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## To do
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-To do
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Reorganize the People page
+### Reorganize the People page
 
 - **Status:** To do (2026-10-19)
 - **Why:** it has grown piece by piece and is now messy and logically inconsistent.
@@ -57,49 +21,13 @@ Reorganize the People page
   - Home now shows the same "Owed to you / You owe" totals, plus "Needs you" (claims and invites), which overlaps with the People page.
 - **To decide before changing it:** is the page about **people** (one row per person across groups) or **groups**? Should groups move to their own place? What stays on Home versus People?
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Turn on receipt scanning and measure it
+### Turn on receipt scanning and measure it
 
 - **Status:** To do (2026-10-19)
 - **What's left:** add a Gemini or Anthropic API key to `supabase/functions/.env` (README, "Receipt scanning"), then run about 20 real receipts through `npm run receipts:accuracy`. If the first model often needs the retry, or long receipts come back wrong, adjust the photo size (`LONG_EDGE` in `apps/mobile/src/lib/scan.ts`) or the prompt.
 - **Before anyone else scans:** switch off Gemini's free tier. On it, Google may use what's sent to improve its products, and receipts show what people buy and where. Use Gemini's paid tier or Claude (the plan's choice, `RECEIPT_PROVIDER=claude`), and say in the privacy policy (Step 11) who reads receipts.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Turn on push notifications and deploy the payment page
+### Turn on push notifications and deploy the payment page
 
 - **Status:** To do (2026-10-19)
 - **Why:** both need your accounts, so Step 8 built them but didn't switch them on.
@@ -109,103 +37,31 @@ Turn on push notifications and deploy the payment page
   - Set `VITE_GET_APP_URL` once there's an App Store or TestFlight link. Until then the page hides "Get the Spendly app".
   - Push for invites isn't built yet. Only claims and payment-page notes send pushes.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+### Set up Postmark for forwarded receipts
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
+- **Status:** To do (2026-10-20)
+- **What's left:** create a Postmark server, point its inbound webhook at `postmark-inbound` with the shared secret, and set `RECEIPTS_EMAIL_ADDRESS`, `EXPO_PUBLIC_RECEIPTS_EMAIL` and `POSTMARK_SERVER_TOKEN` (README, "Forwarded email receipts"). Then forward a real Amazon order, forward it again (it should be skipped as a duplicate), and send one from an unknown address (it should get the reply).
+- **Also check with real email** which authentication headers Postmark passes through (`Received-SPF` with `envelope-from`, `Authentication-Results`), and that a Gmail filter's forward arrives with your address as the envelope sender, so it's matched to you.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Navigation and settings
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Navigation and settings
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-1.  Is Me → Profile & payments / Categories where people expect settings?
+### 1. Is Me → Profile & payments / Categories where people expect settings?
 
 - **Status:** Open
 - **Now:** the Me tab is a settings hub. Name and payment usernames are under **Profile & payments**; adding, renaming and deleting categories is under **Categories**. Monthly budgets will live in the Budget tab (Step 7).
 - **Why it matters:** if people look for categories in Budget or Add expense and can't find them, they'll make do with "Other" and their budget gets less useful.
 - **How to test:** "You want a category for textbooks. Show me how you'd add one." Watch where they go first, and whether they expect Budget and Categories to be in the same place.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-2.  Should a new category be creatable from Add expense, too?
+### 2. Should a new category be creatable from Add expense, too?
 
 - **Status:** Open
 - **Now:** categories can only be added in Me → Categories. Add expense only shows the existing ones.
 - **Why it matters:** the need for a new category usually comes up while entering an expense. Leaving the form to create one may be annoying, or rare enough not to matter.
 - **How to test:** after question 1, ask whether they'd have wanted to add it without leaving the expense.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Splitting an expense
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Splitting an expense
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-3.  Do people understand how to choose who each item is for?
+### 3. Do people understand how to choose who each item is for?
 
 - **Status:** Testing
 - **Was:** each item had a small tag that cycled You → All → each person → Custom on every tap, with the hint "Tap an item's tag…" in the People section above.
@@ -214,100 +70,28 @@ Splitting an expense
 - **How to test:** give someone the Costco receipt from the plan and ask them to split it without explaining anything. Note whether they find the dropdown, and whether they figure out how to leave someone out of Split evenly.
 - **Also (2026-10-19):** items now have a quantity ("3 ×" before the name). With more than one, the item shows one tag per unit, each starting as You, and tapping a tag picks who that one was for; a tag's list also has "Split all 3 evenly" for the whole line. Give someone a receipt with "3 x Soft drink" (Jeff had 2, Maya 1) and see whether they tag the drinks one by one without help.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-4.  Are the defaults right: new items on "You", and the newest shared group?
+### 4. Are the defaults right: new items on "You", and the newest shared group?
 
 - **Status:** Open
 - **Now:** each new item starts as **You**, and Add expense opens on your most recently created shared group (or Personal if you have none).
 - **Why it matters:** good defaults save taps on every expense. If most receipts are mostly shared, **All** might be the better default.
 - **How to test:** ask what share of their purchases are mostly shared versus mostly theirs. Watch how often they change the default.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-5.  Is "Itemized" versus "Just a total" clear?
+### 5. Is "Itemized" versus "Just a total" clear?
 
 - **Status:** Open
 - **Now:** two chips switch between entering line items and entering one total, split evenly or by amounts.
 - **Why it matters:** for quick things like pizza, most people probably want the total. They should find that mode immediately.
 - **How to test:** "You and Jeff split a $30 pizza. Add it." See whether they find Just a total, or type it as one item.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-6.  Is requiring a category for your share too much friction?
+### 6. Is requiring a category for your share too much friction?
 
 - **Status:** Open
 - **Now:** you can't save until you pick a category, whenever you have a share.
 - **Why it matters:** required fields make entry slower, but without a category spending can't go into a budget.
 - **How to test:** watch whether people hesitate or pick at random. Ask whether a default (for example the last one they used) would be better.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-7.  Is stepping the date with ‹ › good enough?
+### 7. Is stepping the date with ‹ › good enough?
 
 - **Status:** Answered (2026-10-19)
 - **Was:** the date started at today and moved one day per tap, with no calendar.
@@ -319,222 +103,53 @@ Splitting an expense
 - **Was:** each person saw only their own items and amount, never the total; the summary said so.
 - **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Expenses, balances and history
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-8.  Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Open
-- **Now:** the summary says, for example, "Jeff and Maya each see only their own items and amount, never the total."
-- **Why it matters:** privacy (Rule 5) is a main reason to pick this app over a spreadsheet. People should notice it and trust it.
-- **How to test:** after they save, ask "What can Jeff see about this purchase?" Compare their answer with what's actually true.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Expenses, balances and history
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-9.  Will people want "Edit" instead of "Void"?
+### 9. Will people want "Edit" instead of "Void"?
 
 - **Status:** Answered (2026-10-19)
 - **Outcome:** yes. A $30 dinner saved with everything on "You" took voiding and re-entering the whole receipt to fix. The expense screen now has **Edit**: it reopens the form filled in, and saving creates a corrected version that replaces the original. History stays append-only (Rule 2), and the original is kept and linked.
 - **Limit:** expenses with a forgiven debt on them can't be edited yet (forgiveness belongs to the original). They have to be voided and re-entered. If people hit this, carry forgiveness over to the new version.
 - **Still to test:** whether people find Edit, and whether "Replaced by an edit" on the original makes sense.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-10. Do people expect to see the whole group's balances, or only their own?
+### 10. Do people expect to see the whole group's balances, or only their own?
 
 - **Status:** Open
 - **Now:** you only see balances that involve you. Who owes whom between Jeff and Maya is hidden, because it would reveal their shares.
 - **Why it matters:** some roommates may want a full "who owes whom" view to settle up all at once, which conflicts with privacy.
 - **How to test:** ask how their household settles up today, and whether one person tracks everything.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-11. Is "overpaying flips the debt" what people expect?
+### 11. Is "overpaying flips the debt" what people expect?
 
 - **Status:** Open
 - **Now:** if Jeff owes $15 and pays $20, the app shows that you owe Jeff $5.
 - **Why it matters:** it's correct accounting, but people might expect the extra to count as credit toward future expenses, or a warning when it happens.
 - **How to test:** describe the situation and ask what they'd expect the app to show.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-12. Should forgiven debt count in the month of the purchase or the month you forgave it?
+### 12. Should forgiven debt count in the month of the purchase or the month you forgave it?
 
 - **Status:** Open
 - **Now:** if you forgive Jeff's $15 for an October Costco trip in November, the $15 is added to your October spending, in that trip's category.
 - **Why it matters:** changing a past month's numbers can confuse people reviewing their budget.
 - **How to test:** walk them through the example and ask which month they'd expect to see it in.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-13. Should someone else's expense be categorized for you automatically?
+### 13. Should someone else's expense be categorized for you automatically?
 
 - **Status:** Open
 - **Now:** when Maya pays and you have a share, it shows as uncategorized in your spending unless you pick a category for it.
 - **Why it matters:** uncategorized spending makes budgets less useful. A default (for example the same category name as Maya's, if you have one) could help.
 - **How to test:** once Step 7 is in, ask account holders whether they'd categorize these by hand.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Categories
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Categories
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-14. What should happen to a category that's in use when someone wants to delete it?
+### 14. What should happen to a category that's in use when someone wants to delete it?
 
 - **Status:** Open
 - **Now:** deleting is blocked with "rename it instead."
 - **Why it matters:** people may want to merge two categories (for example "Food" into "Groceries"), which we don't support yet.
 - **How to test:** ask whether they've ever wanted to combine or remove categories in other budgeting apps.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-15. Do people want a different category for each line item?
+### 15. Do people want a different category for each line item?
 
 - **Status:** Open
 - **Now:** your whole share of an expense goes in one category. In the plan's example, Leo's $83 includes a $12.99 graphic tee but is all filed under Groceries.
@@ -542,267 +157,69 @@ Categories
 - **Possible approach, if wanted:** keep one category as the default and allow an optional per-item override ("my part of this goes in Clothing"). Best after Step 9, when scanning can suggest a category per line. "Advanced budgeting" is out of scope for the MVP, so this would be post-MVP.
 - **How to test:** ask how often their receipts mix categories, and whether they'd fix the split or not care. After they save a mixed receipt, ask whether their Groceries total looks right to them.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Sign-in and people
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Sign-in and people
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-16. Is an emailed one-time code an acceptable way to sign in?
+### 16. Is an emailed one-time code an acceptable way to sign in?
 
 - **Status:** Open
 - **Now:** email code only. Phone sign-in comes later; there are no passwords.
 - **Why it matters:** students may prefer phone codes or Apple/Google sign-in. Switching to the email app every time adds friction.
 - **How to test:** time a first sign-in and ask how they'd prefer to sign in.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-17. Do people add phone numbers for roommates?
+### 17. Do people add phone numbers for roommates?
 
 - **Status:** Open
 - **Now:** phone is optional when adding a person. If you tap **Request payment** for someone without one, the app asks for their number first ("How should we reach Jeff?"), saves it, and opens Messages. **Share another way** is the fallback for WhatsApp, Instagram and similar.
 - **Why it matters:** payment requests and reminders depend on it. For people who have Spendly, a request inside the app (with a push notification, Step 8) may be better than a text.
 - **How to test:** see whether they fill it in while creating a group, and ask why or why not.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-18. Do quick splits work for a random night out?
+### 18. Do quick splits work for a random night out?
 
 - **Status:** Open
 - **Now:** Add expense has a **Quick split** chip. You pick who was there (suggestions from people you've split with before, or add new people) and split like a group. It's kept out of the Groups list, and named after who was there and the date ("Jeff and Maya · Oct 19").
 - **Why it matters:** for casual outings, making a full group is too much work, so people may not log the expense at all.
 - **How to test:** "You had dinner with two classmates tonight and paid. Split it." Watch whether they find Quick split, and whether they confuse it with the "Just a total" mode. Check whether the suggestions help and whether the name makes sense later in the People tab. Also ask whether they'd want to turn a quick split into a regular group.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-19. Can people find each other by username, and do they notice invites?
+### 19. Can people find each other by username, and do they notice invites?
 
 - **Status:** Open
 - **Now:** everyone gets a username at sign-up (from their email name), shown on the Me tab and changeable in Profile & payments. You invite someone by typing their exact username. They see a dot on the People tab and the invite at the top of People (two at most, then "See all"). Invites don't send a push yet.
 - **Why it matters:** if people don't know their own username, or never notice the invite, their roommate's app stays name-only and "I paid" / "Got it" can't be used.
 - **How to test:** ask someone to add a friend who uses Spendly, and watch whether they know where to find their username. Then check how long the friend takes to notice and accept the invite without being told. Ask whether the automatic usernames (like "liyou2001") feel fine or they'd change them.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Payment page
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Payment page
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-20. Does the payment page make sense to someone who's never heard of Spendly?
+### 20. Does the payment page make sense to someone who's never heard of Spendly?
 
 - **Status:** Open
 - **Now:** the request text links to a private page: "Leo says you owe $15.00", an equal button for each app Leo takes (Venmo, PayPal, Cash App) plus where to send it by Zelle, "I paid Leo", the items behind it, and "Something looks wrong". Shared items show their full price with "Split 3 ways", and a note says your share includes tax and tip.
 - **Why it matters:** the person paying never chose Spendly. If the page looks like spam or the numbers don't add up for them, they won't pay or will ask the payer instead.
 - **How to test:** text a link to someone who's never used the app and watch them open it. Do they trust it? Do they understand why the item prices ($22.99, $11.49, $10.52) don't add up to $15.00? Do they tap "I paid Leo" after paying in Venmo, or assume Venmo told Leo already?
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-21. Is auto-confirming claims useful, and is the default right?
+### 21. Is auto-confirming claims useful, and is the default right?
 
 - **Status:** Open
 - **Now:** off by default. In Profile & payments you can have "I paid" claims to you confirm themselves after 3 or 7 days if you haven't answered.
 - **Why it matters:** people who forget to tap Got it leave balances wrong, but auto-confirming means trusting every claim.
 - **How to test:** ask payers how often they check Venmo before confirming, and whether they'd rather confirm each claim or have it happen on its own.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-22. Do people add Zelle, and is the warning about sharing their email or phone right?
+### 22. Do people add Zelle, and is the warning about sharing their email or phone right?
 
 - **Status:** Open
 - **Now:** Profile & payments has a Zelle field (email or US phone). Zelle has no usernames or payment links, so the number or email is shown as is to people in your groups and on payment links, with a copy button. A warning under the field says so.
 - **Why it matters:** many students use Zelle through their bank, but some won't want their phone number on a link that can be forwarded. If the warning scares everyone off, Zelle users have no easy way to get paid.
 - **How to test:** ask Zelle users to set up their profile and watch whether they add it after reading the warning. Ask payers whether copying the address into their bank app feels like too many steps.
 
-### 8. Does the privacy note reassure people, and do they believe it?
+## Receipt scanning
 
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-Receipt scanning
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-23. Is scanning faster than typing, and do people check the draft?
+### 23. Is scanning faster than typing, and do people check the draft?
 
 - **Status:** Open
 - **Now:** Add expense has Take photo / Choose photo at the top. The draft fills in the store, date, items, tax, tip and discount, with every item set to You. If the lines don't add up to the receipt's total, the form says by how much until they do.
 - **Why it matters:** if fixing the draft takes longer than typing, people stop scanning. If they trust it blindly, a misread price ends up in someone's balance.
 - **How to test:** give someone a long grocery receipt and time scanning against typing. Watch whether they read the lines before saving, and whether the "add up to" message makes sense.
 
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-### 8. Does the privacy note reassure people, and do they believe it?
-
-- **Status:** Answered (2026-10-20)
-- **Was:** each person saw only their own items and amount, never the total; the summary said so.
-- **Outcome:** dropped in favour of transparency (Rule 5 changed). Everyone in a group sees every expense in full, with how each share was worked out; payment links show the full bill too. See question 25.
-
-24. Should scanned item names be cleaned up or kept as printed?
+### 24. Should scanned item names be cleaned up or kept as printed?
 
 - **Status:** Open
 - **Now:** Claude rewrites names the way a person would say them ("KS PAPER TWL" becomes "Paper towels").
@@ -814,6 +231,15 @@ Receipt scanning
 ### 25. Do people understand "How your $15.00 was worked out"?
 
 - **Status:** Open
-- **Now:** every expense shows the whole receipt to everyone in the group, everyone's shares, and a line-by-line breakdown of your share: each of your items with how it was split ("$22.99 split 3 ways"), your items as a percent of all items, your part of each tax, tip and discount line, and your total. Tapping someone in the Split list shows theirs. Payment links show the same.
+- **Now:** every expense shows the whole receipt to everyone in the group, everyone's shares, and a line-by-line breakdown of your share: each of your items with how it was split ("$22.99 split 3 ways"), your items as a percent of all items, your part of each tax, tip and discount line, and your total. Tapping someone in the Split list shows theirs. Payment links and a person's "What it's for" show the same.
 - **Why it matters:** seeing the math is what makes a split feel fair, but a long breakdown can also make a $15 debt look complicated.
 - **How to test:** show someone their breakdown on a receipt with tax and a discount and ask them to explain where their number came from. Ask whether seeing everyone else's items felt useful or nosy.
+
+## Forwarded receipts
+
+### 26. Do people forward receipts, and do they find the address?
+
+- **Status:** Open
+- **Now:** Me → Forward receipts shows the one shared address with a copy button and the addresses your receipts can come from (your sign-in email, plus any you add with a code). Forwarded receipts appear under Needs you on Home, ready to split.
+- **Why it matters:** online orders are a big share of student spending, and forwarding is the only way they get in without retyping.
+- **How to test:** ask someone to split an Amazon order with a roommate. Watch whether they think to forward the email, whether they find the address, and whether forwarding from a second address (school email) confuses them.

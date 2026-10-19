@@ -396,13 +396,12 @@ Splitting rules:
 **Build:**
 
 - Settings:
-  - Add the email addresses you forward from, each verified with a code.
-  - Show `receipts@in.yourapp.com` with a copy button.
-  - A personal auto-forward address (`receipts+<token>@in.yourapp.com`) for Gmail filters.
+  - Add the email addresses you forward from, each verified with a code. Your sign-in address counts automatically.
+  - Show the one shared address, `receipts@in.yourapp.com`, with a copy button. There are no personal addresses: whose receipt it is comes from the sender.
 - A `postmark-inbound` Edge Function:
   - Checks a shared secret, saves the email to `inbound_emails` as received, and responds with 200 right away.
   - Processes in the background (for example with `EdgeRuntime.waitUntil`).
-  - Finds the user by the plus-address token (Postmark's `MailboxHash`) or by verified sender. An unknown sender gets an automatic reply explaining how to add the address.
+  - Finds the user by a verified address the email provably came from: the From address when SPF, DKIM or DMARC passed for its domain, or the SPF-checked envelope sender (how Gmail filters forward). Headers anyone can write are never trusted. An unknown sender gets an automatic reply explaining how to add the address.
   - Extracts from the text body or a PDF or image attachment, using the same extraction and math check as Step 9.
   - Creates a draft under Needs you.
   - Skips duplicates by provider message id, and by matching amount, date and merchant.

@@ -22,6 +22,8 @@ import {
   fetchExpenses,
   fetchGroups,
   fetchPayments,
+  fetchDrafts,
+  fetchForwardingCodes,
   fetchProblemReports,
   fetchProfile,
 } from '@/lib/data';
@@ -43,11 +45,13 @@ async function fetchSummary(userId: string) {
 }
 
 async function fetchPeople(userId: string) {
-  const [groups, balances, payments, reports] = await Promise.all([
+  const [groups, balances, payments, reports, drafts, codes] = await Promise.all([
     fetchGroups(),
     fetchBalances(),
     fetchPayments({ status: 'claimed' }),
     fetchProblemReports(),
+    fetchDrafts(),
+    fetchForwardingCodes(),
   ]);
   const people = new Map(
     groups.flatMap((g) => g.people.map((p) => [p.id, { name: p.displayName, groupName: g.name }])),
@@ -59,6 +63,8 @@ async function fetchPeople(userId: string) {
       name: people.get(report.from)?.name ?? 'Someone',
       groupName: people.get(report.from)?.groupName ?? '',
     })),
+    drafts,
+    codes,
   };
 }
 
@@ -89,6 +95,51 @@ export default function Home() {
         )
       : [];
   const notes = people.status === 'ready' ? people.data.notes : [];
+  const drafts = people.status === 'ready' ? people.data.drafts : [];
+  const codes = people.status === 'ready' ? people.data.codes : [];
+  // Everything waiting on you, in one list.
+  const needs: { key: string; title: string; subtitle: string; open: () => void }[] = [
+    ...drafts.map((draft) => ({
+      key: `draft-${draft.id}`,
+      title: `${draft.receipt.merchant ?? 'Forwarded receipt'} · ${formatCents(draft.receipt.total_cents)}`,
+      subtitle:
+        draft.gapCents === 0
+          ? 'Forwarded receipt · tap to split'
+          : 'Forwarded receipt · check the amounts, then split',
+      open: () => router.push({ pathname: '/add-expense', params: { draft: draft.id } }),
+    })),
+    ...codes.map((code) => ({
+      key: `code-${code.id}`,
+      title: `Gmail forwarding code: ${code.code}`,
+      subtitle: 'Enter it in Gmail to finish setting up forwarding',
+      open: () => router.push('/settings/emails'),
+    })),
+    ...claims.map(({ claim, person }) => ({
+      key: claim.id,
+      title: `${person.name} says they paid ${formatCents(claim.amountCents)}`,
+      subtitle: `${person.groupName} · tap to confirm`,
+      open: () => router.push({ pathname: '/people/[id]', params: { id: person.participantId } }),
+    })),
+    ...notes.map(({ report, name, groupName }) => ({
+      key: report.id,
+      title: `${name}: “${report.message}”`,
+      subtitle: [groupName, 'something looks wrong'].filter(Boolean).join(' · '),
+      open: () => router.push({ pathname: '/people/[id]', params: { id: report.from } }),
+    })),
+    ...(invites.length > 0
+      ? [
+          {
+            key: 'invites',
+            title:
+              invites.length === 1
+                ? `${invites[0]?.invitedByName} invited you to ${invites[0]?.groupName}`
+                : `${invites.length} invites to groups`,
+            subtitle: 'Accept to see your share in your app',
+            open: () => router.push(invites.length === 1 ? '/people' : '/invites'),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Screen title={firstName ? `Hi, ${firstName}` : 'Home'}>
@@ -140,46 +191,19 @@ export default function Home() {
         </Loadable>
       )}
 
-      {claims.length > 0 || notes.length > 0 || invites.length > 0 ? (
+      {needs.length > 0 ? (
         <Section title="Needs you">
           <View>
-            {claims.map(({ claim, person }, index) => (
+            {needs.map((need, index) => (
               <ListRow
-                key={claim.id}
-                title={`${person.name} says they paid ${formatCents(claim.amountCents)}`}
-                subtitle={`${person.groupName} · tap to confirm`}
+                key={need.key}
+                title={need.title}
+                subtitle={need.subtitle}
                 trailing={<View style={styles.dot} />}
-                onPress={() =>
-                  router.push({ pathname: '/people/[id]', params: { id: person.participantId } })
-                }
-                divider={index < claims.length - 1 || notes.length > 0 || invites.length > 0}
+                onPress={need.open}
+                divider={index < needs.length - 1}
               />
             ))}
-            {notes.map(({ report, name, groupName }, index) => (
-              <ListRow
-                key={report.id}
-                title={`${name}: “${report.message}”`}
-                subtitle={[groupName, 'something looks wrong'].filter(Boolean).join(' · ')}
-                trailing={<View style={styles.dot} />}
-                onPress={() =>
-                  router.push({ pathname: '/people/[id]', params: { id: report.from } })
-                }
-                divider={index < notes.length - 1 || invites.length > 0}
-              />
-            ))}
-            {invites.length > 0 ? (
-              <ListRow
-                title={
-                  invites.length === 1
-                    ? `${invites[0]?.invitedByName} invited you to ${invites[0]?.groupName}`
-                    : `${invites.length} invites to groups`
-                }
-                subtitle="Accept to see your share in your app"
-                trailing={<View style={styles.dot} />}
-                onPress={() => router.push(invites.length === 1 ? '/people' : '/invites')}
-                divider={false}
-              />
-            ) : null}
           </View>
         </Section>
       ) : null}

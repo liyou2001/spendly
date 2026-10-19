@@ -50,6 +50,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="expenses/[id]" />
           <Stack.Screen name="settings/profile" />
           <Stack.Screen name="settings/categories" />
+          <Stack.Screen name="settings/emails" />
           <Stack.Screen name="people/[id]" />
           <Stack.Screen name="invites" />
           <Stack.Screen name="activity" />

@@ -1,5 +1,12 @@
 // One call to the Claude API to read a receipt photo. The key stays on the server (Rule 9).
-import { RECEIPT_SCHEMA, SYSTEM_PROMPT, userPrompt, type AskInput } from './receipt.ts';
+import {
+  fencedEmail,
+  RECEIPT_SCHEMA,
+  SYSTEM_PROMPT,
+  userPrompt,
+  type AskInput,
+  type ReceiptContent,
+} from './receipt.ts';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -14,8 +21,25 @@ const RECEIPT_TOOL = {
   input_schema: RECEIPT_SCHEMA,
 };
 
+/** The receipt as a Claude content block: an image, a PDF document, or the email's text. */
+function claudeBlock(content: ReceiptContent) {
+  if (content.kind === 'image') {
+    return {
+      type: 'image',
+      source: { type: 'base64', media_type: content.mediaType, data: content.base64 },
+    };
+  }
+  if (content.kind === 'pdf') {
+    return {
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data: content.base64 },
+    };
+  }
+  return { type: 'text', text: fencedEmail(content.text) };
+}
+
 /**
- * Asks `model` to read the photo and returns the record_receipt tool's input, unchecked
+ * Asks `model` to read the receipt and returns the record_receipt tool's input, unchecked
  * (parseReading checks it). Tool use is forced and extended thinking is off, so the reply is
  * just the structured receipt.
  */
@@ -37,15 +61,8 @@ export async function askClaude(input: AskInput): Promise<unknown> {
         {
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: input.mediaType ?? 'image/jpeg',
-                data: input.imageBase64,
-              },
-            },
-            { type: 'text', text: userPrompt(input.categories) },
+            claudeBlock(input.content),
+            { type: 'text', text: userPrompt(input.categories, input.content.kind) },
           ],
         },
       ],

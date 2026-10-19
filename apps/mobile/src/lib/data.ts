@@ -7,6 +7,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import type { BudgetRow, SpendingItem } from './budget';
 import type { BillLine } from './breakdown';
 import { toSummaries, type ExpenseSummary } from './expenseList';
+import type { ScannedReceipt } from './receipts';
 import type { KnownPerson } from './oneOff';
 import { profileColumns, toForm, type ProfileFields, type ProfileForm } from './profile';
 import type { SaveItem } from './split';
@@ -309,8 +310,8 @@ export interface SaveExpenseInput {
   categoryId: string | null;
   /** Set when editing: the expense this one replaces, which is voided in the same save. */
   replacesExpenseId?: string;
-  /** "photo" when it was filled in from a scanned receipt. */
-  source?: 'manual' | 'photo';
+  /** "photo" or "email" when it was filled in from a scanned or forwarded receipt. */
+  source?: 'manual' | 'photo' | 'email';
 }
 
 /** Saves through save_expense, which checks everything adds up. Returns the new expense id. */
@@ -946,5 +947,110 @@ export async function setAutoConfirmDays(userId: string, days: number | null): P
     .from('profiles')
     .update({ auto_confirm_days: days })
     .eq('id', userId);
+  if (error) throw error;
+}
+
+// Forwarded receipts -------------------------------------------------------------------
+
+/** One of your addresses for forwarding receipts. */
+export interface ForwardingAddress {
+  email: string;
+  verified: boolean;
+  /** The address you sign in with: always on the list. */
+  isSignIn: boolean;
+}
+
+export async function fetchMyEmails(): Promise<ForwardingAddress[]> {
+  const rows = unwrap(
+    await supabase.from('verified_emails').select('email, verified_at, is_sign_in').order('email'),
+  );
+  return rows
+    .map((row) => ({
+      email: row.email,
+      verified: row.verified_at !== null,
+      isSignIn: row.is_sign_in,
+    }))
+    .sort((a, b) => Number(b.isSignIn) - Number(a.isSignIn));
+}
+
+/**
+ * Emails a code to an address you want to forward from. False when it couldn't be sent (no
+ * Postmark set up; locally the code is in the functions log).
+ */
+export async function addEmail(email: string): Promise<boolean> {
+  const { data, error } = await supabase.functions.invoke<{ sent: boolean }>('add-email', {
+    body: { email },
+  });
+  if (error) {
+    const context = (error as { context?: Response }).context;
+    const message = await context
+      ?.json()
+      .then((body: { error?: string }) => body.error)
+      .catch(() => undefined);
+    throw new UserFacingError(message ?? 'Couldn’t send a code. Try again.');
+  }
+  return data?.sent ?? false;
+}
+
+export async function verifyEmail(email: string, code: string): Promise<void> {
+  const { error } = await supabase.rpc('verify_email', { p_email: email, p_code: code });
+  if (error) throw error;
+}
+
+export async function removeEmail(email: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_email', { p_email: email });
+  if (error) throw error;
+}
+
+/** A forwarded receipt read into a draft, waiting under Needs you. */
+export interface ReceiptDraft {
+  id: string;
+  receipt: ScannedReceipt;
+  /** Lines minus the total when they don't add up; 0 when they do. */
+  gapCents: Cents;
+  createdAt: string;
+}
+
+/** Your drafts not yet split or dismissed, newest first. */
+export async function fetchDrafts(): Promise<ReceiptDraft[]> {
+  const rows = unwrap(
+    await supabase
+      .from('receipt_drafts')
+      .select('id, receipt, gap_cents, created_at')
+      .is('used_at', null)
+      .is('dismissed_at', null)
+      .order('created_at', { ascending: false }),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    receipt: row.receipt as unknown as ScannedReceipt,
+    gapCents: row.gap_cents,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function fetchDraft(draftId: string): Promise<ReceiptDraft | null> {
+  return (await fetchDrafts()).find((d) => d.id === draftId) ?? null;
+}
+
+/** Done with a draft: saved as an expense (used) or not a receipt (dismissed). */
+export async function closeDraft(draftId: string, used: boolean): Promise<void> {
+  const { error } = await supabase.rpc('close_draft', { p_draft_id: draftId, p_used: used });
+  if (error) throw error;
+}
+
+/** Gmail's "confirm forwarding" codes for you, newest first. */
+export async function fetchForwardingCodes(): Promise<{ id: string; code: string }[]> {
+  return unwrap(
+    await supabase
+      .from('forwarding_codes')
+      .select('id, code')
+      .is('dismissed_at', null)
+      .order('created_at', { ascending: false }),
+  );
+}
+
+export async function dismissForwardingCode(id: string): Promise<void> {
+  const { error } = await supabase.rpc('dismiss_forwarding_code', { p_id: id });
   if (error) throw error;
 }

@@ -175,6 +175,31 @@ export type Database = {
           },
         ];
       };
+      forwarding_codes: {
+        Row: {
+          code: string;
+          created_at: string;
+          dismissed_at: string | null;
+          id: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          code: string;
+          created_at?: string;
+          dismissed_at?: string | null;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          code?: string;
+          created_at?: string;
+          dismissed_at?: string | null;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       group_invites: {
         Row: {
           created_at: string;
@@ -250,6 +275,7 @@ export type Database = {
           provider_message_id: string;
           received_at: string;
           status: string;
+          subject: string | null;
           user_id: string | null;
         };
         ComputedFields: never;
@@ -260,6 +286,7 @@ export type Database = {
           provider_message_id: string;
           received_at?: string;
           status: string;
+          subject?: string | null;
           user_id?: string | null;
         };
         Update: {
@@ -269,6 +296,7 @@ export type Database = {
           provider_message_id?: string;
           received_at?: string;
           status?: string;
+          subject?: string | null;
           user_id?: string | null;
         };
         Relationships: [];
@@ -561,6 +589,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      receipt_drafts: {
+        Row: {
+          created_at: string;
+          dismissed_at: string | null;
+          gap_cents: number;
+          id: string;
+          inbound_email_id: string | null;
+          receipt: NonNullable<Json>;
+          status: string;
+          used_at: string | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          dismissed_at?: string | null;
+          gap_cents?: number;
+          id?: string;
+          inbound_email_id?: string | null;
+          receipt: NonNullable<Json>;
+          status: string;
+          used_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          dismissed_at?: string | null;
+          gap_cents?: number;
+          id?: string;
+          inbound_email_id?: string | null;
+          receipt?: NonNullable<Json>;
+          status?: string;
+          used_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'receipt_drafts_inbound_email_id_fkey';
+            columns: ['inbound_email_id'];
+            isOneToOne: false;
+            referencedRelation: 'inbound_emails';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       receipt_extractions: {
         Row: {
           created_at: string;
@@ -761,17 +834,20 @@ export type Database = {
       verified_emails: {
         Row: {
           email: string;
+          is_sign_in: boolean;
           user_id: string;
           verified_at: string | null;
         };
         ComputedFields: never;
         Insert: {
           email: string;
+          is_sign_in?: boolean;
           user_id: string;
           verified_at?: string | null;
         };
         Update: {
           email?: string;
+          is_sign_in?: boolean;
           user_id?: string;
           verified_at?: string | null;
         };
@@ -807,12 +883,15 @@ export type Database = {
         Args: { p_amount_cents: number; p_group_id: string; p_method?: string; p_to: string };
         Returns: string;
       };
+      close_draft: { Args: { p_draft_id: string; p_used: boolean }; Returns: undefined };
       create_group: {
         Args: { p_name: string; p_one_off?: boolean; p_people?: Json };
         Returns: string;
       };
       create_share_link: { Args: { p_participant_id: string }; Returns: string };
       decide_payment: { Args: { p_accept: boolean; p_payment_id: string }; Returns: undefined };
+      dismiss_forwarding_code: { Args: { p_id: string }; Returns: undefined };
+      email_code_create: { Args: { p_email: string; p_user_id: string }; Returns: string };
       find_user: {
         Args: { p_username: string };
         Returns: {
@@ -842,6 +921,11 @@ export type Database = {
       };
       hit_rate_limit: {
         Args: { p_key: string; p_max: number; p_window_seconds: number };
+        Returns: boolean;
+      };
+      inbound_find_user: { Args: { p_addresses: string[] }; Returns: string };
+      inbound_is_duplicate: {
+        Args: { p_date?: string; p_merchant: string; p_total_cents: number; p_user_id: string };
         Returns: boolean;
       };
       invite_to_group: { Args: { p_participant_id: string; p_user_id: string }; Returns: string };
@@ -905,6 +989,7 @@ export type Database = {
         Returns: string;
       };
       register_push_token: { Args: { p_token: string }; Returns: undefined };
+      remove_email: { Args: { p_email: string }; Returns: undefined };
       resolve_problem: { Args: { p_report_id: string }; Returns: undefined };
       respond_to_invite: { Args: { p_accept: boolean; p_invite_id: string }; Returns: string };
       revoke_share_links: { Args: { p_participant_id: string }; Returns: number };
@@ -932,6 +1017,7 @@ export type Database = {
         Returns: undefined;
       };
       username_available: { Args: { p_username: string }; Returns: boolean };
+      verify_email: { Args: { p_code: string; p_email: string }; Returns: undefined };
       void_expense: { Args: { p_expense_id: string }; Returns: undefined };
     };
     Enums: {

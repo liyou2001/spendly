@@ -437,3 +437,7 @@ verify_jwt = false
 
 [functions.text-opt-in]
 verify_jwt = false
+
+# Postmark's inbound webhook: checked with the shared secret in its basic auth instead.
+[functions.postmark-inbound]
+verify_jwt = false

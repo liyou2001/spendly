@@ -31,8 +31,10 @@ import {
 import { formatDate, todayLocal } from '@/lib/dates';
 import {
   addPerson,
+  closeDraft,
   createGroup,
   fetchCategories,
+  fetchDraft,
   fetchExpense,
   fetchGroup,
   fetchGroups,
@@ -42,6 +44,7 @@ import {
   UserFacingError,
   type Category,
   type Group,
+  type ReceiptDraft,
 } from '@/lib/data';
 import { debtLabel, evenSplitMessage } from '@/lib/labels';
 import { deviceDecimalSeparator } from '@/lib/locale';
@@ -80,15 +83,19 @@ import {
 import { useLoad } from '@/lib/useLoad';
 import { colors, radius, sizes, space, type } from '@/theme';
 
-async function fetchForm(userId: string, editId: string | undefined) {
-  const [groups, categories, expense, known] = await Promise.all([
+async function fetchForm(userId: string, editId: string | undefined, draftId: string | undefined) {
+  const [groups, categories, expense, known, fromDraft] = await Promise.all([
     fetchGroups(),
     fetchCategories(userId),
     editId ? fetchExpense(editId) : Promise.resolve(null),
     editId ? Promise.resolve([]) : fetchKnownPeople(userId),
+    draftId ? fetchDraft(draftId) : Promise.resolve(null),
   ]);
   const knownPeople = dedupePeople(known);
-  if (!editId) return { groups, categories, knownPeople, editing: null };
+  if (draftId && !fromDraft) {
+    throw new UserFacingError('This receipt was already split or dismissed.');
+  }
+  if (!editId) return { groups, categories, knownPeople, editing: null, fromDraft };
 
   const group = groups.find((g) => g.id === expense?.groupId);
   const me = group?.people.find((p) => p.userId === userId);
@@ -109,14 +116,20 @@ async function fetchForm(userId: string, editId: string | undefined) {
     categories,
     knownPeople,
     editing: { expenseId: expense.id, groupId: group.id, ...form.value },
+    fromDraft: null,
   };
 }
 
 export default function AddExpense() {
-  const { groupId, edit } = useLocalSearchParams<{ groupId?: string; edit?: string }>();
+  const { groupId, edit, draft } = useLocalSearchParams<{
+    groupId?: string;
+    edit?: string;
+    /** A forwarded receipt's draft to start from. */
+    draft?: string;
+  }>();
   const { session } = useSession();
   const userId = session?.user.id ?? '';
-  const loaded = useLoad(useCallback(() => fetchForm(userId, edit), [userId, edit]));
+  const loaded = useLoad(useCallback(() => fetchForm(userId, edit, draft), [userId, edit, draft]));
   const close = () => router.back();
 
   if (loaded.status !== 'ready') {
@@ -149,6 +162,7 @@ export default function AddExpense() {
       userId={userId}
       initialGroupId={loaded.data.editing?.groupId ?? groupId}
       editing={loaded.data.editing}
+      fromDraft={loaded.data.fromDraft}
       knownPeople={loaded.data.knownPeople}
       onGroupsChanged={loaded.reload}
       onClose={close}
@@ -187,6 +201,8 @@ interface ExpenseFormProps {
   initialGroupId: string | undefined;
   /** Set when editing: the form starts from this expense and saving replaces it. */
   editing: (EditableExpense & { expenseId: string }) | null;
+  /** Set when splitting a forwarded receipt: the form starts from its draft. */
+  fromDraft: ReceiptDraft | null;
   /** People from your other groups, suggested when starting a quick split. */
   knownPeople: KnownPerson[];
   onGroupsChanged: () => void;
@@ -199,6 +215,7 @@ function ExpenseForm({
   userId,
   initialGroupId,
   editing,
+  fromDraft,
   knownPeople,
   onGroupsChanged,
   onClose,
@@ -225,24 +242,43 @@ function ExpenseForm({
   const group = groups.find((g) => g.id === groupId) ?? first;
   const meInGroup = group?.people.find((p) => p.userId === userId);
 
-  const [draft, setDraft] = useState<Draft>(
-    () =>
-      editing?.draft ?? {
-        ...emptyDraft(first?.people.map((p) => p.id) ?? []),
-        items: [{ key: 'item-0', name: '', amount: '', quantity: '', assignment: { kind: 'you' } }],
-      },
-  );
-  const [merchant, setMerchant] = useState(editing?.merchant ?? '');
-  const [date, setDate] = useState(editing?.expenseDate ?? todayLocal());
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (editing) return editing.draft;
+    const blank = emptyDraft(first?.people.map((p) => p.id) ?? []);
+    return fromDraft
+      ? draftFromReceipt(fromDraft.receipt, blank, { decimalSeparator: deviceDecimalSeparator() })
+      : {
+          ...blank,
+          items: [
+            { key: 'item-0', name: '', amount: '', quantity: '', assignment: { kind: 'you' } },
+          ],
+        };
+  });
+  const [merchant, setMerchant] = useState(editing?.merchant ?? fromDraft?.receipt.merchant ?? '');
+  const [date, setDate] = useState(() => {
+    const scanned = fromDraft?.receipt.date;
+    return editing?.expenseDate ?? (scanned && scanned <= todayLocal() ? scanned : todayLocal());
+  });
   const [choosingDate, setChoosingDate] = useState(false);
   const [paidBy, setPaidBy] = useState(editing?.paidBy ?? meInGroup?.id ?? '');
-  const [categoryId, setCategoryId] = useState<string | null>(editing?.categoryId ?? null);
+  const [categoryId, setCategoryId] = useState<string | null>(
+    () =>
+      editing?.categoryId ??
+      (fromDraft
+        ? categoryForReceipt(fromDraft.receipt.merchant, fromDraft.receipt.category, categories)
+        : null),
+  );
   const [addingPerson, setAddingPerson] = useState(false);
   const [openItem, setOpenItem] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [scan, setScan] = useState<ScanState>({ status: 'idle' });
+  // A forwarded receipt arrives already read, like a scan.
+  const [scan, setScan] = useState<ScanState>(
+    fromDraft
+      ? { status: 'read', receipt: fromDraft.receipt, scansLeft: Number.POSITIVE_INFINITY }
+      : { status: 'idle' },
+  );
   const scanAttempt = useRef(0);
   const scanning = scan.status === 'scanning';
 
@@ -392,13 +428,20 @@ function ExpenseForm({
         items: result.items,
         shares: p_shares,
         categoryId: p_category_id,
-        source: scan.status === 'read' ? 'photo' : 'manual',
+        source:
+          scan.status !== 'read'
+            ? 'manual'
+            : fromDraft && scan.receipt === fromDraft.receipt
+              ? 'email'
+              : 'photo',
         ...(editing ? { replacesExpenseId: editing.expenseId } : {}),
       });
       if (editing) {
         // Close the editor, then swap the old version's screen for the new one.
         router.back();
       }
+      // The forwarded receipt is split; it leaves Needs you.
+      if (fromDraft) void closeDraft(fromDraft.id, true).catch(() => undefined);
       router.replace({ pathname: '/expenses/[id]', params: { id } });
     } catch (e) {
       setSaveError(friendlyError(e as Error));
@@ -473,6 +516,14 @@ function ExpenseForm({
               onScan={requestScan}
               onConfirm={(from) => void scanFrom(from)}
               onCancel={cancelScan}
+              {...(fromDraft
+                ? {
+                    onDismissDraft: () =>
+                      void closeDraft(fromDraft.id, false)
+                        .then(onClose)
+                        .catch((e: Error) => setSaveError(friendlyError(e))),
+                  }
+                : {})}
             />
           )}
           {/* Locked while a scan is being read: its result replaces these, so typing would be lost. */}
@@ -1159,6 +1210,7 @@ function ScanReceipt({
   onScan,
   onConfirm,
   onCancel,
+  onDismissDraft,
 }: {
   state: ScanState;
   currentTotal: number | null;
@@ -1168,6 +1220,8 @@ function ScanReceipt({
   onConfirm: (from: 'camera' | 'library') => void;
   /** Stop reading, or keep what's been entered. */
   onCancel: () => void;
+  /** For a forwarded receipt: it isn't one, take it off Needs you. */
+  onDismissDraft?: () => void;
 }) {
   if (state.status === 'confirm') {
     return (
@@ -1221,7 +1275,11 @@ function ScanReceipt({
             ? ` ${state.scansLeft} ${state.scansLeft === 1 ? 'scan' : 'scans'} left this month.`
             : ''}
         </Text>
-        {buttons}
+        {onDismissDraft ? (
+          <TextButton label="Not a receipt? Dismiss it" icon="x" onPress={onDismissDraft} />
+        ) : (
+          buttons
+        )}
       </View>
     );
   }
