@@ -1,4 +1,5 @@
 export { AddPersonForm } from './AddPersonForm';
+export { AmountForm } from './AmountForm';
 export { Avatar } from './Avatar';
 export { Button } from './Button';
 export { Chip } from './Chip';

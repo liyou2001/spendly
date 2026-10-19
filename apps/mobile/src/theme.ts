@@ -10,9 +10,9 @@ export const colors = {
   background: '#FFFFFF',
   /** The one key block per screen, the active tab, "You" tags and avatars. */
   accentPale: '#EAE4FF',
-  /** Only for progress bars and attention dots. */
+  /** Primary buttons, selected chips, the + button, progress bars and attention dots. */
   accent: '#6D4FD3',
-  /** Text and primary buttons. */
+  /** Text. */
   ink: '#2B2420',
   onInk: '#FFFFFF',
   muted: '#6B5F57',

@@ -216,6 +216,8 @@ export interface SaveExpenseInput {
   items: SaveItem[];
   shares: { participant_id: string; amount_cents: Cents; category_override_id?: string }[];
   categoryId: string | null;
+  /** Set when editing: the expense this one replaces, which is voided in the same save. */
+  replacesExpenseId?: string;
 }
 
 /** Saves through save_expense, which checks everything adds up. Returns the new expense id. */
@@ -230,6 +232,7 @@ export async function saveExpense(input: SaveExpenseInput): Promise<string> {
       p_shares: input.shares,
       p_items: input.items,
       ...(input.categoryId ? { p_category_id: input.categoryId } : {}),
+      ...(input.replacesExpenseId ? { p_replaces_expense_id: input.replacesExpenseId } : {}),
       p_source: 'manual',
     }),
   );
@@ -263,7 +266,9 @@ export async function fetchExpenses(
 ): Promise<ExpenseSummary[]> {
   let fullQuery = supabase
     .from('expenses')
-    .select('id, group_id, merchant, expense_date, total_cents, voided_at, created_at')
+    .select(
+      'id, group_id, merchant, expense_date, total_cents, voided_at, created_at, replaces_expense_id',
+    )
     .order('expense_date', { ascending: false })
     .order('created_at', { ascending: false });
   let shareQuery = supabase
@@ -285,17 +290,20 @@ export async function fetchExpenses(
   const shareRows = unwrap(mine);
 
   const seen = new Set(fullRows.map((row) => row.id));
+  const replaced = new Set(fullRows.map((row) => row.replaces_expense_id).filter(Boolean));
   const expenses = [
-    ...fullRows.map((row) => ({
-      id: row.id,
-      groupId: row.group_id,
-      merchant: row.merchant,
-      expenseDate: row.expense_date,
-      createdAt: row.created_at,
-      voided: row.voided_at !== null,
-      view: 'full' as const,
-      amountCents: row.total_cents,
-    })),
+    ...fullRows
+      .filter((row) => !replaced.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        groupId: row.group_id,
+        merchant: row.merchant,
+        expenseDate: row.expense_date,
+        createdAt: row.created_at,
+        voided: row.voided_at !== null,
+        view: 'full' as const,
+        amountCents: row.total_cents,
+      })),
     ...shareRows
       .filter((row) => !seen.has(row.expense_id))
       .map((row) => ({
@@ -325,6 +333,12 @@ export interface FullExpense {
   totalCents: Cents;
   categoryId: string | null;
   voidedAt: string | null;
+  /** The earlier version this one replaced, if it was saved as an edit. */
+  replacesExpenseId: string | null;
+  /** The newer version that replaced this one, if it was edited. */
+  replacedById: string | null;
+  /** Forgiveness is tied to this expense, so it can't be edited. */
+  hasForgiveness: boolean;
   items: { id: string; name: string; amountCents: Cents; kind: string; participantIds: string[] }[];
   shares: { participantId: string; amountCents: Cents; categoryOverrideId: string | null }[];
 }
@@ -350,15 +364,29 @@ export async function fetchExpense(
     .from('expenses')
     // One string literal, so supabase-js can infer the row type from it.
     .select(
-      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, expense_items(id, name, amount_cents, kind, position, item_assignments(participant_id)), shares(participant_id, amount_cents, category_override_id)',
+      'id, group_id, paid_by, merchant, expense_date, total_cents, category_id, voided_at, replaces_expense_id, expense_items(id, name, amount_cents, kind, position, item_assignments(participant_id)), shares(participant_id, amount_cents, category_override_id)',
     )
     .eq('id', expenseId)
     .maybeSingle();
   if (error) throw error;
 
   if (data) {
+    const [replacement, forgiveness] = await Promise.all([
+      supabase.from('expenses').select('id').eq('replaces_expense_id', expenseId).maybeSingle(),
+      supabase
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('expense_id', expenseId)
+        .eq('kind', 'forgiveness')
+        .eq('status', 'confirmed'),
+    ]);
+    if (replacement.error) throw replacement.error;
+    if (forgiveness.error) throw forgiveness.error;
     return {
       view: 'full',
+      replacesExpenseId: data.replaces_expense_id,
+      replacedById: replacement.data?.id ?? null,
+      hasForgiveness: (forgiveness.count ?? 0) > 0,
       id: data.id,
       groupId: data.group_id,
       paidBy: data.paid_by,
@@ -406,4 +434,210 @@ export async function fetchExpense(
       return { name: item.name, amountCents: item.amount_cents, splitCount: item.split_count };
     }),
   };
+}
+
+// Payments -------------------------------------------------------------------
+
+export type PaymentMethod = 'venmo' | 'paypal' | 'cashapp' | 'cash' | 'other';
+
+export interface Payment {
+  id: string;
+  groupId: string;
+  from: string;
+  to: string;
+  amountCents: Cents;
+  kind: 'payment' | 'forgiveness';
+  status: 'claimed' | 'confirmed' | 'rejected';
+  method: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+/** Payments you're part of, newest first. Row-level security limits them to yours. */
+export async function fetchPayments(options: { groupId?: string } = {}): Promise<Payment[]> {
+  let query = supabase
+    .from('payments')
+    .select(
+      'id, group_id, from_participant, to_participant, amount_cents, kind, status, method, created_at, decided_at',
+    )
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (options.groupId) query = query.eq('group_id', options.groupId);
+  return unwrap(await query).map((row) => ({
+    id: row.id,
+    groupId: row.group_id,
+    from: row.from_participant,
+    to: row.to_participant,
+    amountCents: row.amount_cents,
+    kind: row.kind as Payment['kind'],
+    status: row.status as Payment['status'],
+    method: row.method,
+    createdAt: row.created_at,
+    decidedAt: row.decided_at,
+  }));
+}
+
+/**
+ * Records a repayment that counts immediately: one you received, or one you made to someone
+ * without the app.
+ */
+export async function recordPayment(input: {
+  groupId: string;
+  from: string;
+  to: string;
+  amountCents: Cents;
+  method: PaymentMethod | null;
+}): Promise<void> {
+  const { error } = await supabase.rpc('record_payment', {
+    p_group_id: input.groupId,
+    p_from: input.from,
+    p_to: input.to,
+    p_amount_cents: input.amountCents,
+    ...(input.method ? { p_method: input.method } : {}),
+  });
+  if (error) throw error;
+}
+
+/** "I paid": counts once the person you paid confirms it. */
+export async function claimPayment(input: {
+  groupId: string;
+  to: string;
+  amountCents: Cents;
+  method: PaymentMethod | null;
+}): Promise<void> {
+  const { error } = await supabase.rpc('claim_payment', {
+    p_group_id: input.groupId,
+    p_to: input.to,
+    p_amount_cents: input.amountCents,
+    ...(input.method ? { p_method: input.method } : {}),
+  });
+  if (error) throw error;
+}
+
+/** "Got it" or "Didn't get it" on a claim made to you. */
+export async function decidePayment(paymentId: string, accept: boolean): Promise<void> {
+  const { error } = await supabase.rpc('decide_payment', {
+    p_payment_id: paymentId,
+    p_accept: accept,
+  });
+  if (error) throw error;
+}
+
+/** Forgives up to what someone owes you in a group. */
+export async function forgiveDebt(
+  groupId: string,
+  debtor: string,
+  amountCents: Cents,
+): Promise<void> {
+  const { error } = await supabase.rpc('forgive_debt', {
+    p_group_id: groupId,
+    p_debtor: debtor,
+    p_amount_cents: amountCents,
+  });
+  if (error) throw error;
+}
+
+export interface PaymentHandles {
+  venmo: string | null;
+  paypal: string | null;
+  cashtag: string | null;
+}
+
+/** Venmo, PayPal and Cash App usernames for these accounts (yours and groupmates'). */
+export async function fetchHandles(userIds: string[]): Promise<Record<string, PaymentHandles>> {
+  if (userIds.length === 0) return {};
+  const rows = unwrap(
+    await supabase
+      .from('profiles')
+      .select('id, venmo_username, paypal_username, cashapp_tag')
+      .in('id', userIds),
+  );
+  return Object.fromEntries(
+    rows.map((row) => [
+      row.id,
+      { venmo: row.venmo_username, paypal: row.paypal_username, cashtag: row.cashapp_tag },
+    ]),
+  );
+}
+
+/** One expense between you and one other person, from your side. */
+export interface PairExpense {
+  id: string;
+  merchant: string;
+  expenseDate: string;
+  voided: boolean;
+  /** "theyOwe": you paid and they have a share. "iOwe": they paid and you have a share. */
+  direction: 'theyOwe' | 'iOwe';
+  amountCents: Cents;
+  /** The items the owing person had a part in. */
+  itemNames: string[];
+}
+
+/** Expenses behind the balance between you (`me`) and `them` in a group, newest first. */
+export async function fetchPairExpenses(
+  groupId: string,
+  me: string,
+  them: string,
+): Promise<PairExpense[]> {
+  const [full, mine] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select(
+        'id, merchant, expense_date, created_at, voided_at, paid_by, shares(participant_id, amount_cents), expense_items(name, kind, position, item_assignments(participant_id))',
+      )
+      .eq('group_id', groupId)
+      .in('paid_by', [me, them])
+      .order('expense_date', { ascending: false })
+      .order('created_at', { ascending: false }),
+    supabase
+      .rpc('get_my_shares')
+      .select('expense_id, merchant, expense_date, amount_cents, items')
+      .eq('group_id', groupId)
+      .eq('paid_by', them),
+  ]);
+
+  const result: PairExpense[] = [];
+  for (const row of unwrap(full)) {
+    const owing = row.paid_by === me ? them : me;
+    const share = row.shares.find((s) => s.participant_id === owing);
+    if (!share || share.amount_cents === 0) continue;
+    result.push({
+      id: row.id,
+      merchant: row.merchant,
+      expenseDate: row.expense_date,
+      voided: row.voided_at !== null,
+      direction: row.paid_by === me ? 'theyOwe' : 'iOwe',
+      amountCents: share.amount_cents,
+      itemNames: [...row.expense_items]
+        .filter(
+          (i) => i.kind === 'item' && i.item_assignments.some((a) => a.participant_id === owing),
+        )
+        .sort((a, b) => a.position - b.position)
+        .map((i) => i.name),
+    });
+  }
+
+  const seen = new Set(result.map((e) => e.id));
+  for (const row of unwrap(mine)) {
+    if (seen.has(row.expense_id)) continue;
+    const items = Array.isArray(row.items) ? (row.items as { name: string }[]) : [];
+    result.push({
+      id: row.expense_id,
+      merchant: row.merchant,
+      expenseDate: row.expense_date,
+      voided: false,
+      direction: 'iOwe',
+      amountCents: row.amount_cents,
+      itemNames: items.map((i) => i.name),
+    });
+  }
+  return result.sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
+}
+
+/** The group a participant belongs to. */
+export async function fetchGroupOf(participantId: string): Promise<Group> {
+  const row = unwrap(
+    await supabase.from('participants').select('group_id').eq('id', participantId).single(),
+  );
+  return fetchGroup(row.group_id);
 }

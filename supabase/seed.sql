@@ -50,12 +50,16 @@ on conflict (id) do update set venmo_username = excluded.venmo_username;
 insert into public.groups (id, name, created_by)
 values ('22222222-2222-2222-2222-222222222222', 'Apartment', '11111111-1111-1111-1111-111111111111');
 
-insert into public.participants (id, group_id, display_name, user_id)
+-- Jeff has a (fictional, 555-01xx) phone number, so Request payment opens Messages for him;
+-- Maya has none, so hers opens the share sheet.
+insert into public.participants (id, group_id, display_name, user_id, phone)
 values
   ('33333333-3333-3333-3333-333333330001', '22222222-2222-2222-2222-222222222222', 'Leo',
-   '11111111-1111-1111-1111-111111111111'),
-  ('33333333-3333-3333-3333-333333330002', '22222222-2222-2222-2222-222222222222', 'Jeff', null),
-  ('33333333-3333-3333-3333-333333330003', '22222222-2222-2222-2222-222222222222', 'Maya', null);
+   '11111111-1111-1111-1111-111111111111', null),
+  ('33333333-3333-3333-3333-333333330002', '22222222-2222-2222-2222-222222222222', 'Jeff', null,
+   '+16085550123'),
+  ('33333333-3333-3333-3333-333333330003', '22222222-2222-2222-2222-222222222222', 'Maya', null,
+   null);
 
 -- The Costco expense, in Leo's Groceries category.
 insert into public.expenses (

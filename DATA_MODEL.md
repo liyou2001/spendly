@@ -241,13 +241,17 @@ People without accounts see their share only through the `get-share` Edge Functi
 
 ## Database functions
 
-| Function                     | What it does                                                                                                                                                     |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `save_expense(...)`          | Inserts an expense with its items, assignments and shares in one transaction. Rejects shares that don't sum to the total. Can replace (void) an earlier expense. |
-| `create_group(name, people)` | Creates a group with you in it plus any name-only people, in one transaction.                                                                                    |
-| `void_expense(id)`           | Marks an expense voided. Never deletes it.                                                                                                                       |
-| `balances()`                 | Net who-owes-whom for every pair that includes you.                                                                                                              |
-| `my_spending()`              | Your spending by month and category.                                                                                                                             |
-| `get_my_shares()`            | Your items and amount on expenses other people paid.                                                                                                             |
-| Signup trigger               | Creates your profile, Personal group and default categories.                                                                                                     |
-| Name sync trigger            | Renaming yourself updates your name in every group you're in.                                                                                                    |
+| Function                              | What it does                                                                                                                                                     |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `save_expense(...)`                   | Inserts an expense with its items, assignments and shares in one transaction. Rejects shares that don't sum to the total. Can replace (void) an earlier expense. |
+| `create_group(name, people)`          | Creates a group with you in it plus any name-only people, in one transaction.                                                                                    |
+| `void_expense(id)`                    | Marks an expense voided. Never deletes it.                                                                                                                       |
+| `record_payment(...)`                 | A repayment that counts right away: recorded by the person who got paid, or by the payer when the person paid has no account.                                    |
+| `claim_payment(...)`                  | "I paid" to someone with the app. Doesn't count until they confirm it.                                                                                           |
+| `decide_payment(id, accept)`          | "Got it" or "Didn't get it" on a claim made to you.                                                                                                              |
+| `forgive_debt(group, debtor, amount)` | Forgives up to what someone owes you, spread over the expenses behind it, newest first.                                                                          |
+| `balances()`                          | Net who-owes-whom for every pair that includes you.                                                                                                              |
+| `my_spending()`                       | Your spending by month and category.                                                                                                                             |
+| `get_my_shares()`                     | Your items and amount on expenses other people paid.                                                                                                             |
+| Signup trigger                        | Creates your profile, Personal group and default categories.                                                                                                     |
+| Name sync trigger                     | Renaming yourself updates your name in every group you're in.                                                                                                    |

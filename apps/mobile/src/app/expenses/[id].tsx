@@ -14,6 +14,7 @@ import {
   STALE_MESSAGE,
   Tag,
   Text,
+  TextButton,
 } from '@/components';
 import {
   fetchCategories,
@@ -146,8 +147,23 @@ function FullView({
         {expense.paidBy === me ? 'you' : nameOf(expense.paidBy)}
       </Text>
 
-      {expense.voidedAt ? (
+      {expense.replacedById ? (
+        <View style={styles.stack}>
+          <FormMessage message="Replaced by an edit. This earlier version is kept in history but no longer counts." />
+          <TextButton
+            label="See the current version"
+            icon="arrow-right"
+            onPress={() => openExpense(expense.replacedById!)}
+          />
+        </View>
+      ) : expense.voidedAt ? (
         <FormMessage message="Voided. It’s kept in history but no longer counts toward balances or budgets." />
+      ) : expense.replacesExpenseId ? (
+        <TextButton
+          label="Edited · see the original"
+          icon="clock"
+          onPress={() => openExpense(expense.replacesExpenseId!)}
+        />
       ) : null}
 
       <KeyBlock>
@@ -214,12 +230,32 @@ function FullView({
       {expense.voidedAt ? null : (
         <View style={styles.stack}>
           {error ? <FormMessage message={error} /> : null}
-          <Button
-            label="Void expense"
-            variant="secondary"
-            onPress={confirmVoid}
-            loading={voiding}
-          />
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <Button
+                label="Edit"
+                variant="secondary"
+                onPress={() =>
+                  router.push({ pathname: '/add-expense', params: { edit: expense.id } })
+                }
+                disabled={expense.hasForgiveness}
+              />
+            </View>
+            <View style={styles.flex}>
+              <Button
+                label="Void expense"
+                variant="secondary"
+                onPress={confirmVoid}
+                loading={voiding}
+              />
+            </View>
+          </View>
+          {expense.hasForgiveness ? (
+            <Text variant="small">
+              A debt on this expense was forgiven, so it can’t be edited. Void it and add it again
+              instead.
+            </Text>
+          ) : null}
         </View>
       )}
     </Screen>
@@ -278,6 +314,8 @@ function ShareView({
     </Screen>
   );
 }
+
+const openExpense = (id: string) => router.push({ pathname: '/expenses/[id]', params: { id } });
 
 const styles = StyleSheet.create({
   stack: {

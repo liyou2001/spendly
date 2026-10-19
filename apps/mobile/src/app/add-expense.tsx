@@ -1,7 +1,8 @@
 import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import {
   AddPersonForm,
@@ -23,9 +24,11 @@ import { addDays, formatDate, todayLocal } from '@/lib/dates';
 import {
   addPerson,
   fetchCategories,
+  fetchExpense,
   fetchGroups,
   friendlyError,
   saveExpense,
+  UserFacingError,
   type Category,
   type Group,
 } from '@/lib/data';
@@ -36,37 +39,67 @@ import {
   assignedTo,
   assignmentLabel,
   buildSplit,
-  nextAssignment,
+  draftFromExpense,
+  assignmentOptions,
+  sameAssignment,
   owedToPayer,
   savePayload,
   type Assignment,
   type Draft,
   type DraftItem,
+  type EditableExpense,
   type SplitPeople,
 } from '@/lib/split';
 import { useLoad } from '@/lib/useLoad';
 import { colors, radius, sizes, space, type } from '@/theme';
 
+async function fetchForm(userId: string, editId: string | undefined) {
+  const [groups, categories, expense] = await Promise.all([
+    fetchGroups(),
+    fetchCategories(userId),
+    editId ? fetchExpense(editId) : Promise.resolve(null),
+  ]);
+  if (!editId) return { groups, categories, editing: null };
+
+  const group = groups.find((g) => g.id === expense?.groupId);
+  const me = group?.people.find((p) => p.userId === userId);
+  if (!expense || expense.view !== 'full' || !group || !me) {
+    throw new UserFacingError('Only the person who paid or entered an expense can edit it.');
+  }
+  const people = { me: me.id, everyone: group.people.map((p) => p.id) };
+  const form = draftFromExpense(expense, people, { decimalSeparator: deviceDecimalSeparator() });
+  if (!form.ok) throw new UserFacingError(form.reason);
+  return {
+    groups,
+    categories,
+    editing: { expenseId: expense.id, groupId: group.id, ...form.value },
+  };
+}
+
 export default function AddExpense() {
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const { groupId, edit } = useLocalSearchParams<{ groupId?: string; edit?: string }>();
   const { session } = useSession();
   const userId = session?.user.id ?? '';
-  const loaded = useLoad(
-    useCallback(async () => {
-      const [groups, categories] = await Promise.all([fetchGroups(), fetchCategories(userId)]);
-      return { groups, categories };
-    }, [userId]),
-  );
+  const loaded = useLoad(useCallback(() => fetchForm(userId, edit), [userId, edit]));
   const close = () => router.back();
 
   if (loaded.status !== 'ready') {
     return (
       <Screen
-        title="Add expense"
+        title={edit ? 'Edit expense' : 'Add expense'}
         edges={['top', 'bottom', 'left', 'right']}
         headerRight={<IconButton icon="x" label="Close" onPress={close} />}
       >
-        <Loadable load={loaded} errorMessage="Couldn’t load your groups.">
+        <Loadable
+          load={loaded}
+          errorMessage={
+            loaded.status === 'error' && loaded.error instanceof UserFacingError
+              ? loaded.error.message
+              : edit
+                ? 'Couldn’t load this expense.'
+                : 'Couldn’t load your groups.'
+          }
+        >
           {() => null}
         </Loadable>
       </Screen>
@@ -78,7 +111,8 @@ export default function AddExpense() {
       groups={loaded.data.groups}
       categories={loaded.data.categories}
       userId={userId}
-      initialGroupId={groupId}
+      initialGroupId={loaded.data.editing?.groupId ?? groupId}
+      editing={loaded.data.editing}
       onGroupsChanged={loaded.reload}
       onClose={close}
     />
@@ -108,6 +142,8 @@ interface ExpenseFormProps {
   categories: Category[];
   userId: string;
   initialGroupId: string | undefined;
+  /** Set when editing: the form starts from this expense and saving replaces it. */
+  editing: (EditableExpense & { expenseId: string }) | null;
   onGroupsChanged: () => void;
   onClose: () => void;
 }
@@ -117,11 +153,12 @@ function ExpenseForm({
   categories,
   userId,
   initialGroupId,
+  editing,
   onGroupsChanged,
   onClose,
 }: ExpenseFormProps) {
-  // The first row is created with the draft; rows added later count up from here.
-  const nextKey = useRef(1);
+  // Rows the form starts with are numbered first; rows added later count up from there.
+  const nextKey = useRef(editing ? editing.draft.items.length : 1);
   const newItem = (): DraftItem => ({
     key: `item-${nextKey.current++}`,
     name: '',
@@ -134,15 +171,19 @@ function ExpenseForm({
   const group = groups.find((g) => g.id === groupId) ?? first;
   const meInGroup = group?.people.find((p) => p.userId === userId);
 
-  const [draft, setDraft] = useState<Draft>(() => ({
-    ...emptyDraft(first?.people.map((p) => p.id) ?? []),
-    items: [{ key: 'item-0', name: '', amount: '', assignment: { kind: 'you' } }],
-  }));
-  const [merchant, setMerchant] = useState('');
-  const [date, setDate] = useState(todayLocal());
-  const [paidBy, setPaidBy] = useState(meInGroup?.id ?? '');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft>(
+    () =>
+      editing?.draft ?? {
+        ...emptyDraft(first?.people.map((p) => p.id) ?? []),
+        items: [{ key: 'item-0', name: '', amount: '', assignment: { kind: 'you' } }],
+      },
+  );
+  const [merchant, setMerchant] = useState(editing?.merchant ?? '');
+  const [date, setDate] = useState(editing?.expenseDate ?? todayLocal());
+  const [paidBy, setPaidBy] = useState(editing?.paidBy ?? meInGroup?.id ?? '');
+  const [categoryId, setCategoryId] = useState<string | null>(editing?.categoryId ?? null);
   const [addingPerson, setAddingPerson] = useState(false);
+  const [openItem, setOpenItem] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -241,7 +282,12 @@ function ExpenseForm({
         items: result.items,
         shares: p_shares,
         categoryId: p_category_id,
+        ...(editing ? { replacesExpenseId: editing.expenseId } : {}),
       });
+      if (editing) {
+        // Close the editor, then swap the old version's screen for the new one.
+        router.back();
+      }
       router.replace({ pathname: '/expenses/[id]', params: { id } });
     } catch (e) {
       setSaveError(friendlyError(e as Error));
@@ -251,25 +297,32 @@ function ExpenseForm({
 
   return (
     <Screen
-      title="Add expense"
+      title={editing ? 'Edit expense' : 'Add expense'}
       edges={['top', 'bottom', 'left', 'right']}
       headerRight={<IconButton icon="x" label="Close" onPress={onClose} />}
     >
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-      >
-        {groups.map((g) => (
-          <Chip
-            key={g.id}
-            label={g.name}
-            icon={g.isPersonal ? 'user' : 'users'}
-            selected={g.id === group.id}
-            onPress={() => switchGroup(g)}
-          />
-        ))}
-      </ScrollView>
+      {editing ? (
+        // A correction stays in the same group (save_expense requires it).
+        <Text variant="small">
+          In {group.name}. Saving replaces the original; it stays in history.
+        </Text>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+        >
+          {groups.map((g) => (
+            <Chip
+              key={g.id}
+              label={g.name}
+              icon={g.isPersonal ? 'user' : 'users'}
+              selected={g.id === group.id}
+              onPress={() => switchGroup(g)}
+            />
+          ))}
+        </ScrollView>
+      )}
 
       <View style={styles.stack}>
         <TextField
@@ -323,11 +376,9 @@ function ExpenseForm({
       {shared ? (
         <Section
           title="People"
-          description={
-            draft.mode === 'items'
-              ? 'Tap an item’s tag to change who it’s for.'
-              : 'Tap people to include or leave them out.'
-          }
+          {...(draft.mode === 'quick'
+            ? { description: 'Tap people to include or leave them out.' }
+            : {})}
         >
           <View style={styles.wrap}>
             {group.people.map((p) =>
@@ -394,6 +445,8 @@ function ExpenseForm({
                     : undefined
                 }
                 amountPlaceholder={amountPlaceholder}
+                open={openItem === item.key}
+                onToggle={() => setOpenItem(openItem === item.key ? null : item.key)}
               />
             ))}
           </View>
@@ -520,7 +573,11 @@ function ExpenseForm({
           />
         ) : null}
         {saveError ? <FormMessage message={saveError} /> : null}
-        <Button label="Save expense" onPress={() => void save()} loading={saving} />
+        <Button
+          label={editing ? 'Save changes' : 'Save expense'}
+          onPress={() => void save()}
+          loading={saving}
+        />
       </View>
     </Screen>
   );
@@ -535,6 +592,9 @@ interface ItemRowProps {
   onChange: (patch: Partial<DraftItem>) => void;
   onRemove: (() => void) | undefined;
   amountPlaceholder: string;
+  /** Whether this item's "Who's it for?" dropdown is open. Only one is open at a time. */
+  open: boolean;
+  onToggle: () => void;
 }
 
 function ItemRow({
@@ -546,10 +606,16 @@ function ItemRow({
   onChange,
   onRemove,
   amountPlaceholder,
+  open,
+  onToggle,
 }: ItemRowProps) {
   const label = assignmentLabel(item.assignment, people, names);
   const alone = people.everyone.length === 1;
   const custom = item.assignment.kind === 'custom' ? item.assignment : null;
+  const choose = (assignment: Assignment) => {
+    onChange({ assignment });
+    onToggle();
+  };
 
   function toggle(id: string) {
     if (!custom) return;
@@ -586,27 +652,51 @@ function ItemRow({
         {alone ? (
           <Tag label="You" tone="accent" />
         ) : (
-          <Chip
-            label={label}
-            tone={item.assignment.kind === 'you' ? 'you' : 'neutral'}
-            icon="repeat"
-            onPress={() => onChange({ assignment: nextAssignment(item.assignment, people) })}
-            accessibilityLabel={`For ${label}`}
-            accessibilityHint="Changes who this item is for"
-          />
+          <>
+            <Text variant="small">Who’s it for?</Text>
+            <Chip
+              label={label}
+              tone={item.assignment.kind === 'you' ? 'you' : 'neutral'}
+              trailingIcon={open ? 'chevron-up' : 'chevron-down'}
+              onPress={onToggle}
+              expanded={open}
+              accessibilityLabel={`Who it’s for: ${label}`}
+              accessibilityHint="Opens a list of people to choose from"
+            />
+          </>
         )}
         <View style={styles.flex} />
         {onRemove ? (
           <IconButton icon="trash-2" label={`Remove ${item.name || 'item'}`} onPress={onRemove} />
         ) : null}
       </View>
+      {open ? (
+        <View style={styles.dropdown}>
+          {assignmentOptions(people, names).map((option) => (
+            <DropdownRow
+              key={option.key}
+              label={option.label}
+              selected={sameAssignment(option.assignment, item.assignment)}
+              onPress={() => choose(option.assignment)}
+            />
+          ))}
+          <DropdownRow
+            label="Choose people…"
+            selected={custom !== null}
+            onPress={() =>
+              choose({ kind: 'custom', participantIds: assignedTo(item.assignment, people) })
+            }
+            last
+          />
+        </View>
+      ) : null}
       {custom ? (
         <View style={styles.wrap}>
           {people.everyone.map((id) => (
             <Chip
               key={id}
               label={nameOf(id)}
-              selected={assignedTo(custom as Assignment, people).includes(id)}
+              selected={assignedTo(custom, people).includes(id)}
               onPress={() => toggle(id)}
             />
           ))}
@@ -614,6 +704,36 @@ function ItemRow({
       ) : null}
       {error ? <FormMessage message={error} /> : null}
     </View>
+  );
+}
+
+function DropdownRow({
+  label,
+  selected,
+  onPress,
+  last = false,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  last?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={({ pressed }) => [
+        styles.dropdownRow,
+        !last && styles.dropdownDivider,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text variant={selected ? 'bodyMedium' : 'body'} style={styles.flex} numberOfLines={1}>
+        {label}
+      </Text>
+      {selected ? <Feather name="check" size={18} color={colors.ink} /> : null}
+    </Pressable>
   );
 }
 
@@ -779,6 +899,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
+  },
+  dropdown: {
+    borderWidth: sizes.hairline,
+    borderColor: colors.controlBorder,
+    borderRadius: radius.button,
+    paddingHorizontal: space.md,
+  },
+  dropdownRow: {
+    minHeight: sizes.touch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  dropdownDivider: {
+    borderBottomWidth: sizes.hairline,
+    borderBottomColor: colors.divider,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   summaryRows: {
     gap: space.xs,

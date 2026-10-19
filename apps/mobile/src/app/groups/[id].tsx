@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
   AddPersonForm,
@@ -21,7 +22,7 @@ import { formatDate } from '@/lib/dates';
 import { debtLabel } from '@/lib/labels';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
-import { space } from '@/theme';
+import { colors, space } from '@/theme';
 
 async function fetchGroupDetail(groupId: string) {
   const [group, balances, expenses] = await Promise.all([
@@ -71,14 +72,25 @@ export default function GroupDetail() {
                 ) : (
                   <View style={styles.stack}>
                     <Text variant="sectionHeading">Your balances</Text>
-                    {balances.map((balance) => (
-                      <View key={`${balance.from}-${balance.to}`} style={styles.balance}>
-                        <Text variant="body" style={styles.flex}>
-                          {debtLabel(balance, me, nameOf)}
-                        </Text>
-                        <Money cents={balance.amountCents} variant="bodyMedium" />
-                      </View>
-                    ))}
+                    {balances.map((balance) => {
+                      const other = balance.from === me ? balance.to : balance.from;
+                      return (
+                        <Pressable
+                          key={`${balance.from}-${balance.to}`}
+                          onPress={() =>
+                            router.push({ pathname: '/people/[id]', params: { id: other } })
+                          }
+                          accessibilityRole="button"
+                          style={({ pressed }) => [styles.balance, pressed && styles.pressed]}
+                        >
+                          <Text variant="body" style={styles.flex}>
+                            {debtLabel(balance, me, nameOf)}
+                          </Text>
+                          <Money cents={balance.amountCents} variant="bodyMedium" />
+                          <Feather name="chevron-right" size={18} color={colors.muted} />
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 )}
               </KeyBlock>
@@ -170,9 +182,13 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   balance: {
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   flex: {
     flex: 1,

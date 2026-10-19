@@ -3,6 +3,7 @@
 // and the ledger's output into what save_expense takes.
 import {
   computeShares,
+  formatAmount,
   formatCents,
   parseCents,
   splitEvenly,
@@ -13,7 +14,7 @@ import {
   type Share,
 } from '@spendly/ledger';
 
-/** Who an item is for. Tapping an item's tag cycles through these. */
+/** Who an item is for, picked from the item's "Who's it for?" dropdown. */
 export type Assignment =
   | { kind: 'you' }
   | { kind: 'all' }
@@ -71,22 +72,39 @@ export interface SplitResult {
   errors: Record<string, string>;
 }
 
-/** The tag after this one: You, All, each other person, Custom, then back to You. */
-export function nextAssignment(current: Assignment, people: SplitPeople): Assignment {
-  const others = people.everyone.filter((id) => id !== people.me);
-  const cycle: Assignment[] = [{ kind: 'you' }];
-  if (others.length > 0) cycle.push({ kind: 'all' });
-  for (const participantId of others) cycle.push({ kind: 'person', participantId });
-  // With one other person, You / All / them already covers every choice.
-  if (others.length > 1) cycle.push({ kind: 'custom', participantIds: [...people.everyone] });
+/** One choice in an item's "Who's it for?" dropdown. */
+export interface AssignmentOption {
+  key: string;
+  label: string;
+  assignment: Assignment;
+}
 
-  const index = cycle.findIndex(
-    (option) =>
-      option.kind === current.kind &&
-      (option.kind !== 'person' ||
-        (current.kind === 'person' && option.participantId === current.participantId)),
-  );
-  return cycle[(index + 1) % cycle.length] ?? { kind: 'you' };
+/**
+ * The dropdown's single choices, in order: All, You, then each other person by name.
+ * "Choose people" (a custom set) is offered separately. Alone in a group, only You.
+ */
+export function assignmentOptions(
+  people: SplitPeople,
+  names: Readonly<Record<ParticipantId, string>>,
+): AssignmentOption[] {
+  const others = people.everyone.filter((id) => id !== people.me);
+  return [
+    ...(others.length > 0
+      ? [{ key: 'all', label: 'All', assignment: { kind: 'all' } as const }]
+      : []),
+    { key: 'you', label: 'You', assignment: { kind: 'you' } as const },
+    ...others.map((participantId) => ({
+      key: `person:${participantId}`,
+      label: names[participantId] ?? 'Someone',
+      assignment: { kind: 'person', participantId } as const,
+    })),
+  ];
+}
+
+/** Whether two assignments are the same choice. Any custom set counts as "Choose people". */
+export function sameAssignment(a: Assignment, b: Assignment): boolean {
+  if (a.kind !== b.kind) return false;
+  return a.kind !== 'person' || (b.kind === 'person' && a.participantId === b.participantId);
 }
 
 /** The participant ids an assignment covers, limited to people in the group. */
@@ -334,5 +352,127 @@ export function savePayload(
         ? { category_override_id: categoryId }
         : {}),
     })),
+  };
+}
+
+/** A saved expense, as the editor needs it to fill in the form again. */
+export interface SavedExpense {
+  paidBy: ParticipantId;
+  merchant: string;
+  expenseDate: string;
+  totalCents: Cents;
+  categoryId: string | null;
+  items: { name: string; amountCents: Cents; kind: string; participantIds: ParticipantId[] }[];
+  shares: { participantId: ParticipantId; amountCents: Cents; categoryOverrideId: string | null }[];
+}
+
+export interface EditableExpense {
+  draft: Draft;
+  merchant: string;
+  expenseDate: string;
+  paidBy: ParticipantId;
+  /** Your category for your share: the expense's if you paid, otherwise your share's. */
+  categoryId: string | null;
+}
+
+/** The "Who's it for?" choice that matches a saved item's people. */
+export function assignmentFor(
+  participantIds: readonly ParticipantId[],
+  people: SplitPeople,
+): Assignment {
+  const ids = new Set(participantIds);
+  if (ids.size === 1 && ids.has(people.me)) return { kind: 'you' };
+  if (
+    ids.size > 1 &&
+    ids.size === people.everyone.length &&
+    people.everyone.every((id) => ids.has(id))
+  ) {
+    return { kind: 'all' };
+  }
+  const [only] = ids;
+  if (ids.size === 1 && only) return { kind: 'person', participantId: only };
+  return { kind: 'custom', participantIds: people.everyone.filter((id) => ids.has(id)) };
+}
+
+/**
+ * Fills the Add expense form from a saved expense, for editing. Saving the form then gives the
+ * same shares as before unless something is changed.
+ */
+export function draftFromExpense(
+  expense: SavedExpense,
+  people: SplitPeople,
+  options: SplitOptions = { decimalSeparator: '.' },
+): { ok: true; value: EditableExpense } | { ok: false; reason: string } {
+  if (expense.items.some((i) => i.kind === 'discount')) {
+    return { ok: false, reason: 'This expense has a discount, which the editor can’t show yet.' };
+  }
+  const typed = (cents: Cents) => formatAmount(cents).replace('.', options.decimalSeparator);
+  const sum = (kind: string) =>
+    expense.items.filter((i) => i.kind === kind).reduce((total, i) => total + i.amountCents, 0);
+  const myShare = expense.shares.find((s) => s.participantId === people.me);
+  const base = {
+    merchant: expense.merchant,
+    expenseDate: expense.expenseDate,
+    paidBy: expense.paidBy,
+    categoryId:
+      expense.paidBy === people.me ? expense.categoryId : (myShare?.categoryOverrideId ?? null),
+  };
+  const empty: Draft = {
+    mode: 'items',
+    items: [],
+    tax: null,
+    tip: null,
+    quickTotal: '',
+    quickSplit: 'even',
+    quickPeople: [...people.everyone],
+    quickAmounts: {},
+  };
+
+  const lines = expense.items.filter((i) => i.kind === 'item');
+  if (lines.length > 0) {
+    return {
+      ok: true,
+      value: {
+        ...base,
+        draft: {
+          ...empty,
+          items: lines.map((line, index) => ({
+            key: `item-${index}`,
+            name: line.name,
+            amount: typed(line.amountCents),
+            assignment: assignmentFor(line.participantIds, people),
+          })),
+          tax: sum('tax') > 0 ? typed(sum('tax')) : null,
+          tip: sum('tip') > 0 ? typed(sum('tip')) : null,
+        },
+      },
+    };
+  }
+
+  // Saved without items: a quick split, evenly or by amount.
+  const owing = people.everyone.filter((id) =>
+    expense.shares.some((s) => s.participantId === id && s.amountCents > 0),
+  );
+  const even = splitEvenly(expense.totalCents, owing);
+  const isEven = even.every(
+    (e) =>
+      expense.shares.find((s) => s.participantId === e.participantId)?.amountCents ===
+      e.amountCents,
+  );
+  return {
+    ok: true,
+    value: {
+      ...base,
+      draft: {
+        ...empty,
+        mode: 'quick',
+        quickTotal: typed(expense.totalCents),
+        quickSplit: isEven ? 'even' : 'amounts',
+        quickPeople: owing,
+        quickAmounts: isEven
+          ? {}
+          : Object.fromEntries(expense.shares.map((s) => [s.participantId, typed(s.amountCents)])),
+      },
+    },
   };
 }

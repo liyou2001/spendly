@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   assignedTo,
   assignmentLabel,
+  assignmentOptions,
   buildSplit,
+  draftFromExpense,
   labelForIds,
-  nextAssignment,
   normalizeAmount,
   owedToPayer,
+  sameAssignment,
   savePayload,
   type Assignment,
   type Draft,
@@ -199,20 +201,31 @@ describe('buildSplit (quick)', () => {
 });
 
 describe('item tags', () => {
-  it('cycle You, All, each other person, Custom, then back to You', () => {
-    const seen: string[] = [];
-    let current: Assignment = you;
-    for (let i = 0; i < 6; i++) {
-      seen.push(assignmentLabel(current, apartment, names));
-      current = nextAssignment(current, apartment);
-    }
-    expect(seen).toEqual(['You', 'All', 'Jeff', 'Maya', '3 people', 'You']);
+  it('offer All, You, then each other person in the dropdown', () => {
+    expect(assignmentOptions(apartment, names).map((o) => [o.label, o.assignment])).toEqual([
+      ['All', { kind: 'all' }],
+      ['You', { kind: 'you' }],
+      ['Jeff', { kind: 'person', participantId: JEFF }],
+      ['Maya', { kind: 'person', participantId: MAYA }],
+    ]);
   });
 
-  it('skip Custom with two people, and stay on You when alone', () => {
-    const pair: SplitPeople = { me: LEO, everyone: [LEO, JEFF] };
-    expect(nextAssignment({ kind: 'person', participantId: JEFF }, pair)).toEqual(you);
-    expect(nextAssignment(you, { me: LEO, everyone: [LEO] })).toEqual(you);
+  it('offer only You when you are alone in the group', () => {
+    expect(assignmentOptions({ me: LEO, everyone: [LEO] }, names).map((o) => o.label)).toEqual([
+      'You',
+    ]);
+  });
+
+  it('match the selected choice, treating any custom set as one choice', () => {
+    expect(sameAssignment(maya, { kind: 'person', participantId: MAYA })).toBe(true);
+    expect(sameAssignment(maya, { kind: 'person', participantId: JEFF })).toBe(false);
+    expect(sameAssignment(all, you)).toBe(false);
+    expect(
+      sameAssignment(
+        { kind: 'custom', participantIds: [LEO] },
+        { kind: 'custom', participantIds: [] },
+      ),
+    ).toBe(true);
   });
 
   it('label custom sets by name, or by count above two', () => {
@@ -335,5 +348,111 @@ describe('very large amounts', () => {
       apartment,
     );
     expect(byAmount.errors[`amount:${LEO}`]).toBe('Amounts over $1,000,000.00 aren’t supported');
+  });
+});
+
+describe('draftFromExpense', () => {
+  const save = (d: Draft, payer = LEO, categoryId: string | null = 'cat-groceries') => {
+    const result = buildSplit(d, apartment);
+    const payload = savePayload(result.shares, apartment, payer, categoryId);
+    return {
+      paidBy: payer,
+      merchant: 'Costco',
+      expenseDate: '2026-10-17',
+      totalCents: result.totalCents!,
+      categoryId: payload.p_category_id,
+      items: result.items.map((i) => ({
+        name: i.name,
+        amountCents: i.amount_cents,
+        kind: i.kind,
+        participantIds: i.participant_ids,
+      })),
+      shares: payload.p_shares.map((s) => ({
+        participantId: s.participant_id,
+        amountCents: s.amount_cents,
+        categoryOverrideId: s.category_override_id ?? null,
+      })),
+    };
+  };
+
+  it('round-trips the Costco receipt: editing without changes gives the same shares', () => {
+    const saved = save(draft({ items: costco, tax: '1.57', tip: '2.00' }));
+    const edit = draftFromExpense(saved, apartment);
+    if (!edit.ok) throw new Error(edit.reason);
+    expect(buildSplit(edit.value.draft, apartment).shares).toEqual(
+      buildSplit(draft({ items: costco, tax: '1.57', tip: '2.00' }), apartment).shares,
+    );
+    expect(edit.value.draft.items.map((i) => i.assignment.kind)).toEqual([
+      'you',
+      'you',
+      'you',
+      'all',
+      'all',
+      'all',
+      'person',
+      'person',
+      'person',
+    ]);
+    expect(edit.value.draft.tax).toBe('1.57');
+    expect(edit.value).toMatchObject({
+      merchant: 'Costco',
+      paidBy: LEO,
+      categoryId: 'cat-groceries',
+    });
+  });
+
+  it('brings back a custom set and your category on someone else’s expense', () => {
+    const saved = save(
+      draft({ items: [item('Gift', '30', { kind: 'custom', participantIds: [LEO, MAYA] })] }),
+      JEFF,
+      'cat-fun',
+    );
+    const edit = draftFromExpense(saved, apartment);
+    if (!edit.ok) throw new Error(edit.reason);
+    expect(edit.value.draft.items[0]?.assignment).toEqual({
+      kind: 'custom',
+      participantIds: [LEO, MAYA],
+    });
+    expect(edit.value.categoryId).toBe('cat-fun');
+  });
+
+  it('reopens quick splits evenly or by amount', () => {
+    const even = draftFromExpense(save(draft({ mode: 'quick', quickTotal: '10' })), apartment);
+    expect(even.ok && even.value.draft).toMatchObject({
+      mode: 'quick',
+      quickTotal: '10.00',
+      quickSplit: 'even',
+      quickPeople: [LEO, JEFF, MAYA],
+    });
+    const byAmount = draftFromExpense(
+      save(
+        draft({
+          mode: 'quick',
+          quickTotal: '30',
+          quickSplit: 'amounts',
+          quickAmounts: { [LEO]: '12.50', [JEFF]: '17.50' },
+        }),
+      ),
+      apartment,
+    );
+    expect(byAmount.ok && byAmount.value.draft).toMatchObject({
+      quickSplit: 'amounts',
+      quickPeople: [LEO, JEFF],
+      quickAmounts: { [LEO]: '12.50', [JEFF]: '17.50' },
+    });
+  });
+
+  it('uses the phone’s decimal separator, and refuses discounts it can’t show', () => {
+    const saved = save(draft({ items: [item('Brot', '2.50', you)] }));
+    const comma = draftFromExpense(saved, apartment, { decimalSeparator: ',' });
+    expect(comma.ok && comma.value.draft.items[0]?.amount).toBe('2,50');
+    const withDiscount = {
+      ...saved,
+      items: [
+        ...saved.items,
+        { name: 'Coupon', amountCents: -50, kind: 'discount', participantIds: [] },
+      ],
+    };
+    expect(draftFromExpense(withDiscount, apartment).ok).toBe(false);
   });
 });

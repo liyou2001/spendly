@@ -1,5 +1,5 @@
 export { computeBalances, netBalances } from './balances';
-export { formatCents, isCents, parseCents } from './cents';
+export { formatAmount, formatCents, isCents, parseCents } from './cents';
 export { LedgerError } from './errors';
 export { computeShares } from './shares';
 export { spendingByCategory } from './spending';

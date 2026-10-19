@@ -88,8 +88,8 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 
 ### Design
 
-- **Colors:** white `#FFFFFF` background. Light purple `#EAE4FF` for the one key block per screen, the active tab, "You" tags and avatars. Deep purple `#6D4FD3` only for progress bars and attention dots. Ink `#2B2420` for text and primary buttons (white text on them). Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
+- **Colors:** white `#FFFFFF` background. Light purple `#EAE4FF` for the one key block per screen, the active tab, "You" tags and avatars. Deep purple `#6D4FD3` for primary buttons, selected chips and the + (add expense) button (white text and icons on them), and for progress bars and attention dots. Ink `#2B2420` for text. Muted `#6B5F57` for secondary text. Dividers `#F1E7DF`. Control borders `#E2D5CB`.
 - **Type:** Hanken Grotesk, weights 300/400/500/600. Big numbers 52px at weight 300, letter-spacing -0.03em, tabular figures. Screen titles 24–28px/500. Section headings 15px/600. Body 15–16px/400. Small text 13–14px in muted.
 - **Layout:** 24px side margins, about 28px between sections. Lists separated by thin dividers, not cards. Key block corner radius 24px. Buttons radius 14px, at least 44px tall. Tags fully rounded.
-- **Tabs:** Home, Budget, + (dark circle, adds an expense), People, Me.
+- **Tabs:** Home, Budget, + (deep purple circle, adds an expense), People, Me.
 - Stroke icons, no emoji. Text contrast at least 4.5:1.

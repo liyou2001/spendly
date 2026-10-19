@@ -13,6 +13,10 @@ interface ChipProps {
   /** "you" is light purple, the color reserved for "You" tags. */
   tone?: 'neutral' | 'you';
   icon?: ComponentProps<typeof Feather>['name'];
+  /** After the label, e.g. a chevron on a chip that opens a dropdown. */
+  trailingIcon?: ComponentProps<typeof Feather>['name'];
+  /** For chips that open and close something: announced as expanded or collapsed. */
+  expanded?: boolean;
   /** Read out instead of the label, e.g. "Who it's for: All. Tap to change." */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -25,6 +29,8 @@ export function Chip({
   selected = false,
   tone = 'neutral',
   icon,
+  trailingIcon,
+  expanded,
   accessibilityLabel,
   accessibilityHint,
 }: ChipProps) {
@@ -33,7 +39,7 @@ export function Chip({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={expanded === undefined ? { selected } : { selected, expanded }}
       accessibilityLabel={accessibilityLabel ?? label}
       {...(accessibilityHint ? { accessibilityHint } : {})}
       // Chips are drawn smaller than 44pt; the hit area still meets it.
@@ -52,6 +58,9 @@ export function Chip({
       >
         {label}
       </Text>
+      {trailingIcon ? (
+        <Feather name={trailingIcon} size={15} color={filled ? colors.onInk : colors.ink} />
+      ) : null}
     </Pressable>
   );
 }
@@ -71,8 +80,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   selected: {
-    borderColor: colors.ink,
-    backgroundColor: colors.ink,
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   you: {
     borderColor: colors.accentPale,

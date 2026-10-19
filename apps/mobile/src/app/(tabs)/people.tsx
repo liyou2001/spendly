@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   Avatar,
@@ -9,14 +9,18 @@ import {
   KeyBlock,
   ListRow,
   Loadable,
+  Money,
   Screen,
   Section,
   Text,
 } from '@/components';
-import { fetchGroups, type Group } from '@/lib/data';
+import { fetchBalances, fetchGroups, fetchPayments, type Group } from '@/lib/data';
+import { formatDate } from '@/lib/dates';
 import { joinNames } from '@/lib/labels';
+import { buildPeopleView, statusLine, type PersonBalance } from '@/lib/people';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
+import { space } from '@/theme';
 
 /** "You, Jeff and Maya", "You, Jeff and 3 others", or "Just you". */
 function memberSummary(group: Group, userId: string | undefined): string {
@@ -26,11 +30,22 @@ function memberSummary(group: Group, userId: string | undefined): string {
   return `${names.slice(0, 2).join(', ')} and ${names.length - 2} others`;
 }
 
-// Balances per person arrive in Step 6. For now this lists your groups.
+async function fetchPeople(userId: string) {
+  const [groups, balances, payments] = await Promise.all([
+    fetchGroups(),
+    fetchBalances(),
+    fetchPayments(),
+  ]);
+  return { groups, view: buildPeopleView({ userId, groups, balances, payments, now: new Date() }) };
+}
+
+const openPerson = (person: PersonBalance) =>
+  router.push({ pathname: '/people/[id]', params: { id: person.participantId } });
+
 export default function People() {
   const { session } = useSession();
-  const userId = session?.user.id;
-  const groups = useLoad(useCallback(() => fetchGroups(), []));
+  const userId = session?.user.id ?? '';
+  const people = useLoad(useCallback(() => fetchPeople(userId), [userId]));
   const newGroup = () => router.push('/groups/new');
 
   return (
@@ -38,38 +53,103 @@ export default function People() {
       title="People"
       headerRight={<IconButton icon="plus" label="New group" onPress={newGroup} />}
     >
-      <Loadable load={groups} errorMessage="Couldn’t load your groups.">
-        {(list) => (
-          <>
-            {list.every((g) => g.isPersonal) ? (
-              <KeyBlock>
-                <Text variant="sectionHeading">Split with roommates</Text>
-                <Text variant="body">
-                  Make a group for your apartment or a trip, add the people in it, and split
-                  purchases with them. They don’t need the app.
-                </Text>
-                <Button label="New group" onPress={newGroup} />
-              </KeyBlock>
-            ) : null}
-            <Section title="Groups">
-              <View>
-                {list.map((group, index) => (
-                  <ListRow
-                    key={group.id}
-                    title={group.name}
-                    subtitle={memberSummary(group, userId)}
-                    leading={<Avatar name={group.name} />}
-                    onPress={() =>
-                      router.push({ pathname: '/groups/[id]', params: { id: group.id } })
-                    }
-                    divider={index < list.length - 1}
-                  />
-                ))}
-              </View>
-            </Section>
-          </>
-        )}
+      <Loadable load={people} errorMessage="Couldn’t load your balances.">
+        {({ groups, view }) => {
+          const shared = groups.filter((g) => !g.isPersonal);
+          return (
+            <>
+              {shared.length === 0 ? (
+                <KeyBlock>
+                  <Text variant="sectionHeading">Split with roommates</Text>
+                  <Text variant="body">
+                    Make a group for your apartment or a trip, add the people in it, and split
+                    purchases with them. They don’t need the app.
+                  </Text>
+                  <Button label="New group" onPress={newGroup} />
+                </KeyBlock>
+              ) : (
+                <KeyBlock style={styles.totals}>
+                  <View style={styles.total}>
+                    <Text variant="small">Owed to you</Text>
+                    <Money cents={view.owedToMeCents} variant="screenTitle" />
+                  </View>
+                  <View style={styles.total}>
+                    <Text variant="small">You owe</Text>
+                    <Money cents={view.iOweCents} variant="screenTitle" />
+                  </View>
+                </KeyBlock>
+              )}
+
+              {shared.length > 0 && view.groups.length === 0 ? (
+                <Text variant="small">Everyone’s settled up.</Text>
+              ) : null}
+
+              {view.groups.map((group) => (
+                <Section key={group.groupId} title={group.name}>
+                  <View>
+                    {group.people.map((person, index) => (
+                      <ListRow
+                        key={person.participantId}
+                        title={person.name}
+                        subtitle={statusLine(person)}
+                        leading={<Avatar name={person.name} size={36} />}
+                        trailing={<Money cents={Math.abs(person.netCents)} variant="bodyMedium" />}
+                        onPress={() => openPerson(person)}
+                        divider={index < group.people.length - 1}
+                      />
+                    ))}
+                  </View>
+                </Section>
+              ))}
+
+              {view.recentlySettled.length > 0 ? (
+                <Section title="Recently settled">
+                  <View>
+                    {view.recentlySettled.map((person, index) => (
+                      <ListRow
+                        key={person.participantId}
+                        title={person.name}
+                        subtitle={`Settled ${formatDate((person.lastSettledAt ?? '').slice(0, 10))} · ${person.groupName}`}
+                        leading={<Avatar name={person.name} size={36} />}
+                        onPress={() => openPerson(person)}
+                        divider={index < view.recentlySettled.length - 1}
+                      />
+                    ))}
+                  </View>
+                </Section>
+              ) : null}
+
+              <Section title="Groups">
+                <View>
+                  {groups.map((group, index) => (
+                    <ListRow
+                      key={group.id}
+                      title={group.name}
+                      subtitle={memberSummary(group, userId)}
+                      leading={<Avatar name={group.name} size={36} />}
+                      onPress={() =>
+                        router.push({ pathname: '/groups/[id]', params: { id: group.id } })
+                      }
+                      divider={index < groups.length - 1}
+                    />
+                  ))}
+                </View>
+              </Section>
+            </>
+          );
+        }}
       </Loadable>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  totals: {
+    flexDirection: 'row',
+    gap: space.lg,
+  },
+  total: {
+    flex: 1,
+    gap: space.xs,
+  },
+});

@@ -7,7 +7,7 @@ import { Text } from './Text';
 interface ButtonProps {
   label: string;
   onPress: () => void;
-  /** Primary is solid ink; secondary is outlined. */
+  /** Primary is solid deep purple; secondary is outlined. */
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
   /** Shows a spinner and ignores taps. */
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primary: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
   },
   secondary: {
     backgroundColor: colors.background,

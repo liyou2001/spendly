@@ -634,7 +634,16 @@ export type Database = {
           to_participant: string;
         }[];
       };
+      claim_payment: {
+        Args: { p_amount_cents: number; p_group_id: string; p_method?: string; p_to: string };
+        Returns: string;
+      };
       create_group: { Args: { p_name: string; p_people?: Json }; Returns: string };
+      decide_payment: { Args: { p_accept: boolean; p_payment_id: string }; Returns: undefined };
+      forgive_debt: {
+        Args: { p_amount_cents: number; p_debtor: string; p_group_id: string };
+        Returns: undefined;
+      };
       get_my_shares: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -657,6 +666,16 @@ export type Database = {
           category_id: string;
           month: string;
         }[];
+      };
+      record_payment: {
+        Args: {
+          p_amount_cents: number;
+          p_from: string;
+          p_group_id: string;
+          p_method?: string;
+          p_to: string;
+        };
+        Returns: string;
       };
       save_expense: {
         Args: {

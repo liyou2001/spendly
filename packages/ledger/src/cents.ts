@@ -42,3 +42,14 @@ export function formatCents(cents: Cents): string {
   const rest = (abs % 100).toString().padStart(2, '0');
   return `${sign}$${dollars}.${rest}`;
 }
+
+/**
+ * A positive amount as a plain decimal for payment links: 1500 -> "15.00", 123456 -> "1234.56".
+ * No currency symbol or thousands separators, which Venmo, PayPal and Cash App links don't accept.
+ */
+export function formatAmount(cents: Cents): string {
+  if (!Number.isSafeInteger(cents) || cents <= 0) {
+    throw new LedgerError(`Expected a positive whole number of cents, got ${cents}`);
+  }
+  return `${Math.floor(cents / 100)}.${(cents % 100).toString().padStart(2, '0')}`;
+}

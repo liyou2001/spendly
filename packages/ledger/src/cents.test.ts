@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCents, isCents, parseCents } from './cents';
+import { formatAmount, formatCents, isCents, parseCents } from './cents';
 import { LedgerError } from './errors';
 
 describe('isCents', () => {
@@ -95,5 +95,23 @@ describe('formatCents', () => {
   it('throws on anything that is not whole cents', () => {
     expect(() => formatCents(15.5)).toThrow(LedgerError);
     expect(() => formatCents(Number.NaN)).toThrow(LedgerError);
+  });
+});
+
+describe('formatAmount', () => {
+  it.each([
+    [1, '0.01'],
+    [99, '0.99'],
+    [1500, '15.00'],
+    [4250, '42.50'],
+    [123456, '1234.56'],
+  ])('formats %i as %j for payment links', (cents, text) => {
+    expect(formatAmount(cents)).toBe(text);
+  });
+
+  it('throws on zero, negative and fractional amounts', () => {
+    expect(() => formatAmount(0)).toThrow(LedgerError);
+    expect(() => formatAmount(-1500)).toThrow(LedgerError);
+    expect(() => formatAmount(15.5)).toThrow(LedgerError);
   });
 });

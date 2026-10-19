@@ -26,12 +26,13 @@ For each question, the **How to test** line suggests something to ask or a task 
 
 ## Splitting an expense
 
-### 3. Do people understand tapping an item's tag to change who it's for?
+### 3. Do people understand how to choose who each item is for?
 
-- **Status:** Open
-- **Now:** each item has a tag that cycles You → All → each person → Custom (pick a subset) on every tap.
-- **Why it matters:** this is the core of splitting a receipt. If it isn't discovered, people will put everything on All or give up on itemizing.
-- **How to test:** give them the Costco receipt from the plan and ask them to split it without explaining the tags. Note how long it takes them to find the cycling, and whether Custom makes sense.
+- **Status:** Testing
+- **Was:** each item had a small tag that cycled You → All → each person → Custom on every tap, with the hint "Tap an item's tag…" in the People section above.
+- **Finding (2026-10-19, first test):** splitting wasn't found. A $30 dinner in a two-person group was saved entirely as "You", with no sign that the tag could be tapped.
+- **Now:** each item shows "Who's it for?" next to a button like **All ▾**. Tapping it opens a dropdown with All, You, each person, and "Choose people…" for a subset. The current choice is checked.
+- **How to test:** give someone the Costco receipt from the plan and ask them to split it without explaining anything. Note whether they find the dropdown, and whether "Choose people…" makes sense.
 
 ### 4. Are the defaults right: new items on "You", and the newest shared group?
 
@@ -72,10 +73,10 @@ For each question, the **How to test** line suggests something to ask or a task 
 
 ### 9. Will people want "Edit" instead of "Void"?
 
-- **Status:** Open
-- **Now:** history is append-only (Rule 2). The app only offers **Void expense**, and you re-enter a corrected one. The database can already link a correction to the expense it replaces, but no screen uses that yet.
-- **Why it matters:** "void and re-enter" may feel heavy for a typo. An **Edit** button could void and replace behind the scenes while keeping the history.
-- **How to test:** "You typed $22.99 instead of $12.99. Fix it." Watch what they look for.
+- **Status:** Answered (2026-10-19)
+- **Outcome:** yes. A $30 dinner saved with everything on "You" took voiding and re-entering the whole receipt to fix. The expense screen now has **Edit**: it reopens the form filled in, and saving creates a corrected version that replaces the original. History stays append-only (Rule 2), and the original is kept and linked.
+- **Limit:** expenses with a forgiven debt on them can't be edited yet (forgiveness belongs to the original). They have to be voided and re-entered. If people hit this, carry forgiveness over to the new version.
+- **Still to test:** whether people find Edit, and whether "Replaced by an edit" on the original makes sense.
 
 ### 10. Do people expect to see the whole group's balances, or only their own?
 

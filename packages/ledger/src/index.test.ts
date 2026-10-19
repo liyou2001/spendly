@@ -10,6 +10,7 @@ describe('package exports', () => {
       'LedgerError',
       'computeBalances',
       'computeShares',
+      'formatAmount',
       'formatCents',
       'isCents',
       'netBalances',
