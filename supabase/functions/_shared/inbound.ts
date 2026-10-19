@@ -1,31 +1,34 @@
-// Reading an inbound email from Postmark: who sent it, whether that's trustworthy, and what to
-// read the receipt from. Pure, so it's unit tested.
+// Reading an inbound email: who sent it, whether that's trustworthy, and what to read the
+// receipt from. Pure, so it's unit tested. Trust comes only from `Auth`, which the function
+// fills in from signatures it checked itself (mailauth.ts), never from headers in the email.
 import type { ReceiptContent } from './receipt.ts';
 
-/** The parts of Postmark's inbound webhook JSON this uses. */
+/** An SPF, DKIM or DMARC pass, with the domain it was for (and for SPF, the envelope sender). */
+export interface AuthPass {
+  method: 'spf' | 'dkim' | 'dmarc';
+  domain: string;
+  address: string | null;
+}
+
+/** A parsed inbound email (mime.ts). */
 export interface InboundEmail {
   MessageID: string;
+  /** The From address. */
   From: string;
-  FromFull?: { Email?: string };
+  /** The envelope sender (SMTP MAIL FROM), as the Worker saw it. */
+  EnvelopeFrom?: string;
   Subject?: string;
   TextBody?: string;
   HtmlBody?: string;
   Headers?: { Name: string; Value: string }[];
   Attachments?: { Name?: string; Content: string; ContentType: string }[];
+  /** What was verified about the sender. */
+  Auth?: AuthPass[];
 }
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const MAX_TEXT = 30_000;
 const EMAIL = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-
-/** Postmark's JSON, or null if it isn't an inbound email. */
-export function parseInbound(body: unknown): InboundEmail | null {
-  if (!body || typeof body !== 'object') return null;
-  const email = body as Record<string, unknown>;
-  if (typeof email.MessageID !== 'string' || !email.MessageID) return null;
-  if (typeof email.From !== 'string') return null;
-  return email as unknown as InboundEmail;
-}
 
 /** Every value of a header, matched without regard to case. */
 export function header(email: InboundEmail, name: string): string[] {
@@ -40,7 +43,7 @@ function addressesIn(text: string): string[] {
 }
 
 /** "leo@gmail.com" or "@gmail.com" or "gmail.com" → "gmail.com". */
-function domainOf(value: string): string {
+export function domainOf(value: string): string {
   return value
     .toLowerCase()
     .replace(/^.*@/, '')
@@ -54,53 +57,7 @@ function aligned(a: string, b: string): boolean {
 
 /** The visible sender's address, lowercased. */
 export function fromAddress(email: InboundEmail): string | null {
-  return addressesIn(email.FromFull?.Email ?? email.From)[0] ?? null;
-}
-
-/**
- * What the receiving server verified: each SPF, DKIM or DMARC pass, with the domain it was for
- * (and for SPF, the envelope sender address it checked).
- */
-export function authPasses(
-  email: InboundEmail,
-): { method: 'spf' | 'dkim' | 'dmarc'; domain: string; address: string | null }[] {
-  const passes: { method: 'spf' | 'dkim' | 'dmarc'; domain: string; address: string | null }[] = [];
-  const value = (text: string, key: string) =>
-    new RegExp(`${key}=["<]?([^\\s;">]+)`, 'i').exec(text)?.[1] ?? null;
-
-  for (const spf of header(email, 'Received-SPF')) {
-    if (!/^\s*pass\b/i.test(spf)) continue;
-    const envelope = value(spf, 'envelope-from') ?? value(spf, 'smtp\\.mailfrom');
-    if (envelope) {
-      passes.push({
-        method: 'spf',
-        domain: domainOf(envelope),
-        address: envelope.includes('@') ? envelope.toLowerCase() : null,
-      });
-    }
-  }
-  for (const results of header(email, 'Authentication-Results')) {
-    for (const part of results.split(';')) {
-      const method = /\b(spf|dkim|dmarc)=pass\b/i.exec(part)?.[1]?.toLowerCase();
-      if (method === 'spf') {
-        const envelope = value(part, 'smtp\\.mailfrom');
-        if (envelope) {
-          passes.push({
-            method,
-            domain: domainOf(envelope),
-            address: envelope.includes('@') ? envelope.toLowerCase() : null,
-          });
-        }
-      } else if (method === 'dkim') {
-        const domain = value(part, 'header\\.d') ?? value(part, 'header\\.i');
-        if (domain) passes.push({ method, domain: domainOf(domain), address: null });
-      } else if (method === 'dmarc') {
-        const domain = value(part, 'header\\.from');
-        if (domain) passes.push({ method, domain: domainOf(domain), address: null });
-      }
-    }
-  }
-  return passes;
+  return addressesIn(email.From)[0] ?? null;
 }
 
 /**
@@ -109,16 +66,28 @@ export function authPasses(
  */
 export function fromIsVerified(email: InboundEmail): boolean {
   const from = fromAddress(email);
-  return from !== null && authPasses(email).some((pass) => aligned(domainOf(from), pass.domain));
+  return from !== null && (email.Auth ?? []).some((pass) => aligned(domainOf(from), pass.domain));
+}
+
+/**
+ * Whether the person in the From line sent this themselves: it's verified and it's also the
+ * envelope sender. True for a forward by hand; false when a Gmail filter passes on someone
+ * else's email (From: Amazon), so a reply would go to the store instead of the person.
+ */
+export function sentByFrom(email: InboundEmail): boolean {
+  const from = fromAddress(email);
+  return (
+    from !== null && fromIsVerified(email) && email.EnvelopeFrom?.trim().toLowerCase() === from
+  );
 }
 
 /**
  * Addresses this email provably came from, most likely first: the From address if it's
  * verified, then the envelope sender SPF checked. A Gmail filter forwards with the forwarding
- * account as the envelope sender, and only that account can send as it, so that's how an
- * automatically forwarded order (From: Amazon) is matched to the person. Headers like
- * X-Forwarded-For are never trusted: anyone can write them. The shared receipts address
- * itself is never a candidate.
+ * account as the envelope sender (leo+caf_=receipts=in.spendly.app@gmail.com), and only that
+ * account can send as it, so that's how an automatically forwarded order (From: Amazon) is
+ * matched to the person. Headers like X-Forwarded-For are never trusted: anyone can write
+ * them. The shared receipts address itself is never a candidate.
  */
 export function verifiedSenders(
   email: InboundEmail,
@@ -128,8 +97,8 @@ export function verifiedSenders(
   const from = fromAddress(email);
   const found = [
     ...(from && fromIsVerified(email) ? [from] : []),
-    ...authPasses(email).flatMap((pass) =>
-      pass.method === 'spf' && pass.address ? [pass.address] : [],
+    ...(email.Auth ?? []).flatMap((pass) =>
+      pass.method === 'spf' && pass.address ? [pass.address.replace(/\+caf_=[^@]*@/, '@')] : [],
     ),
   ];
   return [...new Set(found)].filter((a) => a !== own);

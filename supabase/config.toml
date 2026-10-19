@@ -438,6 +438,6 @@ verify_jwt = false
 [functions.text-opt-in]
 verify_jwt = false
 
-# Postmark's inbound webhook: checked with the shared secret in its basic auth instead.
-[functions.postmark-inbound]
+# Called by the Cloudflare Email Worker: checked with the shared secret (X-Inbound-Secret) instead.
+[functions.inbound-email]
 verify_jwt = false

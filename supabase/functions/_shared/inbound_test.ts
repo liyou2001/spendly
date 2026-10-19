@@ -5,31 +5,19 @@ import {
   gmailForwardingCode,
   htmlToText,
   isAutomated,
-  parseInbound,
   pickContent,
+  sentByFrom,
   verifiedSenders,
   type InboundEmail,
 } from './inbound.ts';
 
 const forwarded: InboundEmail = {
   MessageID: 'm-1',
-  From: 'Leo <Leo@Example.com>',
-  FromFull: { Email: 'Leo@Example.com' },
+  From: 'Leo@Example.com',
   Subject: 'Fwd: Your Amazon.com order',
   TextBody: 'Order total: $42.10\nItems: USB-C cable $12.99, Desk lamp $29.11',
-  Headers: [
-    {
-      Name: 'Received-SPF',
-      Value: 'Pass (sender SPF authorized) identity=mailfrom; envelope-from="leo@example.com"',
-    },
-  ],
+  Auth: [{ method: 'spf', domain: 'example.com', address: 'leo@example.com' }],
 };
-
-Deno.test('Postmark’s JSON is read only if it’s an inbound email', () => {
-  assertEquals(parseInbound(forwarded)?.MessageID, 'm-1');
-  assertEquals(parseInbound({ From: 'x' }), null);
-  assertEquals(parseInbound('nope'), null);
-});
 
 Deno.test('a From address is trusted only when SPF, DKIM or DMARC passed for its domain', () => {
   assertEquals(fromIsVerified(forwarded), true);
@@ -38,43 +26,77 @@ Deno.test('a From address is trusted only when SPF, DKIM or DMARC passed for its
   const dkim: InboundEmail = {
     ...forwarded,
     From: 'leo@gmail.com',
-    FromFull: { Email: 'leo@gmail.com' },
-    Headers: [
-      { Name: 'Authentication-Results', Value: 'mx.google.com; dkim=pass header.d=gmail.com' },
-    ],
+    Auth: [{ method: 'dkim', domain: 'gmail.com', address: null }],
   };
   assertEquals(fromIsVerified(dkim), true);
+  assertEquals(verifiedSenders(dkim, undefined), ['leo@gmail.com']);
 
   // A pass for the forger's own domain says nothing about the From line.
   const forged: InboundEmail = {
     ...forwarded,
-    Headers: [
-      { Name: 'Received-SPF', Value: 'Pass identity=mailfrom; envelope-from="x@evil.example"' },
-      { Name: 'Authentication-Results', Value: 'mx; dkim=pass header.d=evil.example' },
+    Auth: [
+      { method: 'spf', domain: 'evil.example', address: 'x@evil.example' },
+      { method: 'dkim', domain: 'evil.example', address: null },
     ],
   };
   assertEquals(fromIsVerified(forged), false);
   assertEquals(verifiedSenders(forged, undefined), ['x@evil.example']);
 
-  const failed: InboundEmail = {
-    ...forwarded,
-    Headers: [{ Name: 'Received-SPF', Value: 'Fail; envelope-from="leo@example.com"' }],
-  };
-  assertEquals(verifiedSenders(failed, undefined), []);
+  assertEquals(verifiedSenders({ ...forwarded, Auth: [] }, undefined), []);
 });
 
-Deno.test('a Gmail filter’s forward is matched by the envelope sender, never by headers', () => {
+Deno.test('headers in the email are never trusted, only what was verified', () => {
+  const claims: InboundEmail = {
+    ...forwarded,
+    From: 'victim@gmail.com',
+    Headers: [
+      { Name: 'Received-SPF', Value: 'Pass envelope-from=victim@gmail.com' },
+      { Name: 'Authentication-Results', Value: 'mx.google.com; dkim=pass header.d=gmail.com' },
+      {
+        Name: 'ARC-Authentication-Results',
+        Value: 'i=1; mx.cloudflare.net; spf=pass smtp.mailfrom=victim@gmail.com',
+      },
+      { Name: 'X-Forwarded-For', Value: 'victim@gmail.com receipts@in.spendly.app' },
+    ],
+    Auth: [],
+  };
+  assertEquals(fromIsVerified(claims), false);
+  assertEquals(verifiedSenders(claims, undefined), []);
+});
+
+Deno.test('a Gmail filter’s forward is matched by the envelope sender', () => {
   const filtered: InboundEmail = {
     ...forwarded,
-    From: 'Amazon.com <auto-confirm@amazon.com>',
-    FromFull: { Email: 'auto-confirm@amazon.com' },
-    Headers: [
-      { Name: 'X-Forwarded-For', Value: 'victim@gmail.com receipts@in.spendly.app' },
-      { Name: 'Received-SPF', Value: 'pass (google.com) envelope-from=leo@gmail.com' },
+    From: 'auto-confirm@amazon.com',
+    Auth: [
+      { method: 'dkim', domain: 'amazon.com', address: null },
+      {
+        method: 'spf',
+        domain: 'gmail.com',
+        address: 'leo+caf_=receipts=in.spendly.app@gmail.com',
+      },
     ],
   };
-  assertEquals(verifiedSenders(filtered, 'receipts@in.spendly.app'), ['leo@gmail.com']);
-  assertEquals(fromIsVerified(filtered), false);
+  assertEquals(verifiedSenders(filtered, 'receipts@in.spendly.app'), [
+    'auto-confirm@amazon.com',
+    'leo@gmail.com',
+  ]);
+});
+
+Deno.test('only a verified From that also sent it itself is the sender to reply to', () => {
+  assertEquals(sentByFrom({ ...forwarded, EnvelopeFrom: 'LEO@example.com' }), true);
+  // A Gmail filter passing on a store's email: the store's From is genuine, but not the sender.
+  assertEquals(
+    sentByFrom({
+      ...forwarded,
+      From: 'auto-confirm@amazon.com',
+      EnvelopeFrom: 'leo+caf_=receipts=in.spendly.app@gmail.com',
+      Auth: [{ method: 'dkim', domain: 'amazon.com', address: null }],
+    }),
+    false,
+  );
+  assertEquals(sentByFrom({ ...forwarded, EnvelopeFrom: 'leo@example.com', Auth: [] }), false);
+  assertEquals(sentByFrom(forwarded), false);
 });
 
 Deno.test('robots, lists and bounces never get an automatic reply', () => {
@@ -93,7 +115,7 @@ Deno.test('robots, lists and bounces never get an automatic reply', () => {
 Deno.test('Gmail’s forwarding confirmation gives its code and who asked', () => {
   const confirmation: InboundEmail = {
     MessageID: 'm-2',
-    From: 'Gmail Team <forwarding-noreply@google.com>',
+    From: 'forwarding-noreply@google.com',
     Subject: '(#123456789) Gmail Forwarding Confirmation - Receive Mail from leo@gmail.com',
     TextBody:
       'Leo@Gmail.com has requested to automatically forward mail to your email address receipts@in.spendly.app.\nConfirmation code: 123456789',

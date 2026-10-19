@@ -37,11 +37,19 @@ For each question, the **How to test** line suggests something to ask or a task 
   - Set `VITE_GET_APP_URL` once there's an App Store or TestFlight link. Until then the page hides "Get the Spendly app".
   - Push for invites isn't built yet. Only claims and payment-page notes send pushes.
 
-### Set up Postmark for forwarded receipts
+### Launch checklist: email
 
-- **Status:** To do (2026-10-20)
-- **What's left:** create a Postmark server, point its inbound webhook at `postmark-inbound` with the shared secret, and set `RECEIPTS_EMAIL_ADDRESS`, `EXPO_PUBLIC_RECEIPTS_EMAIL` and `POSTMARK_SERVER_TOKEN` (README, "Forwarded email receipts"). Then forward a real Amazon order, forward it again (it should be skipped as a duplicate), and send one from an unknown address (it should get the reply).
-- **Also check with real email** which authentication headers Postmark passes through (`Received-SPF` with `envelope-from`, `Authentication-Results`), and that a Gmail filter's forward arrives with your address as the envelope sender, so it's matched to you.
+- **Status:** To do (2026-10-19)
+- **Why:** forwarded receipts and emailed codes are built and tested locally (Mailpit, `npm run email:test`), but receiving and sending real email needs a domain and accounts. Postmark turned the account down, so receiving is Cloudflare Email Routing (free) and sending is Resend.
+- **What's left** (README, "Forwarded email receipts"):
+  1. Buy a domain and move its DNS to Cloudflare.
+  2. Hosted Supabase: deploy the Edge Functions, and set `INBOUND_SECRET`, `RECEIPTS_EMAIL_ADDRESS`, `RESEND_API_KEY` and `EMAIL_FROM` as secrets.
+  3. Resend: verify the domain (its SPF and DKIM records), then use its SMTP details in Supabase Auth too, so sign-in codes don't go through Supabase's test mailer (a few an hour, unbranded).
+  4. Cloudflare: turn on Email Routing for a receipts subdomain, deploy `apps/email-worker` with `INBOUND_URL` and `INBOUND_SECRET`, and route the receipts address to it. Set `EXPO_PUBLIC_RECEIPTS_EMAIL`.
+- **Then check with real email:**
+  - Forward an Amazon order by hand from Gmail and from your school address: a draft under Needs you. Forward it again: skipped as a duplicate.
+  - Set up a Gmail filter that forwards: the confirmation code shows in the app, and a filtered order is matched to you. This depends on the Worker seeing Cloudflare's ARC seal (`ARC-Authentication-Results` from `mx.cloudflare.net`, sealed by `email.cloudflare.net`); Cloudflare doesn't document whether Workers get it. If it's missing, hand forwards still work (their DKIM is verified directly), but filter forwards would go unmatched. In the `inbound_emails` row they'd show as `unknown_sender`.
+  - Send from an address that isn't on any account: one reply, from `EMAIL_FROM`.
 
 ## Navigation and settings
 

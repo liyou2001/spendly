@@ -48,3 +48,7 @@ receipts/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Cloudflare Worker local state and secrets
+.wrangler/
+.dev.vars

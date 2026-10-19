@@ -22,10 +22,10 @@ const amazonOrder = {
 const fromLeo: InboundEmail = {
   MessageID: 'm-1',
   From: 'leo@gmail.com',
-  FromFull: { Email: 'leo@gmail.com' },
+  EnvelopeFrom: 'leo@gmail.com',
   Subject: 'Fwd: Your Amazon.com order',
   TextBody: 'Order total $42.10: USB-C cable $12.99, Desk lamp $29.11',
-  Headers: [{ Name: 'Received-SPF', Value: 'Pass envelope-from=leo@gmail.com' }],
+  Auth: [{ method: 'spf', domain: 'gmail.com', address: 'leo@gmail.com' }],
 };
 
 /** processEmail with fakes: Leo owns leo@gmail.com; the model replies with `reply`. */
@@ -90,14 +90,24 @@ Deno.test('a stranger gets a reply; a forged From gets nothing', async () => {
   const stranger = await run({
     ...fromLeo,
     From: 'sam@example.com',
-    FromFull: { Email: 'sam@example.com' },
-    Headers: [{ Name: 'Received-SPF', Value: 'Pass envelope-from=sam@example.com' }],
+    EnvelopeFrom: 'sam@example.com',
+    Auth: [{ method: 'spf', domain: 'example.com', address: 'sam@example.com' }],
   });
   assertEquals([stranger.status, stranger.replies, stranger.drafts], ['unknown_sender', 1, 0]);
 
+  // A Gmail filter passing on Amazon's email, from an address on no account: Amazon's From is
+  // genuine, but the reply would go to Amazon, not the person.
+  const filtered = await run({
+    ...fromLeo,
+    From: 'auto-confirm@amazon.com',
+    EnvelopeFrom: 'sam+caf_=receipts=in.spendly.app@gmail.com',
+    Auth: [{ method: 'dkim', domain: 'amazon.com', address: null }],
+  });
+  assertEquals([filtered.status, filtered.replies], ['unknown_sender', 0]);
+
   const forged = await run({
     ...fromLeo,
-    Headers: [{ Name: 'Received-SPF', Value: 'Pass envelope-from=x@evil.example' }],
+    Auth: [{ method: 'spf', domain: 'evil.example', address: 'x@evil.example' }],
   });
   assertEquals([forged.status, forged.replies, forged.drafts], ['unknown_sender', 0, 0]);
 });
@@ -122,18 +132,17 @@ Deno.test('Gmail’s forwarding code is shown only if it really came from Google
   const confirmation: InboundEmail = {
     MessageID: 'm-2',
     From: 'forwarding-noreply@google.com',
-    FromFull: { Email: 'forwarding-noreply@google.com' },
     Subject: '(#123456789) Gmail Forwarding Confirmation - Receive Mail from leo@gmail.com',
     TextBody:
       'leo@gmail.com has requested to automatically forward mail.\nConfirmation code: 123456789',
-    Headers: [{ Name: 'Authentication-Results', Value: 'mx; dkim=pass header.d=google.com' }],
+    Auth: [{ method: 'dkim', domain: 'google.com', address: null }],
   };
   const real = await run(confirmation);
   assertEquals([real.status, real.codes], ['forwarding_code', ['123456789']]);
 
   const fake = await run({
     ...confirmation,
-    Headers: [{ Name: 'Authentication-Results', Value: 'mx; dkim=pass header.d=evil.example' }],
+    Auth: [{ method: 'dkim', domain: 'evil.example', address: null }],
   });
   assertEquals([fake.codes, fake.status], [[], 'unknown_sender']);
 });

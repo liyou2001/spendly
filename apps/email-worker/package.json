@@ -1,0 +1,16 @@
+{
+  "name": "email-worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cloudflare Email Worker: passes emails sent to the receipts address on to the inbound-email function.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "deploy": "npx wrangler@4.147.0 deploy"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,7 @@
+# Deploy: npm run deploy --workspace email-worker (after `npx wrangler@4.147.0 login`).
+# Secrets, set once: npx wrangler@4.147.0 secret put INBOUND_URL, then INBOUND_SECRET.
+# Then in Cloudflare: Email → Email Routing → Routing rules → send the receipts address to this
+# Worker.
+name = "spendly-email"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"

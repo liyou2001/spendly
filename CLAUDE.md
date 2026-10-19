@@ -52,7 +52,7 @@ Bank sync, moving money in the app, automatic repayment detection, advanced budg
 | File storage                              | Supabase Storage (private receipt photos)                                                                                         |
 | Server code                               | Supabase Edge Functions (Deno, standard web APIs)                                                                                 |
 | Receipt reading                           | Claude Haiku 5.5 (`claude-haiku-5-5`), retry on Claude Sonnet 5.5 (`claude-sonnet-5-5`)                                           |
-| Forwarded receipts                        | Postmark inbound email                                                                                                            |
+| Forwarded receipts                        | Cloudflare Email Routing + Email Worker                                                                                           |
 | Texts                                     | Twilio or Telnyx at launch, behind one `sendText()` function                                                                      |
 | Push notifications                        | Expo push                                                                                                                         |
 | Error alerts                              | Sentry                                                                                                                            |
@@ -63,6 +63,7 @@ Bank sync, moving money in the app, automatic repayment detection, advanced budg
 ```
 apps/mobile          Expo app
 apps/pay             payment web page (if not built from the Expo app)
+apps/email-worker    Cloudflare Email Worker for forwarded receipts
 packages/ledger      pure TypeScript money and split math, no dependencies
 supabase/migrations  database schema
 supabase/functions   Edge Functions
@@ -83,7 +84,7 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 6. **AI output is only a draft.** Code checks the math, and the user reviews before anything enters the ledger. The AI never does money math.
 7. **Repayments never count as income or spending** in budgets.
 8. **Texting needs the recipient's own consent.** Never text a number that hasn't opted in itself. Keep proof of consent and honor STOP. All texting goes through `sendText()`.
-9. **Secrets stay on the server.** The Claude, Postmark and Twilio keys live in Supabase secrets, never in the app.
+9. **Secrets stay on the server.** The Claude, Resend and Twilio keys live in Supabase secrets, never in the app.
 10. **Every money calculation has tests.**
 
 ### Design

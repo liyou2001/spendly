@@ -40,7 +40,7 @@ export default function ForwardReceipts() {
   const settings = useLoad(useCallback(() => fetchSettings(), []));
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Addresses whose code couldn't be emailed (no Postmark set up).
+  // Addresses whose code couldn't be emailed.
   const [unsent, setUnsent] = useState<string[]>([]);
 
   async function act(action: () => Promise<void>) {
@@ -311,7 +311,7 @@ function CodeEntry({
           message={
             sent
               ? `Check ${email} for a code from Spendly.`
-              : 'Couldn’t email a code: Postmark isn’t set up. Developing locally? It’s in the functions log.'
+              : 'Couldn’t email a code: sending email isn’t set up. Developing locally? It’s in the functions log.'
           }
         />
       )}

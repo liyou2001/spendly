@@ -1,9 +1,10 @@
-// What happens to a forwarded email after Postmark hands it over, with the database, the model,
-// pushes and replies passed in so every outcome can be tested.
+// What happens to a forwarded email once it's parsed and its sender checked, with the database,
+// the model, pushes and replies passed in so every outcome can be tested.
 import {
   fromIsVerified,
   gmailForwardingCode,
   pickContent,
+  sentByFrom,
   verifiedSenders,
   type InboundEmail,
 } from '../_shared/inbound.ts';
@@ -54,8 +55,9 @@ export async function processEmail(email: InboundEmail, deps: InboundDeps): Prom
     const userId = await deps.findUser(verifiedSenders(email, deps.receiptsAddress));
     if (!userId) {
       await deps.update({ status: 'unknown_sender' });
-      // Only to a sender we know is real, or a forged From would make us email strangers.
-      if (fromIsVerified(email)) await deps.replyToUnknownSender(email);
+      // Only to a sender we know is real and who sent it themselves: never to a forged From
+      // (we'd email strangers) or to the store whose email a Gmail filter passed on.
+      if (sentByFrom(email)) await deps.replyToUnknownSender(email);
       return;
     }
     await deps.update({ user_id: userId });

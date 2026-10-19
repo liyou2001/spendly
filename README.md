@@ -13,6 +13,7 @@ apps/mobile          Expo app (Expo Router, TypeScript)
   src/lib            Supabase client, encrypted session storage, session context
   src/theme.ts       design tokens (colors, Hanken Grotesk, type, spacing, radii)
 apps/pay             payment page people open from a private link (Vite + React), deployed to Vercel
+apps/email-worker    Cloudflare Email Worker: passes forwarded receipts to the inbound-email function
 packages/ledger      pure TypeScript money and split math (Vitest)
 supabase/            Supabase config, migrations, Edge Functions, database tests
 docs/                build plan and exported designs
@@ -205,22 +206,23 @@ To measure accuracy, put about 20 real receipt photos (`.jpg` or `.png`) in `rec
 
 ### Forwarded email receipts
 
-Everyone forwards receipts to one address. The sender's address says whose receipt it is: each person's sign-in email counts automatically, and they can add more in Me → Forward receipts (each confirmed with an emailed code). Gmail filters that forward automatically work too: Gmail sends them with the forwarding account as the envelope sender, which SPF checks. An address is only trusted when SPF, DKIM or DMARC passed for its own domain, so a faked From line matches no one (and gets no reply). The email itself is never stored.
+Everyone forwards receipts to one address. Cloudflare Email Routing receives it and hands it to a small Worker (`apps/email-worker`), which posts the raw email to the `inbound-email` function. The sender's address says whose receipt it is: each person's sign-in email counts automatically, and they can add more in Me → Forward receipts (each confirmed with an emailed code). Gmail filters that forward automatically work too: Gmail sends them with the forwarding account as the envelope sender, which Cloudflare's SPF check covers.
+
+An address is trusted only when SPF, DKIM or DMARC passed for its own domain, and only by checks we can prove: DKIM signatures verified in the function against DNS, and Cloudflare's own results, used only when Cloudflare's ARC seal on them verifies. Authentication headers inside the email are never read, since the sender could have written them. So a faked From line matches no one, and gets no reply. The email itself is never stored.
 
 A forwarded receipt is read like a scanned one (a PDF or photo attachment, or the email text) and shows up under Needs you on Home, ready to split. Duplicates are skipped. Unknown senders get one reply a day explaining how to add their address.
 
-Locally (Postmark can't reach your computer):
+Locally (no domain needed; Cloudflare can't reach your computer):
 
-1. Put any long random string in `supabase/functions/.env` as `POSTMARK_INBOUND_SECRET`. `functions serve` reloads.
-2. `npm run email:test -- you@example.com` sends a sample Amazon order "from" that address, as Postmark would. Use an address on your account. A few seconds later it's under Needs you.
+1. Put any long random string in `supabase/functions/.env` as `INBOUND_SECRET`. `functions serve` reloads.
+2. `npm run email:test -- you@example.com` posts a sample Amazon order "from" that address, as the Worker would. Use an address on your account. A few seconds later it's under Needs you. Locally, the script's `X-Test-Sender` header stands in for Cloudflare's check; hosted, it's ignored.
+3. Emails the functions send (codes for added addresses, the reply to unknown senders) land in Mailpit at http://127.0.0.1:54324. Try `npm run email:test -- stranger@example.com` to see the reply.
 
-Codes for added addresses are printed in the `functions serve` log while `POSTMARK_SERVER_TOKEN` is blank.
+Hosted (needs a domain; see the launch checklist in `NEXT_STEPS.md`):
 
-Hosted, with Postmark:
-
-1. Create a Postmark server. Its inbound address (or your own domain's, later) is the receipts address: set it as `RECEIPTS_EMAIL_ADDRESS` (functions) and `EXPO_PUBLIC_RECEIPTS_EMAIL` (app), and add it as a sender signature so codes and replies can be sent from it.
-2. Set the server's inbound webhook to `https://postmark:<POSTMARK_INBOUND_SECRET>@<project-ref>.supabase.co/functions/v1/postmark-inbound`.
-3. Put `POSTMARK_SERVER_TOKEN` in the functions' secrets and deploy the functions.
+1. **Receiving:** add the domain to Cloudflare and turn on Email Routing. Deploy the Worker: `npx wrangler@4.147.0 login`, then `npx wrangler@4.147.0 secret put INBOUND_URL` (`https://<project-ref>.supabase.co/functions/v1/inbound-email`) and `INBOUND_SECRET`, run from `apps/email-worker`, then `npm run deploy --workspace email-worker`. In Email Routing, send the receipts address to the Worker. Set `RECEIPTS_EMAIL_ADDRESS` (functions) and `EXPO_PUBLIC_RECEIPTS_EMAIL` (app) to it.
+2. **Sending:** verify the domain in Resend, then set `RESEND_API_KEY` and `EMAIL_FROM` in the functions' secrets. Put the same Resend SMTP details in Supabase Auth's SMTP settings so sign-in codes come from your domain too.
+3. Put `INBOUND_SECRET` in the functions' secrets and deploy the functions.
 
 ### Push notifications
 

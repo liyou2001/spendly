@@ -974,8 +974,8 @@ export async function fetchMyEmails(): Promise<ForwardingAddress[]> {
 }
 
 /**
- * Emails a code to an address you want to forward from. False when it couldn't be sent (no
- * Postmark set up; locally the code is in the functions log).
+ * Emails a code to an address you want to forward from (locally, to Mailpit). False when it
+ * couldn't be sent; the code is then in the functions log.
  */
 export async function addEmail(email: string): Promise<boolean> {
   const { data, error } = await supabase.functions.invoke<{ sent: boolean }>('add-email', {

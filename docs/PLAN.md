@@ -56,7 +56,7 @@ Bank sync, moving money in the app, automatic repayment detection, advanced budg
 | File storage                              | Supabase Storage (private receipt photos)                                                                                         |
 | Server code                               | Supabase Edge Functions (Deno, standard web APIs)                                                                                 |
 | Receipt reading                           | Claude Haiku 5.5 (`claude-haiku-5-5`), retry on Claude Sonnet 5.5 (`claude-sonnet-5-5`)                                           |
-| Forwarded receipts                        | Postmark inbound email                                                                                                            |
+| Forwarded receipts                        | Cloudflare Email Routing + Email Worker                                                                                           |
 | Texts                                     | Twilio or Telnyx at launch, behind one `sendText()` function                                                                      |
 | Push notifications                        | Expo push                                                                                                                         |
 | Error alerts                              | Sentry                                                                                                                            |
@@ -67,6 +67,7 @@ Bank sync, moving money in the app, automatic repayment detection, advanced budg
 ```
 apps/mobile          Expo app
 apps/pay             payment web page (if not built from the Expo app)
+apps/email-worker    Cloudflare Email Worker for forwarded receipts
 packages/ledger      pure TypeScript money and split math, no dependencies
 supabase/migrations  database schema
 supabase/functions   Edge Functions
@@ -87,7 +88,7 @@ Use npm or pnpm workspaces and follow Expo's monorepo guide.
 6. **AI output is only a draft.** Code checks the math, and the user reviews before anything enters the ledger. The AI never does money math.
 7. **Repayments never count as income or spending** in budgets.
 8. **Texting needs the recipient's own consent.** Never text a number that hasn't opted in itself. Keep proof of consent and honor STOP. All texting goes through `sendText()`.
-9. **Secrets stay on the server.** The Claude, Postmark and Twilio keys live in Supabase secrets, never in the app.
+9. **Secrets stay on the server.** The Claude, Resend and Twilio keys live in Supabase secrets, never in the app.
 10. **Every money calculation has tests.**
 
 ### Design
@@ -398,17 +399,18 @@ Splitting rules:
 - Settings:
   - Add the email addresses you forward from, each verified with a code. Your sign-in address counts automatically.
   - Show the one shared address, `receipts@in.yourapp.com`, with a copy button. There are no personal addresses: whose receipt it is comes from the sender.
-- A `postmark-inbound` Edge Function:
+- Cloudflare Email Routing receives the email, and a small Email Worker posts it raw to an `inbound-email` Edge Function. Sending (codes, replies) goes through one `sendEmail()`: Resend hosted, Mailpit locally.
+- The `inbound-email` Edge Function:
   - Checks a shared secret, saves the email to `inbound_emails` as received, and responds with 200 right away.
   - Processes in the background (for example with `EdgeRuntime.waitUntil`).
-  - Finds the user by a verified address the email provably came from: the From address when SPF, DKIM or DMARC passed for its domain, or the SPF-checked envelope sender (how Gmail filters forward). Headers anyone can write are never trusted. An unknown sender gets an automatic reply explaining how to add the address.
+  - Finds the user by a verified address the email provably came from: the From address when SPF, DKIM or DMARC passed for its domain, or the SPF-checked envelope sender (how Gmail filters forward). Only DKIM signatures it verifies itself and Cloudflare's ARC-sealed results count; headers anyone can write are never trusted. An unknown sender gets an automatic reply explaining how to add the address.
   - Extracts from the text body or a PDF or image attachment, using the same extraction and math check as Step 9.
   - Creates a draft under Needs you.
   - Skips duplicates by provider message id, and by matching amount, date and merchant.
   - Deletes the raw email once extracted.
 - Gmail forwarding confirmation: if an email comes from Gmail's forwarding confirmation address, show its code to the user in the app.
 - Text inside emails is never treated as instructions. Extraction only fills in the schema.
-- For testing before you own a domain, use Postmark's built-in inbound address.
+- For testing before you own a domain, post sample emails to the local function (`npm run email:test`); sent emails land in Mailpit.
 
 **Done when:**
 

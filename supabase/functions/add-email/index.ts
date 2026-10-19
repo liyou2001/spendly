@@ -1,9 +1,9 @@
 // add-email: adding an address you forward receipts from. Emails it a 6-digit code, which you
-// enter in the app (verify_email). Signed in only. Without POSTMARK_SERVER_TOKEN (local
-// development) the code is printed in the functions log instead.
+// enter in the app (verify_email). Signed in only. Locally the code lands in Mailpit; if it
+// couldn't be sent, it's printed in the functions log instead.
 import { adminClient, withinLimit } from '../_shared/admin.ts';
 import { corsHeaders, dbError, fail, json, readBody, TOO_MANY } from '../_shared/http.ts';
-import { sendEmail } from '../_shared/postmark.ts';
+import { sendEmail } from '../_shared/email.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -30,6 +30,6 @@ Deno.serve(async (req) => {
     subject: `${code} is your Spendly code`,
     text: `Enter ${code} in Spendly to add this address for forwarding receipts. It expires in 15 minutes.\n\nIf you didn’t ask for this, you can ignore it.`,
   });
-  if (!sent) console.log(`(not sent: no POSTMARK_SERVER_TOKEN) Spendly code for ${email}: ${code}`);
+  if (!sent) console.log(`(not sent) Spendly code for ${email}: ${code}`);
   return json({ sent });
 });
