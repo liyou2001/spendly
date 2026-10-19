@@ -20,3 +20,9 @@ export function normalizePhone(
   }
   return { ok: true, phone: `+${digits}` };
 }
+
+/** "+16085550123" as "(608) 555-0123"; other numbers as stored. */
+export function formatPhone(e164: string): string {
+  const us = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return us ? `(${us[1]}) ${us[2]}-${us[3]}` : e164;
+}

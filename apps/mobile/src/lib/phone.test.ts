@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizePhone } from './phone';
+import { formatPhone, normalizePhone } from './phone';
 
 describe('normalizePhone', () => {
   it.each([
@@ -23,4 +23,11 @@ describe('normalizePhone', () => {
       expect(normalizePhone(input).ok).toBe(false);
     },
   );
+});
+
+describe('formatPhone', () => {
+  it('shows US numbers the familiar way and leaves others alone', () => {
+    expect(formatPhone('+16085550123')).toBe('(608) 555-0123');
+    expect(formatPhone('+447700900123')).toBe('+447700900123');
+  });
 });

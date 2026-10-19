@@ -528,7 +528,7 @@ export async function fetchExpense(
 
 // Payments -------------------------------------------------------------------
 
-export type PaymentMethod = 'venmo' | 'paypal' | 'cashapp' | 'cash' | 'other';
+export type PaymentMethod = 'venmo' | 'paypal' | 'cashapp' | 'zelle' | 'cash' | 'other';
 
 export interface Payment {
   id: string;
@@ -591,20 +591,23 @@ export async function recordPayment(input: {
   if (error) throw error;
 }
 
-/** "I paid": counts once the person you paid confirms it. */
+/** "I paid": counts once the person you paid confirms it. They get a push about it. */
 export async function claimPayment(input: {
   groupId: string;
   to: string;
   amountCents: Cents;
   method: PaymentMethod | null;
 }): Promise<void> {
-  const { error } = await supabase.rpc('claim_payment', {
-    p_group_id: input.groupId,
-    p_to: input.to,
-    p_amount_cents: input.amountCents,
-    ...(input.method ? { p_method: input.method } : {}),
-  });
-  if (error) throw error;
+  const paymentId = unwrap(
+    await supabase.rpc('claim_payment', {
+      p_group_id: input.groupId,
+      p_to: input.to,
+      p_amount_cents: input.amountCents,
+      ...(input.method ? { p_method: input.method } : {}),
+    }),
+  );
+  // Best effort: the claim is saved either way, and shows in their app.
+  void supabase.functions.invoke('notify-claim', { body: { payment_id: paymentId } });
 }
 
 /** "Got it" or "Didn't get it" on a claim made to you. */
@@ -634,21 +637,28 @@ export interface PaymentHandles {
   venmo: string | null;
   paypal: string | null;
   cashtag: string | null;
+  /** The email or US phone number their Zelle uses. */
+  zelle: string | null;
 }
 
-/** Venmo, PayPal and Cash App usernames for these accounts (yours and groupmates'). */
+/** Venmo, PayPal, Cash App and Zelle details for these accounts (yours and groupmates'). */
 export async function fetchHandles(userIds: string[]): Promise<Record<string, PaymentHandles>> {
   if (userIds.length === 0) return {};
   const rows = unwrap(
     await supabase
       .from('profiles')
-      .select('id, venmo_username, paypal_username, cashapp_tag')
+      .select('id, venmo_username, paypal_username, cashapp_tag, zelle_contact')
       .in('id', userIds),
   );
   return Object.fromEntries(
     rows.map((row) => [
       row.id,
-      { venmo: row.venmo_username, paypal: row.paypal_username, cashtag: row.cashapp_tag },
+      {
+        venmo: row.venmo_username,
+        paypal: row.paypal_username,
+        cashtag: row.cashapp_tag,
+        zelle: row.zelle_contact,
+      },
     ]),
   );
 }
@@ -857,5 +867,71 @@ export async function setShareCategory(
     p_expense_id: expenseId,
     ...(categoryId ? { p_category_id: categoryId } : {}),
   });
+  if (error) throw error;
+}
+
+// Payment links and notes from the payment page ---------------------------------------
+
+/** A new private payment link token for someone in your group. Shown once; only its hash is kept. */
+export async function createShareLink(participantId: string): Promise<string> {
+  return unwrap(await supabase.rpc('create_share_link', { p_participant_id: participantId }));
+}
+
+/** Stops every payment link you've sent this person. */
+export async function revokeShareLinks(participantId: string): Promise<void> {
+  const { error } = await supabase.rpc('revoke_share_links', { p_participant_id: participantId });
+  if (error) throw error;
+}
+
+/** How many of your payment links for this person still work. */
+export async function fetchActiveShareLinks(participantId: string): Promise<number> {
+  return unwrap(await supabase.rpc('active_share_links', { p_participant_id: participantId }));
+}
+
+/** "Something looks wrong", sent to you from a payment link. */
+export interface ProblemReport {
+  id: string;
+  groupId: string;
+  /** The participant who sent it. */
+  from: string;
+  message: string;
+  createdAt: string;
+}
+
+/** Notes sent to you that you haven't dismissed, newest first. */
+export async function fetchProblemReports(): Promise<ProblemReport[]> {
+  const rows = unwrap(
+    await supabase
+      .from('problem_reports')
+      .select('id, group_id, from_participant, message, created_at')
+      .is('resolved_at', null)
+      .order('created_at', { ascending: false }),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    groupId: row.group_id,
+    from: row.from_participant,
+    message: row.message,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function resolveProblem(reportId: string): Promise<void> {
+  const { error } = await supabase.rpc('resolve_problem', { p_report_id: reportId });
+  if (error) throw error;
+}
+
+/** After how many days claims to you confirm themselves; null when off (the default). */
+export async function fetchAutoConfirmDays(userId: string): Promise<number | null> {
+  return unwrap(
+    await supabase.from('profiles').select('auto_confirm_days').eq('id', userId).single(),
+  ).auto_confirm_days;
+}
+
+export async function setAutoConfirmDays(userId: string, days: number | null): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ auto_confirm_days: days })
+    .eq('id', userId);
   if (error) throw error;
 }

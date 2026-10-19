@@ -27,7 +27,13 @@
       "expo-status-bar",
       "expo-secure-store",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-notifications",
+        {
+          "color": "#E58C76"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

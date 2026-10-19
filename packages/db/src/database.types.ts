@@ -443,8 +443,62 @@ export type Database = {
           },
         ];
       };
+      problem_reports: {
+        Row: {
+          created_at: string;
+          from_participant: string;
+          group_id: string;
+          id: string;
+          message: string;
+          resolved_at: string | null;
+          to_participant: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          from_participant: string;
+          group_id: string;
+          id?: string;
+          message: string;
+          resolved_at?: string | null;
+          to_participant: string;
+        };
+        Update: {
+          created_at?: string;
+          from_participant?: string;
+          group_id?: string;
+          id?: string;
+          message?: string;
+          resolved_at?: string | null;
+          to_participant?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'problem_reports_from_participant_group_id_fkey';
+            columns: ['from_participant', 'group_id'];
+            isOneToOne: false;
+            referencedRelation: 'participants';
+            referencedColumns: ['id', 'group_id'];
+          },
+          {
+            foreignKeyName: 'problem_reports_group_id_fkey';
+            columns: ['group_id'];
+            isOneToOne: false;
+            referencedRelation: 'groups';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'problem_reports_to_participant_group_id_fkey';
+            columns: ['to_participant', 'group_id'];
+            isOneToOne: false;
+            referencedRelation: 'participants';
+            referencedColumns: ['id', 'group_id'];
+          },
+        ];
+      };
       profiles: {
         Row: {
+          auto_confirm_days: number | null;
           cashapp_tag: string | null;
           created_at: string;
           display_name: string;
@@ -452,9 +506,11 @@ export type Database = {
           paypal_username: string | null;
           username: string;
           venmo_username: string | null;
+          zelle_contact: string | null;
         };
         ComputedFields: never;
         Insert: {
+          auto_confirm_days?: number | null;
           cashapp_tag?: string | null;
           created_at?: string;
           display_name: string;
@@ -462,8 +518,10 @@ export type Database = {
           paypal_username?: string | null;
           username: string;
           venmo_username?: string | null;
+          zelle_contact?: string | null;
         };
         Update: {
+          auto_confirm_days?: number | null;
           cashapp_tag?: string | null;
           created_at?: string;
           display_name?: string;
@@ -471,6 +529,7 @@ export type Database = {
           paypal_username?: string | null;
           username?: string;
           venmo_username?: string | null;
+          zelle_contact?: string | null;
         };
         Relationships: [];
       };
@@ -569,6 +628,7 @@ export type Database = {
           created_at: string;
           id: string;
           participant_id: string;
+          requested_by: string;
           revoked_at: string | null;
           token_hash: string;
         };
@@ -577,6 +637,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           participant_id: string;
+          requested_by: string;
           revoked_at?: string | null;
           token_hash: string;
         };
@@ -584,6 +645,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           participant_id?: string;
+          requested_by?: string;
           revoked_at?: string | null;
           token_hash?: string;
         };
@@ -591,6 +653,13 @@ export type Database = {
           {
             foreignKeyName: 'share_links_participant_id_fkey';
             columns: ['participant_id'];
+            isOneToOne: false;
+            referencedRelation: 'participants';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'share_links_requested_by_fkey';
+            columns: ['requested_by'];
             isOneToOne: false;
             referencedRelation: 'participants';
             referencedColumns: ['id'];
@@ -704,6 +773,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      active_share_links: { Args: { p_participant_id: string }; Returns: number };
       add_person: {
         Args: {
           p_display_name: string;
@@ -723,6 +793,7 @@ export type Database = {
         }[];
       };
       cancel_invite: { Args: { p_invite_id: string }; Returns: undefined };
+      claim_notice: { Args: { p_payment_id: string; p_user_id: string }; Returns: Json };
       claim_payment: {
         Args: { p_amount_cents: number; p_group_id: string; p_method?: string; p_to: string };
         Returns: string;
@@ -731,6 +802,7 @@ export type Database = {
         Args: { p_name: string; p_one_off?: boolean; p_people?: Json };
         Returns: string;
       };
+      create_share_link: { Args: { p_participant_id: string }; Returns: string };
       decide_payment: { Args: { p_accept: boolean; p_payment_id: string }; Returns: undefined };
       find_user: {
         Args: { p_username: string };
@@ -759,7 +831,21 @@ export type Database = {
           payer_name: string;
         }[];
       };
+      hit_rate_limit: {
+        Args: { p_key: string; p_max: number; p_window_seconds: number };
+        Returns: boolean;
+      };
       invite_to_group: { Args: { p_participant_id: string; p_user_id: string }; Returns: string };
+      link_claim: {
+        Args: { p_amount_cents: number; p_method?: string; p_token_hash: string };
+        Returns: Json;
+      };
+      link_flag: { Args: { p_message: string; p_token_hash: string }; Returns: Json };
+      link_share: { Args: { p_token_hash: string }; Returns: Json };
+      link_text_opt_in: {
+        Args: { p_opt_in: boolean; p_phone: string; p_token_hash: string };
+        Returns: boolean;
+      };
       my_invites: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -796,6 +882,7 @@ export type Database = {
           you_paid: boolean;
         }[];
       };
+      push_tokens_for: { Args: { p_user_id: string }; Returns: string[] };
       record_payment: {
         Args: {
           p_amount_cents: number;
@@ -806,7 +893,10 @@ export type Database = {
         };
         Returns: string;
       };
+      register_push_token: { Args: { p_token: string }; Returns: undefined };
+      resolve_problem: { Args: { p_report_id: string }; Returns: undefined };
       respond_to_invite: { Args: { p_accept: boolean; p_invite_id: string }; Returns: string };
+      revoke_share_links: { Args: { p_participant_id: string }; Returns: number };
       save_expense: {
         Args: {
           p_category_id?: string;

@@ -12,12 +12,11 @@ apps/mobile          Expo app (Expo Router, TypeScript)
   src/components     shared UI (Screen, KeyBlock, ListRow, Button, Tag, Avatar, ProgressBar, Money, ...)
   src/lib            Supabase client, encrypted session storage, session context
   src/theme.ts       design tokens (colors, Hanken Grotesk, type, spacing, radii)
+apps/pay             payment page people open from a private link (Vite + React), deployed to Vercel
 packages/ledger      pure TypeScript money and split math (Vitest)
 supabase/            Supabase config, migrations, Edge Functions, database tests
 docs/                build plan and exported designs
 ```
-
-`apps/pay` (the payment web page) is added in Step 8 if it isn't built from the Expo app.
 
 ## Prerequisites
 
@@ -119,7 +118,8 @@ Your phone has to reach your computer directly, for the app bundle and for local
 ## Tests, lint, types, formatting
 
 ```sh
-npm test               # every workspace's tests (currently packages/ledger)
+npm test               # every workspace's tests (ledger, app, payment page)
+npm run test:functions # Edge Function tests (Deno), against local Supabase with functions served
 npm run lint           # ESLint across the repo
 npm run typecheck      # tsc in every workspace
 npm run format         # Prettier, write
@@ -167,6 +167,39 @@ Local Supabase never sends real email. Every email it sends, to any address, lan
 Open it in your computer's browser while local Supabase is running. Sign-in codes arrive as "Your Spendly sign-in code" (or "Your Spendly sign-up code" for a new address), newest at the top. Nothing reaches your real inbox, so you can sign in as any address, including made-up ones like `jeff@example.com`.
 
 `npm run db:reset` deletes every account except the seeded `leo@example.com`. If you signed in with your own address, sign in again afterwards to get a fresh account.
+
+## Payment page and Edge Functions
+
+People without the app open a private link to see their share, pay with Venmo, PayPal or Cash App, and say "I paid". Request payment on a person's screen makes the link.
+
+Locally, run three things (each in its own terminal):
+
+```sh
+npm run db:start                  # if it isn't running
+npx supabase functions serve      # Edge Functions in supabase/functions, with hot reload
+npm run pay                       # the page at http://<your computer's address>:5173
+```
+
+The app builds links to the page's dev server on the same computer as Expo, so a link texted from your phone opens on your phone over Wi-Fi. Set `EXPO_PUBLIC_PAY_PAGE_URL` once the page is deployed.
+
+`npm run test:functions` needs [Deno](https://deno.com) (`curl -fsSL https://deno.land/install.sh | sh`) and the functions being served.
+
+### Deploying the page to Vercel
+
+1. Import the repo at https://vercel.com/new and set **Root Directory** to `apps/pay`. `apps/pay/vercel.json` sets the build.
+2. Add the environment variable `VITE_SUPABASE_URL` (your hosted project's URL) and optionally `VITE_GET_APP_URL`.
+3. Deploy the functions with `npx supabase functions deploy`, and put the page's URL in the app's `EXPO_PUBLIC_PAY_PAGE_URL`.
+
+### Push notifications
+
+Pushes ("Jeff says they paid you $15.00") need the app linked to an EAS project, once:
+
+```sh
+cd apps/mobile
+npx eas-cli@latest init   # adds extra.eas.projectId to app.json
+```
+
+Until then the app skips push registration. Expo Go on iOS receives pushes; on Android, pushes need a development build (`eas build --profile development`).
 
 ## Hosted Supabase
 

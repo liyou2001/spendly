@@ -17,7 +17,14 @@ import {
 } from '@/components';
 import { monthStart } from '@/lib/budget';
 import { fetchMonth } from '@/lib/budgetData';
-import { fetchBalances, fetchExpenses, fetchGroups, fetchPayments, fetchProfile } from '@/lib/data';
+import {
+  fetchBalances,
+  fetchExpenses,
+  fetchGroups,
+  fetchPayments,
+  fetchProblemReports,
+  fetchProfile,
+} from '@/lib/data';
 import { formatDate, todayLocal } from '@/lib/dates';
 import { useInvites } from '@/lib/invites';
 import { buildPeopleView } from '@/lib/people';
@@ -35,12 +42,23 @@ async function fetchSummary(userId: string) {
 }
 
 async function fetchPeople(userId: string) {
-  const [groups, balances, payments] = await Promise.all([
+  const [groups, balances, payments, reports] = await Promise.all([
     fetchGroups(),
     fetchBalances(),
     fetchPayments({ status: 'claimed' }),
+    fetchProblemReports(),
   ]);
-  return buildPeopleView({ userId, groups, balances, payments, now: new Date() });
+  const people = new Map(
+    groups.flatMap((g) => g.people.map((p) => [p.id, { name: p.displayName, groupName: g.name }])),
+  );
+  return {
+    ...buildPeopleView({ userId, groups, balances, payments, now: new Date() }),
+    notes: reports.map((report) => ({
+      report,
+      name: people.get(report.from)?.name ?? 'Someone',
+      groupName: people.get(report.from)?.groupName ?? '',
+    })),
+  };
 }
 
 async function fetchRecent() {
@@ -69,6 +87,7 @@ export default function Home() {
           g.people.flatMap((person) => person.claimsToMe.map((claim) => ({ claim, person }))),
         )
       : [];
+  const notes = people.status === 'ready' ? people.data.notes : [];
 
   return (
     <Screen title={firstName ? `Hi, ${firstName}` : 'Home'}>
@@ -120,7 +139,7 @@ export default function Home() {
         </Loadable>
       )}
 
-      {claims.length > 0 || invites.length > 0 ? (
+      {claims.length > 0 || notes.length > 0 || invites.length > 0 ? (
         <Section title="Needs you">
           <View>
             {claims.map(({ claim, person }, index) => (
@@ -132,7 +151,19 @@ export default function Home() {
                 onPress={() =>
                   router.push({ pathname: '/people/[id]', params: { id: person.participantId } })
                 }
-                divider={index < claims.length - 1 || invites.length > 0}
+                divider={index < claims.length - 1 || notes.length > 0 || invites.length > 0}
+              />
+            ))}
+            {notes.map(({ report, name, groupName }, index) => (
+              <ListRow
+                key={report.id}
+                title={`${name}: “${report.message}”`}
+                subtitle={[groupName, 'something looks wrong'].filter(Boolean).join(' · ')}
+                trailing={<View style={styles.dot} />}
+                onPress={() =>
+                  router.push({ pathname: '/people/[id]', params: { id: report.from } })
+                }
+                divider={index < notes.length - 1 || invites.length > 0}
               />
             ))}
             {invites.length > 0 ? (

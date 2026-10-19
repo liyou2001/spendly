@@ -14,6 +14,7 @@
   },
   "scripts": {
     "mobile": "npm run start --workspace mobile",
+    "pay": "npm run dev --workspace pay",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
@@ -24,7 +25,8 @@
     "db:status": "supabase status",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:types": "supabase gen types typescript --local --schema public > packages/db/src/database.types.ts && prettier --write packages/db/src/database.types.ts"
+    "db:types": "supabase gen types typescript --local --schema public > packages/db/src/database.types.ts && prettier --write packages/db/src/database.types.ts",
+    "test:functions": "scripts/test-functions.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

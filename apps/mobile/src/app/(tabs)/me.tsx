@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import { Avatar, Button, KeyBlock, ListRow, Screen, Section, Text } from '@/components';
 import { fetchCategories, fetchProfile } from '@/lib/data';
 import { useSession } from '@/lib/session';
+import { unregisterPush } from '@/lib/push';
 import { supabase } from '@/lib/supabase';
 import { useLoad } from '@/lib/useLoad';
 import { space } from '@/theme';
@@ -31,6 +32,8 @@ export default function Me() {
 
   async function signOut() {
     setSigningOut(true);
+    // This phone stops getting your pushes; a failure here mustn't block signing out.
+    await unregisterPush().catch(() => undefined);
     // Clears the saved session even if the network call fails; the route guard then shows sign-in.
     await supabase.auth.signOut();
     setSigningOut(false);

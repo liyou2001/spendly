@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { InvitesProvider } from '@/lib/invites';
+import { usePushNotifications } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
 import { colors, fontFiles } from '@/theme';
 
@@ -24,6 +25,8 @@ export default function RootLayout() {
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const { session, isLoading } = useSession();
   const ready = fontsReady && !isLoading;
+  // Only once the navigator below is mounted, so a tapped notification can open its screen.
+  usePushNotifications(ready && session !== null);
 
   useEffect(() => {
     if (ready) SplashScreen.hide();

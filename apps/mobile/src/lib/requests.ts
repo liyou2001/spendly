@@ -1,8 +1,7 @@
 // Payment requests sent from the user's own phone (Messages or the share sheet), and the
 // Venmo / PayPal / Cash App links in them. No payment API: the links open the payment app.
-import { formatAmount, formatCents, type Cents } from '@spendly/ledger';
+import { formatCents, paymentAppLinks, type Cents, type PaymentHandles } from '@spendly/ledger';
 
-import type { PaymentHandles } from './data';
 import { joinNames } from './labels';
 
 /** An expense someone owes you for: what they owe on it and the items that were theirs. */
@@ -52,14 +51,7 @@ export function paymentLink(
   amountCents: Cents,
   note: string,
 ): string | null {
-  const amount = formatAmount(amountCents);
-  if (handles.venmo) {
-    const params = `txn=pay&amount=${amount}&note=${encodeURIComponent(note)}&audience=private`;
-    return `https://venmo.com/${encodeURIComponent(handles.venmo)}?${params}`;
-  }
-  if (handles.paypal) return `https://paypal.me/${encodeURIComponent(handles.paypal)}/${amount}USD`;
-  if (handles.cashtag) return `https://cash.app/$${encodeURIComponent(handles.cashtag)}/${amount}`;
-  return null;
+  return paymentAppLinks(handles, amountCents, note)[0]?.url ?? null;
 }
 
 /** "Costco (paper towels, dish soap, trash bags)", "Costco on 10/17", "Costco and Target". */
@@ -80,7 +72,8 @@ function whatFor(expenses: readonly OwedExpense[]): string {
 
 /**
  * The text for a payment request, e.g. "Hey Jeff, you owe $15.00 for Costco (paper towels,
- * dish soap and trash bags). Pay here: https://venmo.com/...".
+ * dish soap and trash bags). See your share and pay here: https://...". The link is the private
+ * payment page, or a payment app link where there's no page.
  */
 export function requestMessage(input: {
   firstName: string;
@@ -90,5 +83,5 @@ export function requestMessage(input: {
 }): string {
   const reason = whatFor(input.expenses);
   const owe = `Hey ${input.firstName}, you owe ${formatCents(input.owedCents)}${reason ? ` for ${reason}` : ''}.`;
-  return input.link ? `${owe} Pay here: ${input.link}` : `${owe} Thanks!`;
+  return input.link ? `${owe} See your share and pay here: ${input.link}` : `${owe} Thanks!`;
 }

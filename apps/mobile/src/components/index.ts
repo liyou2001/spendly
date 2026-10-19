@@ -8,6 +8,7 @@ export { ListRow } from './ListRow';
 export { Loadable, STALE_MESSAGE } from './Loadable';
 export { Money } from './Money';
 export { MonthSummary } from './MonthSummary';
+export { PayOptions } from './PayOptions';
 export { ProgressBar } from './ProgressBar';
 export { Screen } from './Screen';
 export { Section } from './Section';

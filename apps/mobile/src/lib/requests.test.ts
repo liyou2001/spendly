@@ -69,10 +69,10 @@ describe('requestMessage', () => {
         firstName: 'Jeff',
         owedCents: 1500,
         expenses: [costco],
-        link: 'https://venmo.com/leo-k?txn=pay&amount=15.00&note=Costco%2010%2F17&audience=private',
+        link: 'https://pay.spendly.app/#abc',
       }),
     ).toBe(
-      'Hey Jeff, you owe $15.00 for Costco (paper towels, dish soap and trash bags). Pay here: https://venmo.com/leo-k?txn=pay&amount=15.00&note=Costco%2010%2F17&audience=private',
+      'Hey Jeff, you owe $15.00 for Costco (paper towels, dish soap and trash bags). See your share and pay here: https://pay.spendly.app/#abc',
     );
   });
 

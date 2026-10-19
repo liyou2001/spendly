@@ -21,6 +21,16 @@ For each question, the **How to test** line suggests something to ask or a task 
   - Home now shows the same "Owed to you / You owe" totals, plus "Needs you" (claims and invites), which overlaps with the People page.
 - **To decide before changing it:** is the page about **people** (one row per person across groups) or **groups**? Should groups move to their own place? What stays on Home versus People?
 
+### Turn on push notifications and deploy the payment page
+
+- **Status:** To do (2026-10-19)
+- **Why:** both need your accounts, so Step 8 built them but didn't switch them on.
+- **What's left:**
+  - Run `npx eas-cli@latest init` in `apps/mobile` to give the app an EAS project id. Until then it skips push registration.
+  - Deploy `apps/pay` to Vercel and the Edge Functions to hosted Supabase (README, "Payment page and Edge Functions"), then set `EXPO_PUBLIC_PAY_PAGE_URL`.
+  - Set `VITE_GET_APP_URL` once there's an App Store or TestFlight link. Until then the page hides "Get the Spendly app".
+  - Push for invites isn't built yet. Only claims and payment-page notes send pushes.
+
 ## Navigation and settings
 
 ### 1. Is Me → Profile & payments / Categories where people expect settings?
@@ -162,6 +172,29 @@ For each question, the **How to test** line suggests something to ask or a task 
 ### 19. Can people find each other by username, and do they notice invites?
 
 - **Status:** Open
-- **Now:** everyone gets a username at sign-up (from their email name), shown on the Me tab and changeable in Profile & payments. You invite someone by typing their exact username. They see a dot on the People tab and the invite at the top of People (two at most, then "See all"). There's no push notification yet (Step 8).
+- **Now:** everyone gets a username at sign-up (from their email name), shown on the Me tab and changeable in Profile & payments. You invite someone by typing their exact username. They see a dot on the People tab and the invite at the top of People (two at most, then "See all"). Invites don't send a push yet.
 - **Why it matters:** if people don't know their own username, or never notice the invite, their roommate's app stays name-only and "I paid" / "Got it" can't be used.
 - **How to test:** ask someone to add a friend who uses Spendly, and watch whether they know where to find their username. Then check how long the friend takes to notice and accept the invite without being told. Ask whether the automatic usernames (like "liyou2001") feel fine or they'd change them.
+
+## Payment page
+
+### 20. Does the payment page make sense to someone who's never heard of Spendly?
+
+- **Status:** Open
+- **Now:** the request text links to a private page: "Leo says you owe $15.00", an equal button for each app Leo takes (Venmo, PayPal, Cash App) plus where to send it by Zelle, "I paid Leo", the items behind it, and "Something looks wrong". Shared items show their full price with "Split 3 ways", and a note says your share includes tax and tip.
+- **Why it matters:** the person paying never chose Spendly. If the page looks like spam or the numbers don't add up for them, they won't pay or will ask the payer instead.
+- **How to test:** text a link to someone who's never used the app and watch them open it. Do they trust it? Do they understand why the item prices ($22.99, $11.49, $10.52) don't add up to $15.00? Do they tap "I paid Leo" after paying in Venmo, or assume Venmo told Leo already?
+
+### 21. Is auto-confirming claims useful, and is the default right?
+
+- **Status:** Open
+- **Now:** off by default. In Profile & payments you can have "I paid" claims to you confirm themselves after 3 or 7 days if you haven't answered.
+- **Why it matters:** people who forget to tap Got it leave balances wrong, but auto-confirming means trusting every claim.
+- **How to test:** ask payers how often they check Venmo before confirming, and whether they'd rather confirm each claim or have it happen on its own.
+
+### 22. Do people add Zelle, and is the warning about sharing their email or phone right?
+
+- **Status:** Open
+- **Now:** Profile & payments has a Zelle field (email or US phone). Zelle has no usernames or payment links, so the number or email is shown as is to people in your groups and on payment links, with a copy button. A warning under the field says so.
+- **Why it matters:** many students use Zelle through their bank, but some won't want their phone number on a link that can be forwarded. If the warning scares everyone off, Zelle users have no easy way to get paid.
+- **How to test:** ask Zelle users to set up their profile and watch whether they add it after reading the warning. Ask payers whether copying the address into their bank app feels like too many steps.

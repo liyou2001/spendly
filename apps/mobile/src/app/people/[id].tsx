@@ -1,5 +1,5 @@
 import { formatCents } from '@spendly/ledger';
-import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as SMS from 'expo-sms';
 import { useCallback, useState } from 'react';
@@ -13,6 +13,7 @@ import {
   ListRow,
   Loadable,
   Money,
+  PayOptions,
   Screen,
   Section,
   Tag,
@@ -24,23 +25,29 @@ import {
 import {
   cancelInvite,
   claimPayment,
+  createShareLink,
   decidePayment,
+  fetchActiveShareLinks,
   fetchBalances,
   fetchGroupOf,
   fetchHandles,
   fetchPairExpenses,
   fetchPayments,
+  fetchProblemReports,
   forgiveDebt,
   friendlyError,
   inviteToGroup,
   updatePersonPhone,
   recordPayment,
+  resolveProblem,
+  revokeShareLinks,
   type PairExpense,
   type Person,
   type Payment,
   type PaymentHandles,
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
+import { payPageUrl } from '@/lib/payPage';
 import { normalizePhone } from '@/lib/phone';
 import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/requests';
 import { useSession } from '@/lib/session';
@@ -48,12 +55,13 @@ import { useLoad } from '@/lib/useLoad';
 import { useUsernameCheck } from '@/lib/useUsernameCheck';
 import { space } from '@/theme';
 
-const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null };
+const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null, zelle: null };
 
 const METHOD_LABELS: Record<string, string> = {
   venmo: 'Venmo',
   paypal: 'PayPal',
   cashapp: 'Cash App',
+  zelle: 'Zelle',
   cash: 'cash',
   other: 'other',
 };
@@ -64,11 +72,13 @@ async function fetchPerson(participantId: string, userId: string) {
   const them = group.people.find((p) => p.id === participantId);
   if (!me || !them) throw new Error('Person not found');
 
-  const [balances, payments, expenses, handles] = await Promise.all([
+  const [balances, payments, expenses, handles, activeLinks, reports] = await Promise.all([
     fetchBalances(group.id),
     fetchPayments({ groupId: group.id }),
     fetchPairExpenses(group.id, me.id, them.id),
     fetchHandles([userId, ...(them.userId ? [them.userId] : [])]),
+    fetchActiveShareLinks(them.id),
+    fetchProblemReports(),
   ]);
   const owed = (from: string, to: string) =>
     balances.find((b) => b.from === from && b.to === to)?.amountCents ?? 0;
@@ -85,7 +95,17 @@ async function fetchPerson(participantId: string, userId: string) {
     expenses,
     myHandles: handles[userId] ?? NO_HANDLES,
     theirHandles: (them.userId && handles[them.userId]) || NO_HANDLES,
+    activeLinks,
+    reports: reports.filter((r) => r.from === them.id),
   };
+}
+
+/** A new private payment page link for this person, or null where there's no page to link to. */
+async function newPayPageLink(participantId: string): Promise<string | null> {
+  const configured = process.env.EXPO_PUBLIC_PAY_PAGE_URL;
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (!payPageUrl('', configured, hostUri)) return null;
+  return payPageUrl(await createShareLink(participantId), configured, hostUri);
 }
 
 type Form = 'none' | 'record' | 'paid' | 'forgive' | 'phone';
@@ -117,6 +137,8 @@ function PersonView({
   expenses,
   myHandles,
   theirHandles,
+  activeLinks,
+  reports,
   onChanged,
 }: Awaited<ReturnType<typeof fetchPerson>> & { onChanged: () => void }) {
   const [form, setForm] = useState<Form>('none');
@@ -139,25 +161,43 @@ function PersonView({
     }
   }
 
-  function requestText(): string {
+  /** The request, with a new private link to the payment page (or a payment app link). */
+  async function requestText(): Promise<string> {
     const behind = expensesBehind(owedToMe, netCents);
-    const link = paymentLink(myHandles, netCents, paymentNote(behind));
+    const link =
+      (await newPayPageLink(them.id)) ?? paymentLink(myHandles, netCents, paymentNote(behind));
     return requestMessage({ firstName, owedCents: netCents, expenses: behind, link });
   }
 
   /** Opens Messages to this number with the request filled in, or the share sheet without SMS. */
   async function textRequest(phone: string) {
+    let message: string;
     try {
-      if (await SMS.isAvailableAsync()) await SMS.sendSMSAsync([phone], requestText());
-      else await Share.share({ message: requestText() });
+      message = await requestText();
+    } catch (e) {
+      setError(friendlyError(e as Error));
+      return;
+    }
+    onChanged();
+    try {
+      if (await SMS.isAvailableAsync()) await SMS.sendSMSAsync([phone], message);
+      else await Share.share({ message });
     } catch {
       setError('Couldn’t open Messages. Try again.');
     }
   }
 
   async function shareRequest() {
+    let message: string;
     try {
-      await Share.share({ message: requestText() });
+      message = await requestText();
+    } catch (e) {
+      setError(friendlyError(e as Error));
+      return;
+    }
+    onChanged();
+    try {
+      await Share.share({ message });
     } catch {
       setError('Couldn’t open sharing. Try again.');
     }
@@ -169,19 +209,6 @@ function PersonView({
     if (them.phone) void textRequest(them.phone);
     else setForm('phone');
   }
-
-  async function payThem() {
-    const link = paymentLink(theirHandles, -netCents, paymentNote(expensesBehind(iOwe, -netCents)));
-    if (link) await Linking.openURL(link);
-  }
-
-  const payApp = theirHandles.venmo
-    ? 'Venmo'
-    : theirHandles.paypal
-      ? 'PayPal'
-      : theirHandles.cashtag
-        ? 'Cash App'
-        : null;
 
   return (
     <>
@@ -210,6 +237,16 @@ function PersonView({
           </Text>
         ))}
       </KeyBlock>
+
+      {reports.map((report) => (
+        <ProblemNote
+          key={report.id}
+          name={firstName}
+          message={report.message}
+          createdAt={report.createdAt}
+          onDismiss={() => act(() => resolveProblem(report.id))}
+        />
+      ))}
 
       {claimsToMe.map((claim) => (
         <ClaimToConfirm
@@ -290,10 +327,10 @@ function PersonView({
       ) : netCents > 0 ? (
         <View style={styles.actions}>
           <Button label="Request payment" onPress={requestPayment} />
-          {myHandles.venmo || myHandles.paypal || myHandles.cashtag ? null : (
+          {myHandles.venmo || myHandles.paypal || myHandles.cashtag || myHandles.zelle ? null : (
             <Text variant="small">
-              Add your Venmo, PayPal or Cash App in Me → Profile & payments to include a payment
-              link.
+              Add your Venmo, PayPal, Cash App or Zelle in Me → Profile & payments so {firstName}{' '}
+              can pay you easily.
             </Text>
           )}
           <Button
@@ -305,17 +342,86 @@ function PersonView({
         </View>
       ) : netCents < 0 ? (
         <View style={styles.actions}>
-          {payApp ? <Button label={`Pay with ${payApp}`} onPress={() => void payThem()} /> : null}
-          <Button
-            label={`I paid ${firstName}`}
-            variant={payApp ? 'secondary' : 'primary'}
-            onPress={() => setForm('paid')}
+          <PayOptions
+            name={firstName}
+            handles={theirHandles}
+            amountCents={-netCents}
+            note={paymentNote(expensesBehind(iOwe, -netCents))}
           />
+          <Button label={`I paid ${firstName}`} onPress={() => setForm('paid')} />
         </View>
+      ) : null}
+
+      {activeLinks > 0 ? (
+        <PaymentLinkStatus name={firstName} onRevoke={() => act(() => revokeShareLinks(them.id))} />
       ) : null}
 
       <History expenses={expenses} payments={payments} me={me.id} name={firstName} />
     </>
+  );
+}
+
+/** "Jeff can see their share from a private link", with a way to turn the link off. */
+function PaymentLinkStatus({ name, onRevoke }: { name: string; onRevoke: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <View style={styles.claim}>
+      <Text variant="small">
+        {name} has a private link to see their share and say they paid. Anyone with the link can see
+        it.
+      </Text>
+      {error ? <FormMessage message={error} /> : null}
+      <TextButton
+        label={busy ? 'Revoking…' : 'Revoke link'}
+        icon="slash"
+        disabled={busy}
+        onPress={() => {
+          setBusy(true);
+          setError(null);
+          void onRevoke().catch((e: Error) => {
+            setError(e.message);
+            setBusy(false);
+          });
+        }}
+      />
+    </View>
+  );
+}
+
+/** "Something looks wrong", sent from the payment page. */
+function ProblemNote({
+  name,
+  message,
+  createdAt,
+  onDismiss,
+}: {
+  name: string;
+  message: string;
+  createdAt: string;
+  onDismiss: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <View style={styles.claim}>
+      <FormMessage
+        message={`${name} says something looks wrong (${formatDate(createdAt.slice(0, 10))}): “${message}”`}
+      />
+      {error ? <FormMessage message={error} /> : null}
+      <TextButton
+        label="Dismiss"
+        icon="check"
+        disabled={busy}
+        onPress={() => {
+          setBusy(true);
+          void onDismiss().catch((e: Error) => {
+            setError(e.message);
+            setBusy(false);
+          });
+        }}
+      />
+    </View>
   );
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateProfile, validateUsername } from './profile';
+import { validateProfile, validateUsername, validateZelle } from './profile';
 
 describe('validateUsername', () => {
   it('cleans up what was typed: a leading @, spaces and capitals', () => {
@@ -38,6 +38,7 @@ describe('validateProfile', () => {
     venmo_username: '@leo-k',
     paypal_username: 'paypal.me/leok',
     cashapp_tag: '$leok',
+    zelle_contact: ' Leo@Example.com ',
   };
 
   it('cleans every field, including the username', () => {
@@ -49,6 +50,7 @@ describe('validateProfile', () => {
         venmo_username: 'leo-k',
         paypal_username: 'leok',
         cashapp_tag: 'leok',
+        zelle_contact: 'leo@example.com',
       },
     });
   });
@@ -58,5 +60,22 @@ describe('validateProfile', () => {
       ok: false,
       errors: { username: 'Choose a username.' },
     });
+  });
+});
+
+describe('validateZelle', () => {
+  it('takes an email or a US phone number, cleaned up', () => {
+    expect(validateZelle(' Leo@Example.com ')).toEqual({ ok: true, contact: 'leo@example.com' });
+    expect(validateZelle('(608) 555-0123')).toEqual({ ok: true, contact: '+16085550123' });
+    expect(validateZelle('')).toEqual({ ok: true, contact: null });
+  });
+
+  it('refuses anything else, including numbers outside the US', () => {
+    expect(validateZelle('leo@')).toEqual({
+      ok: false,
+      error: 'That doesn’t look like an email address.',
+    });
+    expect(validateZelle('+447700900123').ok).toBe(false);
+    expect(validateZelle('leo').ok).toBe(false);
   });
 });
