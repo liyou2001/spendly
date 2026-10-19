@@ -4,6 +4,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 
 import {
   Button,
+  Chip,
   FormMessage,
   KeyBlock,
   ListRow,
@@ -21,6 +22,7 @@ import {
   fetchExpense,
   fetchGroup,
   friendlyError,
+  setShareCategory,
   voidExpense,
   type Category,
   type FullExpense,
@@ -78,6 +80,7 @@ export default function ExpenseDetail() {
       categories={categories}
       onBack={back}
       stale={detail.refreshFailed}
+      onChanged={detail.reload}
     />
   );
 }
@@ -170,7 +173,7 @@ function FullView({
         <Text variant="sectionHeading">Your share</Text>
         <Money cents={myShare?.amountCents ?? 0} variant="bigNumber" />
         {myShare && myShare.amountCents > 0 ? (
-          <Text variant="body">→ {myCategory ?? 'Uncategorized'}</Text>
+          <Tag label={myCategory ?? 'Uncategorized'} tone="white" />
         ) : null}
         <View style={styles.rows}>
           {owed.map((debt) => (
@@ -268,14 +271,32 @@ function ShareView({
   categories,
   onBack,
   stale,
+  onChanged,
 }: {
   expense: ShareOfExpense;
   group: Group;
   categories: Category[];
   onBack: () => void;
   stale: boolean;
+  onChanged: () => void;
 }) {
-  const category = categories.find((c) => c.id === expense.categoryOverrideId)?.name;
+  const category = categories.find((c) => c.id === expense.categoryId)?.name;
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function file(categoryId: string | null) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setShareCategory(expense.id, categoryId);
+      onChanged();
+    } catch (e) {
+      setError(friendlyError(e as Error));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <Screen title={expense.merchant} onBack={onBack}>
       {stale ? <FormMessage message={STALE_MESSAGE} /> : null}
@@ -285,10 +306,8 @@ function ShareView({
       <KeyBlock>
         <Text variant="sectionHeading">Your share</Text>
         <Money cents={expense.amountCents} variant="bigNumber" />
-        <Text variant="body">
-          You owe {expense.payerName}
-          {category ? ` · ${category}` : ''}
-        </Text>
+        <Text variant="body">You owe {expense.payerName}</Text>
+        {category ? <Tag label={category} tone="white" /> : null}
       </KeyBlock>
       {expense.items.length > 0 ? (
         <Section title="Your items">
@@ -305,6 +324,23 @@ function ShareView({
           </View>
         </Section>
       ) : null}
+      <Section
+        title="Category for your share"
+        description="Where your share counts in your budget. Only you see this."
+      >
+        <View style={styles.wrap}>
+          {categories.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.name}
+              selected={c.id === expense.categoryId}
+              disabled={busy}
+              onPress={() => void file(c.id === expense.categoryId ? null : c.id)}
+            />
+          ))}
+        </View>
+        {error ? <FormMessage message={error} /> : null}
+      </Section>
       <View style={styles.note}>
         <Tag label="Private" />
         <Text variant="small" style={styles.flex}>
@@ -332,6 +368,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
+  },
+  wrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
   },
   note: {
     flexDirection: 'row',

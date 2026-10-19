@@ -49,6 +49,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="settings/categories" />
           <Stack.Screen name="people/[id]" />
           <Stack.Screen name="invites" />
+          <Stack.Screen name="activity" />
         </Stack.Protected>
         <Stack.Protected guard={session === null}>
           <Stack.Screen name="sign-in" />

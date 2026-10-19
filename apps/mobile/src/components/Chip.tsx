@@ -17,6 +17,7 @@ interface ChipProps {
   trailingIcon?: ComponentProps<typeof Feather>['name'];
   /** For chips that open and close something: announced as expanded or collapsed. */
   expanded?: boolean;
+  disabled?: boolean;
   /** Read out instead of the label, e.g. "Who it's for: All. Tap to change." */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -31,6 +32,7 @@ export function Chip({
   icon,
   trailingIcon,
   expanded,
+  disabled = false,
   accessibilityLabel,
   accessibilityHint,
 }: ChipProps) {
@@ -38,8 +40,11 @@ export function Chip({
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={expanded === undefined ? { selected } : { selected, expanded }}
+      accessibilityState={
+        expanded === undefined ? { selected, disabled } : { selected, expanded, disabled }
+      }
       accessibilityLabel={accessibilityLabel ?? label}
       {...(accessibilityHint ? { accessibilityHint } : {})}
       // Chips are drawn smaller than 44pt; the hit area still meets it.
@@ -47,7 +52,7 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         tone === 'you' ? styles.you : filled ? styles.selected : styles.neutral,
-        pressed && styles.pressed,
+        (pressed || disabled) && styles.pressed,
       ]}
     >
       {icon ? (

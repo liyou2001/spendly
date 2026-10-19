@@ -4,6 +4,7 @@
 import type { Cents, Debt } from '@spendly/ledger';
 import type { PostgrestError } from '@supabase/supabase-js';
 
+import type { BudgetRow, SpendingItem } from './budget';
 import type { KnownPerson } from './oneOff';
 import { profileColumns, toForm, type ProfileFields, type ProfileForm } from './profile';
 import type { SaveItem } from './split';
@@ -440,7 +441,8 @@ export interface ShareOfExpense {
   merchant: string;
   expenseDate: string;
   amountCents: Cents;
-  categoryOverrideId: string | null;
+  /** Your category for your share: how you filed it, else the one set when it was saved. */
+  categoryId: string | null;
   items: { name: string; amountCents: Cents; splitCount: number }[];
 }
 
@@ -516,7 +518,7 @@ export async function fetchExpense(
     merchant: mine.merchant,
     expenseDate: mine.expense_date,
     amountCents: mine.amount_cents,
-    categoryOverrideId: mine.category_override_id,
+    categoryId: mine.category_id,
     items: items.map((raw) => {
       const item = raw as { name: string; amount_cents: number; split_count: number };
       return { name: item.name, amountCents: item.amount_cents, splitCount: item.split_count };
@@ -542,7 +544,9 @@ export interface Payment {
 }
 
 /** Payments you're part of, newest first. Row-level security limits them to yours. */
-export async function fetchPayments(options: { groupId?: string } = {}): Promise<Payment[]> {
+export async function fetchPayments(
+  options: { groupId?: string; status?: Payment['status'] } = {},
+): Promise<Payment[]> {
   let query = supabase
     .from('payments')
     .select(
@@ -551,6 +555,7 @@ export async function fetchPayments(options: { groupId?: string } = {}): Promise
     .order('created_at', { ascending: false })
     .limit(200);
   if (options.groupId) query = query.eq('group_id', options.groupId);
+  if (options.status) query = query.eq('status', options.status);
   return unwrap(await query).map((row) => ({
     id: row.id,
     groupId: row.group_id,
@@ -794,4 +799,63 @@ export async function fetchMyInvites(): Promise<Invite[]> {
     addedAs: row.added_as,
     createdAt: row.created_at,
   }));
+}
+
+// Budgets ----------------------------------------------------------------------
+
+/** Your budget rows; each applies from its month on, until the next row for that category. */
+export async function fetchBudgets(userId: string): Promise<BudgetRow[]> {
+  return unwrap(
+    await supabase
+      .from('budgets')
+      .select('category_id, month, amount_cents')
+      .eq('user_id', userId)
+      .order('month'),
+  ).map((row) => ({
+    categoryId: row.category_id,
+    month: row.month,
+    amountCents: row.amount_cents,
+  }));
+}
+
+/** Sets your budget for a category from this month on; null removes it from this month on. */
+export async function setBudget(
+  categoryId: string,
+  month: string,
+  amountCents: Cents | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_budget', {
+    p_category_id: categoryId,
+    p_month: month,
+    ...(amountCents === null ? {} : { p_amount_cents: amountCents }),
+  });
+  if (error) throw error;
+}
+
+/** What counts as your spending in a month: your shares and debts you forgave. */
+export async function fetchSpendingItems(month: string): Promise<SpendingItem[]> {
+  return unwrap(await supabase.rpc('my_spending_items', { p_month: month })).map((row) => ({
+    itemId: row.item_id,
+    expenseId: row.expense_id,
+    merchant: row.merchant,
+    expenseDate: row.expense_date,
+    categoryId: row.category_id,
+    amountCents: row.amount_cents,
+    totalCents: row.total_cents,
+    paidByName: row.paid_by_name,
+    youPaid: row.you_paid,
+    isForgiveness: row.is_forgiveness,
+  }));
+}
+
+/** Files your share of someone else's expense under one of your categories (null clears it). */
+export async function setShareCategory(
+  expenseId: string,
+  categoryId: string | null,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_share_category', {
+    p_expense_id: expenseId,
+    ...(categoryId ? { p_category_id: categoryId } : {}),
+  });
+  if (error) throw error;
 }

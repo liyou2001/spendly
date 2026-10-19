@@ -309,7 +309,7 @@ Splitting rules:
 
 **Build:**
 
-- Set a monthly budget for each category. Categories themselves are added, renamed and deleted in Me → Categories (built after Step 5).
+- Set a monthly budget for each category. Categories themselves are added, renamed and deleted in Me → Categories (built after Step 5). Budgets carry forward from the month they're set until changed. Your share of someone else's expense can be filed under one of your categories from its expense screen.
 - The Budget screen, matching the design:
   - A month switcher.
   - A key block: spent so far, the budget, a progress bar, and what's left with days to go.

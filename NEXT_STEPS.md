@@ -8,6 +8,19 @@ For each question, the **How to test** line suggests something to ask or a task 
 
 ---
 
+## To do
+
+### Reorganize the People page
+
+- **Status:** To do (2026-10-19)
+- **Why:** it has grown piece by piece and is now messy and logically inconsistent.
+- **What's inconsistent now:**
+  - It's called People, but its sections are organized by group. The same person appears once per group, and their balances are never combined across groups.
+  - Group management also lives here: the Groups list, the collapsed Quick splits row, and the + for a new group. So it's half people, half groups.
+  - The order is mixed: invites, then the totals block, then one section per group, then Recently settled, then Groups. Things needing action, the overview and history are interleaved.
+  - Home now shows the same "Owed to you / You owe" totals, plus "Needs you" (claims and invites), which overlaps with the People page.
+- **To decide before changing it:** is the page about **people** (one row per person across groups) or **groups**? Should groups move to their own place? What stays on Home versus People?
+
 ## Navigation and settings
 
 ### 1. Is Me → Profile & payments / Categories where people expect settings?

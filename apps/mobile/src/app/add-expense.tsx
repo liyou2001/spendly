@@ -1000,9 +1000,13 @@ function Summary({
         variant="bigNumber"
         accessibilityLabel={`Your share ${formatCents(myShare)}`}
       />
-      <Text variant="body">
-        {myShare > 0 ? `→ ${categoryName ?? 'pick a category'}` : 'Nothing for you'}
-      </Text>
+      {myShare === 0 ? (
+        <Text variant="body">Nothing for you</Text>
+      ) : categoryName ? (
+        <Tag label={categoryName} tone="white" />
+      ) : (
+        <Text variant="small">Pick a category below</Text>
+      )}
       <View style={styles.summaryRows}>
         {owed.map((debt) => (
           <View key={debt.from} style={styles.summaryRow}>

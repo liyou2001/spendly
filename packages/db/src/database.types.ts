@@ -5,20 +5,20 @@ export type Database = {
     Tables: {
       budgets: {
         Row: {
-          amount_cents: number;
+          amount_cents: number | null;
           category_id: string;
           month: string;
           user_id: string;
         };
         ComputedFields: never;
         Insert: {
-          amount_cents: number;
+          amount_cents?: number | null;
           category_id: string;
           month: string;
           user_id?: string;
         };
         Update: {
-          amount_cents?: number;
+          amount_cents?: number | null;
           category_id?: string;
           month?: string;
           user_id?: string;
@@ -530,6 +530,40 @@ export type Database = {
         };
         Relationships: [];
       };
+      share_categories: {
+        Row: {
+          category_id: string;
+          expense_id: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          category_id: string;
+          expense_id: string;
+          user_id?: string;
+        };
+        Update: {
+          category_id?: string;
+          expense_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'share_categories_category_id_user_id_fkey';
+            columns: ['category_id', 'user_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id', 'user_id'];
+          },
+          {
+            foreignKeyName: 'share_categories_expense_id_fkey';
+            columns: ['expense_id'];
+            isOneToOne: false;
+            referencedRelation: 'expenses';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       share_links: {
         Row: {
           created_at: string;
@@ -714,7 +748,7 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: {
           amount_cents: number;
-          category_override_id: string;
+          category_id: string;
           expense_date: string;
           expense_id: string;
           group_id: string;
@@ -746,6 +780,22 @@ export type Database = {
           month: string;
         }[];
       };
+      my_spending_items: {
+        Args: { p_month: string };
+        Returns: {
+          amount_cents: number;
+          category_id: string;
+          expense_date: string;
+          expense_id: string;
+          group_id: string;
+          is_forgiveness: boolean;
+          item_id: string;
+          merchant: string;
+          paid_by_name: string;
+          total_cents: number;
+          you_paid: boolean;
+        }[];
+      };
       record_payment: {
         Args: {
           p_amount_cents: number;
@@ -771,6 +821,14 @@ export type Database = {
           p_total_cents: number;
         };
         Returns: string;
+      };
+      set_budget: {
+        Args: { p_amount_cents?: number; p_category_id: string; p_month: string };
+        Returns: undefined;
+      };
+      set_share_category: {
+        Args: { p_category_id?: string; p_expense_id: string };
+        Returns: undefined;
       };
       username_available: { Args: { p_username: string }; Returns: boolean };
       void_expense: { Args: { p_expense_id: string }; Returns: undefined };

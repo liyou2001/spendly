@@ -117,6 +117,7 @@ erDiagram
     categories ||--o{ budgets : "limit per month"
     categories |o--o{ expenses : "payer's category"
     categories |o--o{ shares : "category_override_id"
+    categories |o--o{ share_categories : "your filing"
 
     categories {
         uuid id PK
@@ -127,7 +128,12 @@ erDiagram
         uuid user_id PK
         uuid category_id PK "must be the same user's"
         date month PK "first day of the month"
-        bigint amount_cents ">= 0"
+        bigint amount_cents ">= 0; null = no budget from this month on"
+    }
+    share_categories {
+        uuid user_id PK
+        uuid expense_id PK
+        uuid category_id FK "how you file your share of someone else's expense; follows edits"
     }
     expenses {
         uuid id PK
@@ -239,16 +245,16 @@ flowchart LR
 
 Nothing is readable without signing in. Signed-in users see:
 
-| Data                                                   | Who                                                                                                      |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| Full expense, its items, assignments and shares        | The payer and whoever entered it                                                                         |
-| Your part of an expense someone else paid              | You, only through `get_my_shares()`: your items and your amount, never the total or other people's items |
-| Groups and their participants                          | Members of the group                                                                                     |
-| Profiles                                               | You, and people who share a group with you                                                               |
-| Payments                                               | The two people involved, and whoever recorded it                                                         |
-| Invites                                                | The person who sent it, the person invited, and members of that group                                    |
-| Categories, budgets, push tokens                       | Their owner                                                                                              |
-| Payment links, text consents, messages, inbound emails | Edge Functions only                                                                                      |
+| Data                                                   | Who                                                                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Full expense, its items, assignments and shares        | The payer and whoever entered it                                                                                                        |
+| Your part of an expense someone else paid              | You, only through `get_my_shares()` and `my_spending_items()`: your items, amount and category, never the total or other people's items |
+| Groups and their participants                          | Members of the group                                                                                                                    |
+| Profiles                                               | You, and people who share a group with you                                                                                              |
+| Payments                                               | The two people involved, and whoever recorded it                                                                                        |
+| Invites                                                | The person who sent it, the person invited, and members of that group                                                                   |
+| Categories, budgets, share filings, push tokens        | Their owner                                                                                                                             |
+| Payment links, text consents, messages, inbound emails | Edge Functions only                                                                                                                     |
 
 People without accounts see their share only through the `get-share` Edge Function (Step 8), with a private link.
 
@@ -263,6 +269,9 @@ People without accounts see their share only through the `get-share` Edge Functi
 | `claim_payment(...)`                             | "I paid" to someone with the app. Doesn't count until they confirm it.                                                                                           |
 | `decide_payment(id, accept)`                     | "Got it" or "Didn't get it" on a claim made to you.                                                                                                              |
 | `forgive_debt(group, debtor, amount)`            | Forgives up to what someone owes you, spread over the expenses behind it, newest first.                                                                          |
+| `set_budget(category, month, amount)`            | Sets your budget for a category from a month on (budgets carry forward); no amount removes it from that month on.                                                |
+| `set_share_category(expense, category)`          | Files your share of someone else's expense under one of your categories, for your budget only.                                                                   |
+| `my_spending_items(month)`                       | Your spending items for a month: your shares and debts you forgave, with the total only for expenses you paid or entered.                                        |
 | `find_user(username)`                            | The account with exactly that username, or nothing. No partial search, so nobody can browse users.                                                               |
 | `username_available(username)`                   | Whether a username is free for you.                                                                                                                              |
 | `add_person(group, name, phone, invite_user_id)` | Adds a person to a group, and invites an account to be them if given.                                                                                            |
@@ -271,6 +280,6 @@ People without accounts see their share only through the `get-share` Edge Functi
 | `cancel_invite(invite)`, `my_invites()`          | Cancel an invite you sent; list the ones waiting for you.                                                                                                        |
 | `balances()`                                     | Net who-owes-whom for every pair that includes you.                                                                                                              |
 | `my_spending()`                                  | Your spending by month and category.                                                                                                                             |
-| `get_my_shares()`                                | Your items and amount on expenses other people paid.                                                                                                             |
+| `get_my_shares()`                                | Your items, amount and category (how you filed it) on expenses other people paid.                                                                                |
 | Signup trigger                                   | Creates your profile, Personal group and default categories.                                                                                                     |
 | Name sync trigger                                | Renaming yourself updates your name in every group you're in.                                                                                                    |
