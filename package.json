@@ -15,6 +15,7 @@
   "scripts": {
     "mobile": "npm run start --workspace mobile --",
     "mobile:prod": "npm run start:prod --workspace mobile --",
+    "web:deploy": "npm run deploy:web:prod --workspace mobile",
     "pay": "npm run dev --workspace pay",
     "pay:prod": "npm run dev:prod --workspace pay",
     "test": "npm run test --workspaces --if-present",

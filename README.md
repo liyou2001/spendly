@@ -286,17 +286,48 @@ One-time setup:
 
    The project ref is the ID in the dashboard URL (`https://supabase.com/dashboard/project/<project-ref>`).
 
-For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.html` into the dashboard's **Authentication → Emails** templates (the hosted defaults send only a link, and the app needs the `{{ .Token }}` code). The built-in email sender only delivers to members of your Supabase organization, a few emails an hour. To send codes to anyone, set up custom SMTP under **Authentication → Emails → SMTP Settings** with the same values as [Sign-in codes to real inboxes](#sign-in-codes-to-real-inboxes).
+For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.html` into the dashboard's **Authentication → Emails** templates (the hosted defaults send only a link, and the app needs the `{{ .Token }}` code). Then set **Authentication → Sign In / Providers → Email → Email OTP Length** to `6`: new hosted projects send 8-digit codes, and the app takes 6. The built-in email sender only delivers to members of your Supabase organization, a few emails an hour. To send codes to anyone, set up custom SMTP under **Authentication → Emails → SMTP Settings** with the same values as [Sign-in codes to real inboxes](#sign-in-codes-to-real-inboxes).
+
+### Web demo link
+
+To let friends try the app without the App Store, publish the web version on Vercel. It talks to the hosted project (`apps/mobile/.env.prod`):
+
+```sh
+npm run web:deploy
+```
+
+This builds the site into `apps/mobile/dist` and uploads it. The first time, the Vercel CLI asks you to log in and name the project; it prints the link (`https://<name>.vercel.app`). Run it again after changes to publish a new version. To check the build on your computer first: `npm run build:web:prod --workspace mobile`, then `npx expo serve` from `apps/mobile`.
+
+- Friends sign in with their own email, so codes must reach any inbox: the hosted project needs SMTP from a verified domain (see above).
+- Push notifications and texting from the phone don't work on the web.
+- Payment links need the payment page deployed too ([Deploying the page to Vercel](#deploying-the-page-to-vercel)) and its URL in `EXPO_PUBLIC_PAY_PAGE_URL` in `.env.prod`. Without it, the app doesn't offer links.
 
 ### Switching between local and hosted
 
-Each target has its own git-ignored env file, and a script that loads it:
+Dev runs against local Supabase, prod against the hosted project. Each has its own git-ignored env file and a script that loads it:
 
-|                           | Local Supabase                 | Hosted project                      |
+|                           | Dev (local Supabase)           | Prod (hosted project)               |
 | ------------------------- | ------------------------------ | ----------------------------------- |
 | App (`apps/mobile`)       | `.env.dev` → `npm run mobile`  | `.env.prod` → `npm run mobile:prod` |
 | Payment page (`apps/pay`) | no file needed → `npm run pay` | `.env.prod` → `npm run pay:prod`    |
 
-`apps/mobile/.env.prod` has the hosted URL and its publishable key (**Project Settings → API Keys**, starts with `sb_publishable_`; not the local key from `npm run db:status`, which the hosted project rejects with "Invalid API key"). `apps/pay/.env.prod` has `VITE_SUPABASE_URL`. Stop the dev server and start it with the other script to switch; values are read when it starts. Pass Expo options after `--`, e.g. `npm run mobile:prod -- --web`.
+To switch, stop the dev server (Ctrl+C) and start it again with the other script, from the repo root:
+
+| Where           | Dev                       | Prod                           |
+| --------------- | ------------------------- | ------------------------------ |
+| Phone (Expo Go) | `npm run mobile`          | `npm run mobile:prod`          |
+| Web browser     | `npm run mobile -- --web` | `npm run mobile:prod -- --web` |
+
+For dev, start local Supabase first (`npm run db:start`) if it isn't running.
+
+The web version opens at http://localhost:8081. You can also press `w` in a running dev server. Other Expo options go after `--` the same way, e.g. `npm run mobile -- --tunnel`.
+
+- **Restart the dev server to switch.** The values are read when it starts, so reloading the page or the app isn't enough.
+- **You'll be signed out when you switch.** Local and hosted have separate accounts, so you sign in again on each.
+- **Codes go to different places.** In dev they land in Mailpit at http://127.0.0.1:54324. In prod they go to real inboxes through the SMTP settings in the Supabase dashboard.
+- **Payment links:** if you're testing them, run the matching page too: `npm run pay` with dev, `npm run pay:prod` with prod.
+- **Don't use plain `npx expo start`.** It loads neither file, and the app stops with "Missing the Supabase URL".
+
+`apps/mobile/.env.prod` has the hosted URL and its publishable key (**Project Settings → API Keys**, starts with `sb_publishable_`). Don't use the local key from `npm run db:status`; the hosted project rejects it with "Invalid API key". `apps/pay/.env.prod` has `VITE_SUPABASE_URL`.
 
 Later steps push migrations with `npx supabase db push` and set Edge Function secrets with `npx supabase secrets set --env-file supabase/functions/.env`.
