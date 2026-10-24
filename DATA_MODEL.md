@@ -261,6 +261,24 @@ erDiagram
     }
 ```
 
+## Feedback
+
+What people send from Me → Send feedback. Anyone signed in can send it (always as themselves), but nobody can read, change or delete it through the app, not even their own. You read it in the Supabase dashboard's Table Editor.
+
+```mermaid
+erDiagram
+    users ||--o{ feedback : "sends"
+
+    feedback {
+        uuid id PK
+        uuid user_id FK "always the sender"
+        text message "1-2000 characters"
+        text app_version "e.g. 1.0.0"
+        text platform "ios | android | web"
+        timestamptz created_at
+    }
+```
+
 ## How money flows
 
 Using the plan's Costco example: Leo pays $140.00, the household items are split three ways, and Maya's food is hers alone.
@@ -304,6 +322,7 @@ Nothing is readable without signing in. Signed-in users see:
 | Invites                                                | The person who sent it, the person invited, and members of that group                                                                                                                                                                                                                                    |
 | Categories, budgets, share filings, push tokens        | Their owner                                                                                                                                                                                                                                                                                              |
 | Problem reports ("Something looks wrong")              | The person they were sent to                                                                                                                                                                                                                                                                             |
+| Feedback                                               | Nobody through the app; the Supabase dashboard only                                                                                                                                                                                                                                                      |
 | Payment links, text consents, messages, inbound emails | Edge Functions only                                                                                                                                                                                                                                                                                      |
 
 People without accounts see the bills behind what they owe only through the `get-share` Edge Function, with a private link. The Edge Functions use the service role but only call the `link_*` functions below, which take the hash of the link's token. `link_share` returns, for the requester's expenses behind what's owed now (newest first, until they cover it), each bill in full: every item with who it was for, tax, tip and discounts, the total and everyone's shares. People in it are labelled `p001`, `p002`… in the same order as their ids (so the page's breakdown rounds exactly like the saved shares), never by their real ids. It also returns what's owed and the requester's payment usernames. People outside the group see nothing.

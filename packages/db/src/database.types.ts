@@ -175,6 +175,34 @@ export type Database = {
           },
         ];
       };
+      feedback: {
+        Row: {
+          app_version: string | null;
+          created_at: string;
+          id: string;
+          message: string;
+          platform: string | null;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          app_version?: string | null;
+          created_at?: string;
+          id?: string;
+          message: string;
+          platform?: string | null;
+          user_id?: string;
+        };
+        Update: {
+          app_version?: string | null;
+          created_at?: string;
+          id?: string;
+          message?: string;
+          platform?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       forwarding_codes: {
         Row: {
           code: string;

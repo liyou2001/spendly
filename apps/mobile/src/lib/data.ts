@@ -3,6 +3,8 @@
 // transparent, so every expense in your groups in full, except other people's categories.
 import type { Cents, Debt } from '@spendly/ledger';
 import type { PostgrestError } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 import type { BudgetRow, SpendingItem } from './budget';
 import type { BillLine } from './breakdown';
@@ -1052,5 +1054,15 @@ export async function fetchForwardingCodes(): Promise<{ id: string; code: string
 
 export async function dismissForwardingCode(id: string): Promise<void> {
   const { error } = await supabase.rpc('dismiss_forwarding_code', { p_id: id });
+  if (error) throw error;
+}
+
+/** Sends feedback as you, with the app version and platform. Nobody can read it back in the app. */
+export async function sendFeedback(message: string): Promise<void> {
+  const { error } = await supabase.from('feedback').insert({
+    message: message.trim(),
+    app_version: Constants.expoConfig?.version ?? null,
+    platform: Platform.OS,
+  });
   if (error) throw error;
 }

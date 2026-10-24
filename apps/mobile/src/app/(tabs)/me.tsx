@@ -83,6 +83,15 @@ export default function Me() {
         </View>
       </Section>
 
+      <Section title="Help">
+        <ListRow
+          title="Send feedback"
+          subtitle="Tell us what’s confusing or broken"
+          onPress={() => router.push('/settings/feedback')}
+          divider={false}
+        />
+      </Section>
+
       <Button
         label="Sign out"
         variant="secondary"
