@@ -39,6 +39,8 @@ async function run(
     pushes: [] as string[],
     replies: 0,
     codes: [] as string[],
+    limits: [] as number[],
+    reads: 0,
   };
   const deps: InboundDeps = {
     update: (fields) => {
@@ -62,6 +64,10 @@ async function run(
       log.pushes.push(message.url);
       return Promise.resolve();
     },
+    limitReached: (_user, limit) => {
+      log.limits.push(limit);
+      return Promise.resolve();
+    },
     replyToUnknownSender: () => {
       log.replies++;
       return Promise.resolve();
@@ -69,9 +75,12 @@ async function run(
     reader: {
       provider: 'gemini',
       models: ['first', 'retry'],
-      ask: () => Promise.resolve(overrides.reply ?? amazonOrder),
+      ask: () => {
+        log.reads++;
+        return Promise.resolve(overrides.reply ?? amazonOrder);
+      },
     },
-    monthlyLimit: 50,
+    monthlyLimit: 40,
     receiptsAddress: 'receipts@in.spendly.app',
     ...overrides,
   };
@@ -112,13 +121,22 @@ Deno.test('a stranger gets a reply; a forged From gets nothing', async () => {
   assertEquals([forged.status, forged.replies, forged.drafts], ['unknown_sender', 0, 0]);
 });
 
+Deno.test('at the monthly limit, nothing is read and Leo is told', async () => {
+  const result = await run(fromLeo, { scansThisMonth: () => Promise.resolve(40) });
+  assertEquals(
+    [result.updates.at(-1), result.limits, result.reads, result.drafts],
+    [{ status: 'failed', error: 'Monthly limit reached' }, [40], 0, 0],
+  );
+  assertEquals((await run(fromLeo, { scansThisMonth: () => Promise.resolve(39) })).limits, []);
+});
+
 Deno.test('duplicates, the monthly limit and unreadable emails make no draft', async () => {
   assertEquals(
     (await run(fromLeo, { isDuplicate: () => Promise.resolve(true) })).status,
     'duplicate',
   );
   assertEquals(
-    (await run(fromLeo, { scansThisMonth: () => Promise.resolve(50) })).status,
+    (await run(fromLeo, { scansThisMonth: () => Promise.resolve(40) })).status,
     'failed',
   );
   const blurry = await run(fromLeo, { reply: { readable: false, problem: 'not a receipt' } });

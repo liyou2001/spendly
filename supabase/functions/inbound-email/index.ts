@@ -5,7 +5,7 @@
 // who sent it and what became of it (inbound_emails).
 import { adminClient, withinLimit, type AdminClient } from '../_shared/admin.ts';
 import { isLocalStack, sendEmail } from '../_shared/email.ts';
-import { fail, json } from '../_shared/http.ts';
+import { fail, json, sameSecret } from '../_shared/http.ts';
 import { domainOf, isAutomated, type AuthPass, type InboundEmail } from '../_shared/inbound.ts';
 import { verifiedAuth } from '../_shared/mailauth.ts';
 import { parseRawEmail } from '../_shared/mime.ts';
@@ -17,15 +17,6 @@ import { processEmail, type InboundDeps } from './process.ts';
 
 /** Cloudflare's limit for an email. */
 const MAX_BYTES = 25 * 1024 * 1024;
-
-/** Compares without stopping at the first difference. */
-function sameSecret(given: string, secret: string): boolean {
-  let diff = given.length ^ secret.length;
-  for (let i = 0; i < Math.max(given.length, secret.length); i++) {
-    diff |= (given.charCodeAt(i) || 0) ^ (secret.charCodeAt(i) || 0);
-  }
-  return diff === 0;
-}
 
 /**
  * Locally only (npm run email:test): X-Test-Sender stands in for the SPF pass Cloudflare would
@@ -147,6 +138,15 @@ function liveDeps(admin: AdminClient, inboundId: string): InboundDeps {
       return data.id;
     },
     push: (userId, message) => pushToUser(admin, userId, message),
+    limitReached: async (userId, limit) => {
+      const month = new Date().toISOString().slice(0, 7);
+      if (!(await withinLimit(admin, `scan-limit:${userId}:${month}`, 1, 32 * 86400))) return;
+      await pushToUser(admin, userId, {
+        title: `You’ve used all ${limit} receipt scans this month`,
+        body: 'Forwarded receipts are read again from the 1st. You can still add this one by hand.',
+        url: '/add-expense',
+      });
+    },
     replyToUnknownSender: (email) => replyToUnknownSender(admin, email),
     reader: receiptReader(),
     monthlyLimit: monthlyScanLimit(Deno.env.get('RECEIPT_SCANS_PER_MONTH')),

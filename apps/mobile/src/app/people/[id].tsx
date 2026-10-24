@@ -1,5 +1,4 @@
 import { formatCents } from '@spendly/ledger';
-import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as SMS from 'expo-sms';
 import { useCallback, useState } from 'react';
@@ -49,6 +48,7 @@ import {
 } from '@/lib/data';
 import { explainShare } from '@/lib/breakdown';
 import { formatDate } from '@/lib/dates';
+import { devServerHostUri } from '@/lib/devServer';
 import { payPageUrl } from '@/lib/payPage';
 import { normalizePhone } from '@/lib/phone';
 import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/requests';
@@ -105,7 +105,7 @@ async function fetchPerson(participantId: string, userId: string) {
 /** A new private payment page link for this person, or null where there's no page to link to. */
 async function newPayPageLink(participantId: string): Promise<string | null> {
   const configured = process.env.EXPO_PUBLIC_PAY_PAGE_URL;
-  const hostUri = Constants.expoConfig?.hostUri;
+  const hostUri = devServerHostUri();
   if (!payPageUrl('', configured, hostUri)) return null;
   return payPageUrl(await createShareLink(participantId), configured, hostUri);
 }

@@ -541,6 +541,7 @@ export type Database = {
           display_name: string;
           id: string;
           paypal_username: string | null;
+          time_zone: string | null;
           username: string;
           venmo_username: string | null;
           zelle_contact: string | null;
@@ -553,6 +554,7 @@ export type Database = {
           display_name: string;
           id: string;
           paypal_username?: string | null;
+          time_zone?: string | null;
           username: string;
           venmo_username?: string | null;
           zelle_contact?: string | null;
@@ -564,6 +566,7 @@ export type Database = {
           display_name?: string;
           id?: string;
           paypal_username?: string | null;
+          time_zone?: string | null;
           username?: string;
           venmo_username?: string | null;
           zelle_contact?: string | null;
@@ -670,6 +673,69 @@ export type Database = {
           user_id?: string;
         };
         Relationships: [];
+      };
+      reminders: {
+        Row: {
+          amount_cents: number;
+          channel: string;
+          created_at: string;
+          creditor_id: string;
+          debtor_id: string;
+          group_id: string;
+          id: string;
+          outbound_message_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          amount_cents: number;
+          channel: string;
+          created_at?: string;
+          creditor_id: string;
+          debtor_id: string;
+          group_id: string;
+          id?: string;
+          outbound_message_id?: string | null;
+        };
+        Update: {
+          amount_cents?: number;
+          channel?: string;
+          created_at?: string;
+          creditor_id?: string;
+          debtor_id?: string;
+          group_id?: string;
+          id?: string;
+          outbound_message_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'reminders_creditor_id_group_id_fkey';
+            columns: ['creditor_id', 'group_id'];
+            isOneToOne: false;
+            referencedRelation: 'participants';
+            referencedColumns: ['id', 'group_id'];
+          },
+          {
+            foreignKeyName: 'reminders_debtor_id_group_id_fkey';
+            columns: ['debtor_id', 'group_id'];
+            isOneToOne: false;
+            referencedRelation: 'participants';
+            referencedColumns: ['id', 'group_id'];
+          },
+          {
+            foreignKeyName: 'reminders_group_id_fkey';
+            columns: ['group_id'];
+            isOneToOne: false;
+            referencedRelation: 'groups';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'reminders_outbound_message_id_fkey';
+            columns: ['outbound_message_id'];
+            isOneToOne: false;
+            referencedRelation: 'outbound_messages';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       share_categories: {
         Row: {
@@ -891,6 +957,24 @@ export type Database = {
       create_share_link: { Args: { p_participant_id: string }; Returns: string };
       decide_payment: { Args: { p_accept: boolean; p_payment_id: string }; Returns: undefined };
       dismiss_forwarding_code: { Args: { p_id: string }; Returns: undefined };
+      due_reminders: {
+        Args: { p_now?: string };
+        Returns: {
+          amount_cents: number;
+          channel: string;
+          creditor_id: string;
+          creditor_name: string;
+          creditor_user_id: string;
+          debtor_id: string;
+          debtor_name: string;
+          debtor_user_id: string;
+          group_id: string;
+          group_name: string;
+          oldest_unpaid_at: string;
+          phone: string;
+          time_zone: string;
+        }[];
+      };
       email_code_create: { Args: { p_email: string; p_user_id: string }; Returns: string };
       find_user: {
         Args: { p_username: string };
@@ -1016,6 +1100,7 @@ export type Database = {
         Args: { p_category_id?: string; p_expense_id: string };
         Returns: undefined;
       };
+      set_time_zone: { Args: { p_time_zone: string }; Returns: undefined };
       username_available: { Args: { p_username: string }; Returns: boolean };
       verify_email: { Args: { p_code: string; p_email: string }; Returns: undefined };
       void_expense: { Args: { p_expense_id: string }; Returns: undefined };

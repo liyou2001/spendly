@@ -1,9 +1,9 @@
 import type { Database } from '@spendly/db';
 import { createClient } from '@supabase/supabase-js';
-import Constants from 'expo-constants';
 import { AppState, Platform } from 'react-native';
 
 import { localSupabaseUrl } from './devHost';
+import { devServerHostUri } from './devServer';
 import { secureSessionStorage } from './secureSessionStorage';
 
 /** Local Supabase's API port (supabase/config.toml, [api] port). */
@@ -11,13 +11,13 @@ const LOCAL_SUPABASE_PORT = 54321;
 
 /**
  * The Supabase URL: EXPO_PUBLIC_SUPABASE_URL if it's set (hosted projects). Left blank, the app
- * uses local Supabase on the computer running the dev server, at the same address the phone
- * used to load the app, so it keeps working when that computer's Wi-Fi address changes.
+ * uses local Supabase on the computer running the dev server, at the same address the phone or
+ * browser used to load the app, so it keeps working when that computer's Wi-Fi address changes.
  */
 function supabaseUrl(): string | undefined {
   const configured = process.env.EXPO_PUBLIC_SUPABASE_URL;
   if (configured) return configured;
-  return localSupabaseUrl(Constants.expoConfig?.hostUri, LOCAL_SUPABASE_PORT);
+  return localSupabaseUrl(devServerHostUri(), LOCAL_SUPABASE_PORT);
 }
 
 // EXPO_PUBLIC_* values are inlined into the bundle at build time, so they must be read with
@@ -29,7 +29,8 @@ const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !publishableKey) {
   throw new Error(
     'Missing the Supabase URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. ' +
-      'Copy .env.example to apps/mobile/.env, fill them in (see the README), then restart `npm run mobile`. ' +
+      'Start with `npm run mobile` (apps/mobile/.env.dev) or `npm run mobile:prod` (apps/mobile/.env.prod), ' +
+      'not plain `expo start`. Copy .env.example to those files and fill them in (see the README). ' +
       'With --tunnel, local Supabase isn’t reachable: set EXPO_PUBLIC_SUPABASE_URL to a hosted project.',
   );
 }

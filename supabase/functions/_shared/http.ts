@@ -46,6 +46,15 @@ export function isToken(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{32}$/.test(value);
 }
 
+/** Whether a secret someone sent matches ours, compared without stopping at the first difference. */
+export function sameSecret(given: string, secret: string): boolean {
+  let diff = given.length ^ secret.length;
+  for (let i = 0; i < Math.max(given.length, secret.length); i++) {
+    diff |= (given.charCodeAt(i) || 0) ^ (secret.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 /** The SHA-256 of a token, in hex: what share_links stores. */
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));

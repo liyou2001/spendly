@@ -32,15 +32,15 @@ The Supabase CLI is installed as a dev dependency, so there's nothing to install
 ```sh
 nvm use
 npm install
-cp .env.example apps/mobile/.env          # then delete the lines that aren't for the app
+cp .env.example apps/mobile/.env.dev      # then delete the lines that aren't for the app
 cp .env.example supabase/functions/.env   # then delete the lines that aren't for functions
 ```
 
-`.env.example` lists every variable, grouped by where it goes and which step first needs it. Real `.env` files are git-ignored. The app needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (see [Sign in on your phone](#sign-in-on-your-phone)); the rest can stay blank until their step.
+`.env.example` lists every variable, grouped by where it goes and which step first needs it. Real `.env` files are git-ignored. The app reads `apps/mobile/.env.dev` for local Supabase (`npm run mobile`) and `apps/mobile/.env.prod` for the hosted project (`npm run mobile:prod`; see [Switching between local and hosted](#switching-between-local-and-hosted)). It needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (see [Sign in on your phone](#sign-in-on-your-phone)); the rest can stay blank until their step.
 
 ## Run the app
 
-The app runs in Expo Go during development. It uses **Expo SDK 57**, so your Expo Go must support SDK 57 (Expo Go's settings tab shows which SDK it supports).
+The app runs in Expo Go during development. It uses **Expo SDK 58**, so your Expo Go must support SDK 58 (Expo Go's settings tab shows which SDK it supports). Expo Go on an iPhone only runs the newest SDK, so when it updates, upgrade the project too: `npx expo install expo@^<new>.0.0 --fix` from `apps/mobile`, then `npx expo-doctor`.
 
 ### One-time Expo setup
 
@@ -79,21 +79,21 @@ Your phone and computer must be on the same Wi-Fi network. If they can't see eac
 npm run mobile -- --tunnel
 ```
 
-Press `w` in the dev server to open the web version in a browser instead.
+Press `w` in the dev server to open the web version in a browser instead (or start with `npm run mobile -- --web`). Start the app with these scripts rather than plain `npx expo start`, which doesn't load `.env.dev`.
 
 ### Sign in on your phone
 
 The app signs in with a 6-digit code sent by email. Against local Supabase, the emails never leave your computer: they land in Mailpit at http://127.0.0.1:54324 (see [Development emails](#development-emails-sign-in-codes)).
 
 1. Start local Supabase (`npm run db:start`) if it isn't running.
-2. Give the app the local key. Copy `PUBLISHABLE_KEY` from `npm run db:status` into `apps/mobile/.env`, and leave the URL blank:
+2. Give the app the local key. Copy `PUBLISHABLE_KEY` from `npm run db:status` into `apps/mobile/.env.dev`, and leave the URL blank:
 
    ```sh
    EXPO_PUBLIC_SUPABASE_URL=
    EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
    ```
 
-   With the URL blank, the app finds local Supabase by itself: it uses the same computer address your phone used to load the app, on port 54321. Nothing to update when your Wi-Fi address changes. Set the URL only for a hosted project (`https://<project-ref>.supabase.co`). Restart `npm run mobile` after editing `.env`; values are read when the bundle is built.
+   With the URL blank, the app finds local Supabase by itself: it uses the same computer address your phone used to load the app, on port 54321. Nothing to update when your Wi-Fi address changes. Set the URL only for a hosted project (`https://<project-ref>.supabase.co`). Restart `npm run mobile` after editing `.env.dev`; values are read when the bundle is built.
 
 3. Open the app, enter an email and tap **Email me a code**. Use `leo@example.com` to sign in as the seed user, or any other address to create a new account (it gets a profile, a Personal group and the default categories).
 4. On your computer, open Mailpit at http://127.0.0.1:54324, open the newest "Your Spendly sign-in code" email and type the code into the app. It signs in as soon as all 6 digits are in.
@@ -106,15 +106,15 @@ Your phone has to reach your computer directly, for the app bundle and for local
 
 ### Troubleshooting
 
-| Message                                                | Fix                                                                                                                                |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| "No usable data found" (iPhone Camera)                 | Install Expo Go first; the Camera app only opens `exp://` links once it's installed.                                               |
-| "You need to be signed in to Expo Go"                  | Log in on the computer (`npx expo login --browser`) and in Expo Go with the same account.                                          |
-| "Project is incompatible with this version of Expo Go" | Your Expo Go supports a different SDK than the project. Update Expo Go, or move the project to its SDK.                            |
-| App won't load, or the connection times out            | Phone and computer can't reach each other on this network. Use your phone's hotspot, or `--tunnel` plus a hosted Supabase project. |
-| "Missing the Supabase URL..." on launch                | Create `apps/mobile/.env` with the publishable key (see [Sign in on your phone](#sign-in-on-your-phone)) and restart.              |
-| "Network request failed" when sending the code         | The phone can't reach Supabase. Check `npm run db:start` is up and the network allows it (see above).                              |
-| Signed out after `npm run db:reset`                    | Expected: the reset deletes every session. Sign in again.                                                                          |
+| Message                                                | Fix                                                                                                                                       |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| "No usable data found" (iPhone Camera)                 | Install Expo Go first; the Camera app only opens `exp://` links once it's installed.                                                      |
+| "You need to be signed in to Expo Go"                  | Log in on the computer (`npx expo login --browser`) and in Expo Go with the same account.                                                 |
+| "Project is incompatible with this version of Expo Go" | Your Expo Go supports a different SDK than the project. Update Expo Go, or move the project to its SDK.                                   |
+| App won't load, or the connection times out            | Phone and computer can't reach each other on this network. Use your phone's hotspot, or `--tunnel` plus a hosted Supabase project.        |
+| "Missing the Supabase URL..." on launch                | Start with `npm run mobile`, and put the publishable key in `apps/mobile/.env.dev` (see [Sign in on your phone](#sign-in-on-your-phone)). |
+| "Network request failed" when sending the code         | The phone can't reach Supabase. Check `npm run db:start` is up and the network allows it (see above).                                     |
+| Signed out after `npm run db:reset`                    | Expected: the reset deletes every session. Sign in again.                                                                                 |
 
 ## Tests, lint, types, formatting
 
@@ -169,6 +169,23 @@ Open it in your computer's browser while local Supabase is running. Sign-in code
 
 `npm run db:reset` deletes every account except the seeded `leo@example.com`. If you signed in with your own address, sign in again afterwards to get a fresh account.
 
+### Sign-in codes to real inboxes
+
+For a demo, local Supabase can send sign-in codes to people's real inboxes through an SMTP server. Put these in `supabase/.env` (git-ignored; the Supabase CLI reads it), then restart with `npm run db:stop && npm run db:start`:
+
+```sh
+SUPABASE_AUTH_EMAIL_SMTP_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=you@gmail.com
+SMTP_PASS=abcdefghijklmnop
+SMTP_FROM=you@gmail.com
+```
+
+- **Gmail** (no domain needed): turn on 2-Step Verification, create an app password at https://myaccount.google.com/apppasswords and use it as `SMTP_PASS`. `SMTP_USER` and `SMTP_FROM` are your Gmail address. Gmail sends up to about 500 a day. Codes may land in spam the first time.
+- **Resend**: `SMTP_HOST=smtp.resend.com`, `SMTP_USER=resend`, `SMTP_PASS` is your API key, and `SMTP_FROM` is an address on a domain verified in Resend. Without a domain, `onboarding@resend.dev` only delivers to your own Resend account's address.
+
+Codes then stop arriving in Mailpit. Supabase allows 30 emails an hour (`[auth.rate_limit]` in `supabase/config.toml`). To go back to Mailpit, set `SUPABASE_AUTH_EMAIL_SMTP_ENABLED=false` and restart.
+
 ## Payment page and Edge Functions
 
 People without the app open a private link to see their share, pay with Venmo, PayPal or Cash App, and say "I paid". Request payment on a person's screen makes the link.
@@ -198,7 +215,7 @@ Scanning reads a receipt photo with Gemini or Claude and fills in Add expense. T
 - **Gemini (free tier, for development):** `GEMINI_API_KEY` from https://aistudio.google.com. It reads with Gemini 3.5 Flash-Lite, then 3.8 Flash if the lines don't add up. On the free tier Google may use what you send to improve its products, so scan only your own receipts with it.
 - **Claude (the plan's choice):** `ANTHROPIC_API_KEY` from https://console.anthropic.com (needs API credits; a Claude subscription doesn't include them). It reads with Haiku 5.5, then Sonnet 5.5.
 
-With both set, Gemini is used unless `RECEIPT_PROVIDER=claude`. `RECEIPT_SCANS_PER_MONTH` sets the monthly limit per person (default 50). `functions serve` reloads when the file changes. Hosted: `npx supabase secrets set --env-file supabase/functions/.env`.
+With both set, Gemini is used unless `RECEIPT_PROVIDER=claude`. `RECEIPT_SCANS_PER_MONTH` sets the monthly limit per person, photos and forwarded emails together (default 40). `functions serve` reloads when the file changes. Hosted: `npx supabase secrets set --env-file supabase/functions/.env`.
 
 Without a key, scanning says it isn't set up yet and you enter the expense by hand. Photos are deleted as soon as they've been read; only the draft is kept, in `receipt_extractions`.
 
@@ -235,6 +252,26 @@ npx eas-cli@latest init   # adds extra.eas.projectId to app.json
 
 Until then the app skips push registration. Expo Go on iOS receives pushes; on Android, pushes need a development build (`eas build --profile development`).
 
+### Reminders and texts
+
+Every hour, `pg_cron` asks the `send-reminders` function to remind about debts unpaid for more than 3 days. Someone with the app gets a push. Someone without it who ticked "Text me about payments" on their payment link gets a text, with a fresh link. Anyone else is left to the person they owe, who gets a push to remind them from their own phone. A debt is reminded about at most once every 3 days, never while an "I paid" waits to be confirmed, and only between 9am and 9pm in the time zone of the person owed (the app saves each phone's).
+
+Every text goes through `sendText()` (`supabase/functions/_shared/text.ts`). It only texts a number whose owner opted in themselves, never at night, starts each text with "Spendly:", and adds "Reply STOP to opt out." to the first one. Replying STOP reaches `sms-inbound`, which withdraws the consent. With `SMS_PROVIDER=log` (the default) nothing is sent: texts are saved to `outbound_messages` as `logged`.
+
+To turn reminders on locally (or hosted, with your project's URL instead of `http://kong:8000`):
+
+1. Put any long random string in `supabase/functions/.env` as `CRON_SECRET`. `functions serve` reloads.
+2. Give the database the same secret and where to call, once (Studio's SQL editor, or `psql`):
+
+   ```sql
+   select vault.create_secret('http://kong:8000', 'project_url');
+   select vault.create_secret('<the same CRON_SECRET>', 'cron_secret');
+   ```
+
+3. To send now instead of waiting for the hour: `select private.request_reminders();`. Pushes need a phone registered for them; logged texts show in `outbound_messages`.
+
+To really send texts, set `SMS_PROVIDER` to `twilio` or `telnyx` with that provider's settings (`.env.example`), and point the number's incoming-message webhook at `https://<project-ref>.supabase.co/functions/v1/sms-inbound`. For Twilio, also set `SMS_WEBHOOK_URL` to exactly that URL, since Twilio's signature covers it. Register the texting brand and campaign (10DLC) first; carriers block unregistered texts.
+
 ## Hosted Supabase
 
 One-time setup:
@@ -249,6 +286,17 @@ One-time setup:
 
    The project ref is the ID in the dashboard URL (`https://supabase.com/dashboard/project/<project-ref>`).
 
-For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.html` into the dashboard's **Authentication → Emails** templates (the hosted defaults send only a link, and the app needs the `{{ .Token }}` code). The built-in email sender allows only a few emails per hour, which is fine for testing.
+For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.html` into the dashboard's **Authentication → Emails** templates (the hosted defaults send only a link, and the app needs the `{{ .Token }}` code). The built-in email sender only delivers to members of your Supabase organization, a few emails an hour. To send codes to anyone, set up custom SMTP under **Authentication → Emails → SMTP Settings** with the same values as [Sign-in codes to real inboxes](#sign-in-codes-to-real-inboxes).
+
+### Switching between local and hosted
+
+Each target has its own git-ignored env file, and a script that loads it:
+
+|                           | Local Supabase                 | Hosted project                      |
+| ------------------------- | ------------------------------ | ----------------------------------- |
+| App (`apps/mobile`)       | `.env.dev` → `npm run mobile`  | `.env.prod` → `npm run mobile:prod` |
+| Payment page (`apps/pay`) | no file needed → `npm run pay` | `.env.prod` → `npm run pay:prod`    |
+
+`apps/mobile/.env.prod` has the hosted URL and its publishable key (**Project Settings → API Keys**, starts with `sb_publishable_`; not the local key from `npm run db:status`, which the hosted project rejects with "Invalid API key"). `apps/pay/.env.prod` has `VITE_SUPABASE_URL`. Stop the dev server and start it with the other script to switch; values are read when it starts. Pass Expo options after `--`, e.g. `npm run mobile:prod -- --web`.
 
 Later steps push migrations with `npx supabase db push` and set Edge Function secrets with `npx supabase secrets set --env-file supabase/functions/.env`.

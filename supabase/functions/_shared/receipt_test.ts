@@ -354,10 +354,10 @@ Deno.test(
   },
 );
 
-Deno.test('the monthly scan limit falls back to 50 unless set to a whole number', () => {
+Deno.test('the monthly scan limit falls back to 40 unless set to a whole number', () => {
   assertEquals(monthlyScanLimit('20'), 20);
   assertEquals(monthlyScanLimit('0'), 0);
-  for (const bad of [undefined, '', 'fifty', '12.5', '-3']) assertEquals(monthlyScanLimit(bad), 50);
+  for (const bad of [undefined, '', 'fifty', '12.5', '-3']) assertEquals(monthlyScanLimit(bad), 40);
 });
 
 Deno.test('emails are sent as fenced text, and PDFs as documents', async () => {

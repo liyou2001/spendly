@@ -37,6 +37,16 @@ For each question, the **How to test** line suggests something to ask or a task 
   - Set `VITE_GET_APP_URL` once there's an App Store or TestFlight link. Until then the page hides "Get the Spendly app".
   - Push for invites isn't built yet. Only claims and payment-page notes send pushes.
 
+### Turn on reminders and texts
+
+- **Status:** To do (2026-10-19)
+- **Why:** reminders and `sendText()` are built and tested, but run only when switched on, and texts are only logged until a provider is set up.
+- **What's left** (README, "Reminders and texts"):
+  1. Set `CRON_SECRET` and the two Vault secrets (`project_url`, `cron_secret`), locally and on hosted Supabase.
+  2. Pick Twilio or Telnyx, register the texting brand and campaign (10DLC) early, since approval takes weeks and may want the domain's website, then set `SMS_PROVIDER` and point the number's webhook at `sms-inbound`.
+  3. Check with a real phone: a debt over 3 days old gets a reminder, a second one doesn't come for 3 days, and replying STOP stops texts.
+- **Not built yet:** texting opt-in for people with the app. The plan ties it to verifying a phone number, which itself needs texting, so it waits for the provider. Until then, people with the app get pushes.
+
 ### Launch checklist: email
 
 - **Status:** To do (2026-10-19)

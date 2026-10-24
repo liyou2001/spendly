@@ -19,19 +19,19 @@ const icons: Record<string, IconName> = {
 };
 
 /** Home, Budget, +, People, Me. The + opens Add expense instead of being a tab of its own. */
-export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const { invites } = useInvites();
   const tabs = state.routes.map((route, index) => {
     const focused = state.index === index;
     const label = descriptors[route.key]?.options.title ?? route.name;
 
     const onPress = () => {
-      const event = navigation.emit({
+      const event = emitter.emit({
         type: 'tabPress',
         target: route.key,
         canPreventDefault: true,
       });
-      if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+      if (!focused && !event.defaultPrevented) navigateToTab(route.key);
     };
 
     return (

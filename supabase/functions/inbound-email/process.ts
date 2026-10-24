@@ -25,6 +25,8 @@ export interface InboundDeps {
   /** Saves the draft under Needs you and returns its id. */
   saveDraft(userId: string, outcome: Extract<Outcome, { receipt: Receipt }>): Promise<string>;
   push(userId: string, message: PushMessage): Promise<void>;
+  /** Tells someone they've used all their scans this month; at most once a month. */
+  limitReached(userId: string, limit: number): Promise<void>;
   /** The "add this address" reply; it decides itself about robots and how often. */
   replyToUnknownSender(email: InboundEmail): Promise<void>;
   reader: ReceiptReader | null;
@@ -63,7 +65,8 @@ export async function processEmail(email: InboundEmail, deps: InboundDeps): Prom
     await deps.update({ user_id: userId });
 
     if ((await deps.scansThisMonth(userId)) >= deps.monthlyLimit) {
-      return await deps.update({ status: 'failed', error: 'Monthly limit reached' });
+      await deps.update({ status: 'failed', error: 'Monthly limit reached' });
+      return await deps.limitReached(userId, deps.monthlyLimit);
     }
     const content = pickContent(email);
     if (!content) return await deps.update({ status: 'failed', error: 'Nothing to read' });

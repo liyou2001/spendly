@@ -26,8 +26,8 @@ export const colors = {
   controlBorder: '#E2D5CB',
 } as const;
 
-// Each weight is its own static font file (variable fonts need SDK 58), so a weight is picked
-// by family name, never with fontWeight.
+// Each weight is its own static font file, so a weight is picked by family name, never with
+// fontWeight.
 export const fontFiles = {
   HankenGrotesk_300Light,
   HankenGrotesk_400Regular,

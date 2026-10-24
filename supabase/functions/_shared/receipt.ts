@@ -317,8 +317,8 @@ export async function extractReceipt(
   return { status: 'failed' };
 }
 
-/** RECEIPT_SCANS_PER_MONTH as a whole number of scans; 50 if it's unset or not a number. */
+/** RECEIPT_SCANS_PER_MONTH as a whole number of scans; 40 if it's unset or not a number. */
 export function monthlyScanLimit(value: string | undefined): number {
   const limit = Number(value);
-  return value && Number.isSafeInteger(limit) && limit >= 0 ? limit : 50;
+  return value && Number.isSafeInteger(limit) && limit >= 0 ? limit : 40;
 }

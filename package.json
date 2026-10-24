@@ -6,15 +6,17 @@
     "packages/*"
   ],
   "overrides": {
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "engines": {
     "node": ">=24.3.0"
   },
   "scripts": {
-    "mobile": "npm run start --workspace mobile",
+    "mobile": "npm run start --workspace mobile --",
+    "mobile:prod": "npm run start:prod --workspace mobile --",
     "pay": "npm run dev --workspace pay",
+    "pay:prod": "npm run dev:prod --workspace pay",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
