@@ -42,9 +42,8 @@ values (
   now()
 );
 
-insert into public.profiles (id, display_name, venmo_username)
-values ('11111111-1111-1111-1111-111111111111', 'Leo', 'leo-example')
-on conflict (id) do update set venmo_username = excluded.venmo_username;
+update public.profiles set venmo_username = 'leo-example'
+where id = '11111111-1111-1111-1111-111111111111';
 
 -- The apartment group.
 insert into public.groups (id, name, created_by)
