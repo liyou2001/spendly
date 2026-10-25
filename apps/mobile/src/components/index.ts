@@ -10,6 +10,7 @@ export { ListRow } from './ListRow';
 export { Loadable, STALE_MESSAGE } from './Loadable';
 export { Money } from './Money';
 export { MonthSummary } from './MonthSummary';
+export { PageCamera } from './PageCamera';
 export { PayOptions } from './PayOptions';
 export { ProgressBar } from './ProgressBar';
 export { Screen } from './Screen';

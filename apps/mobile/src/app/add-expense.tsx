@@ -21,6 +21,7 @@ import {
   KeyBlock,
   Loadable,
   Money,
+  PageCamera,
   Screen,
   Section,
   Tag,
@@ -57,7 +58,7 @@ import {
   type ScannedReceipt,
   type ScanResult,
 } from '@/lib/receipts';
-import { pickReceiptPhoto, scanReceipt } from '@/lib/scan';
+import { pickReceiptPhoto, scanReceipt, usesPageCamera, type Photo } from '@/lib/scan';
 import { useSession } from '@/lib/session';
 import {
   assignedTo,
@@ -385,11 +386,22 @@ function ExpenseForm({
     setScan({ status: 'read', receipt, scansLeft: scanned.scans_left });
   }
 
-  async function scanFrom(from: 'camera' | 'library') {
+  function scanFrom(from: 'camera' | 'library') {
+    if (from === 'camera' && usesPageCamera()) {
+      setScan((current) => ({
+        status: 'camera',
+        previous: current.status === 'confirm' ? current.previous : current,
+      }));
+    } else {
+      void scanPhoto(() => pickReceiptPhoto(from));
+    }
+  }
+
+  async function scanPhoto(getPhoto: () => Promise<Photo | null>) {
     // A cancelled scan's result is ignored when it arrives.
     const attempt = ++scanAttempt.current;
     try {
-      const photo = await pickReceiptPhoto(from);
+      const photo = await getPhoto();
       if (!photo) return;
       setScan({ status: 'scanning' });
       const scanned = await scanReceipt(userId, photo);
@@ -404,12 +416,16 @@ function ExpenseForm({
   /** Scans straight away on a fresh form; otherwise asks before replacing what's there. */
   function requestScan(from: 'camera' | 'library') {
     if (hasEnteredDetails(draft, merchant)) setScan({ status: 'confirm', from, previous: scan });
-    else void scanFrom(from);
+    else scanFrom(from);
   }
 
   function cancelScan() {
     scanAttempt.current++;
-    setScan((current) => (current.status === 'confirm' ? current.previous : { status: 'idle' }));
+    setScan((current) =>
+      current.status === 'confirm' || current.status === 'camera'
+        ? current.previous
+        : { status: 'idle' },
+    );
   }
 
   async function save() {
@@ -514,7 +530,8 @@ function ExpenseForm({
               state={scan}
               currentTotal={draft.mode === 'items' ? result.totalCents : null}
               onScan={requestScan}
-              onConfirm={(from) => void scanFrom(from)}
+              onConfirm={scanFrom}
+              onPhoto={(photo) => void scanPhoto(async () => photo)}
               onCancel={cancelScan}
               {...(fromDraft
                 ? {
@@ -1201,7 +1218,9 @@ type ScanState =
   | { status: 'read'; receipt: ScannedReceipt; scansLeft: number }
   | { status: 'error'; message: string }
   /** Asking before a scan replaces what's been entered. */
-  | { status: 'confirm'; from: 'camera' | 'library'; previous: ScanState };
+  | { status: 'confirm'; from: 'camera' | 'library'; previous: ScanState }
+  /** The camera inside the page, on a laptop. */
+  | { status: 'camera'; previous: ScanState };
 
 /** "Scan a receipt": take or choose a photo, then how the draft compares with its total. */
 function ScanReceipt({
@@ -1209,6 +1228,7 @@ function ScanReceipt({
   currentTotal,
   onScan,
   onConfirm,
+  onPhoto,
   onCancel,
   onDismissDraft,
 }: {
@@ -1218,7 +1238,9 @@ function ScanReceipt({
   onScan: (from: 'camera' | 'library') => void;
   /** Scan anyway, replacing what's been entered. */
   onConfirm: (from: 'camera' | 'library') => void;
-  /** Stop reading, or keep what's been entered. */
+  /** A photo from the camera inside the page, to read. */
+  onPhoto: (photo: Photo) => void;
+  /** Stop reading, close the camera, or keep what's been entered. */
   onCancel: () => void;
   /** For a forwarded receipt: it isn't one, take it off Needs you. */
   onDismissDraft?: () => void;
@@ -1239,6 +1261,9 @@ function ScanReceipt({
         </View>
       </View>
     );
+  }
+  if (state.status === 'camera') {
+    return <PageCamera onPhoto={onPhoto} onCancel={onCancel} />;
   }
   if (state.status === 'scanning') {
     return (

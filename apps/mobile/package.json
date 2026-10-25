@@ -23,6 +23,7 @@
     "@spendly/ledger": "*",
     "@supabase/supabase-js": "^2.118.0",
     "expo": "~58.0.19",
+    "expo-camera": "~58.0.12",
     "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.13",
     "expo-crypto": "~58.0.7",

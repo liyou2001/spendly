@@ -4,6 +4,7 @@ import { randomUUID } from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import { UserFacingError } from './data';
 import type { ScanResult } from './receipts';
@@ -18,6 +19,18 @@ export interface Photo {
   height: number;
 }
 
+/**
+ * Whether "Take photo" opens the camera inside the page (PageCamera): in a browser with a mouse,
+ * where the camera picker can only offer files. Phone browsers open their own camera.
+ */
+export function usesPageCamera(): boolean {
+  return (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  );
+}
+
 /** Opens the camera or the photo library. null if the person cancels. */
 export async function pickReceiptPhoto(from: 'camera' | 'library'): Promise<Photo | null> {
   if (from === 'camera') {
@@ -28,7 +41,12 @@ export async function pickReceiptPhoto(from: 'camera' | 'library'): Promise<Phot
       );
     }
   }
-  const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 1 };
+  // The back camera. On web this also makes phone browsers open the camera, not a file picker.
+  const options: ImagePicker.ImagePickerOptions = {
+    mediaTypes: ['images'],
+    quality: 1,
+    cameraType: ImagePicker.CameraType.back,
+  };
   const result =
     from === 'camera'
       ? await ImagePicker.launchCameraAsync(options)
@@ -58,13 +76,19 @@ async function shrink(photo: Photo): Promise<string> {
   return saved.uri;
 }
 
+/** The photo's bytes. expo-file-system doesn't work on web, where the photo is a blob: URL. */
+async function readPhoto(uri: string): Promise<ArrayBuffer> {
+  if (Platform.OS === 'web') return (await fetch(uri)).arrayBuffer();
+  return new File(uri).arrayBuffer();
+}
+
 /** Shrinks, uploads and reads the photo. Throws a UserFacingError with what to do if it can't. */
 export async function scanReceipt(userId: string, photo: Photo): Promise<ScanResult> {
   const uri = await shrink(photo);
   const path = `${userId}/${randomUUID()}.jpg`;
   const { error: uploadError } = await supabase.storage
     .from('receipts')
-    .upload(path, await new File(uri).arrayBuffer(), { contentType: 'image/jpeg' });
+    .upload(path, await readPhoto(uri), { contentType: 'image/jpeg' });
   if (uploadError) throw new UserFacingError('Couldn’t upload the photo. Check your connection.');
 
   const { data, error } = await supabase.functions.invoke<ScanResult>('extract-receipt', {

@@ -41,6 +41,15 @@
           "photosPermission": "Spendly opens your photos so you can pick a receipt to scan.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Spendly uses the camera to scan receipts you want to split.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
       ]
     ],
     "experiments": {
