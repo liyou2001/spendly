@@ -85,3 +85,11 @@ export function requestMessage(input: {
   const owe = `Hey ${input.firstName}, you owe ${formatCents(input.owedCents)}${reason ? ` for ${reason}` : ''}.`;
   return input.link ? `${owe} See your share and pay here: ${input.link}` : `${owe} Thanks!`;
 }
+
+/**
+ * A link that opens Messages to `phone` with `body` filled in, for browsers (the phone app uses
+ * expo-sms). `?&body=` works on both iPhone (which reads `&body=`) and Android (`?body=`).
+ */
+export function smsLink(phone: string, body: string): string {
+  return `sms:${phone}?&body=${encodeURIComponent(body)}`;
+}

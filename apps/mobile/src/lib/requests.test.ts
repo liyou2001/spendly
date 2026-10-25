@@ -5,6 +5,7 @@ import {
   paymentLink,
   paymentNote,
   requestMessage,
+  smsLink,
   type OwedExpense,
 } from './requests';
 
@@ -103,5 +104,13 @@ describe('requestMessage', () => {
         link: null,
       }),
     ).toBe('Hey Jeff, you owe $45.00 for Pizza, Target and 1 more. Thanks!');
+  });
+});
+
+describe('smsLink', () => {
+  it('opens Messages to the number with the request filled in', () => {
+    expect(smsLink('+16085551234', 'Jeff, you owe $15.00 & more')).toBe(
+      'sms:+16085551234?&body=Jeff%2C%20you%20owe%20%2415.00%20%26%20more',
+    );
   });
 });

@@ -1,8 +1,9 @@
 import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import * as SMS from 'expo-sms';
 import { useCallback, useState } from 'react';
-import { Share, StyleSheet, View } from 'react-native';
+import { Platform, Share, StyleSheet, View } from 'react-native';
 
 import {
   AmountForm,
@@ -52,11 +53,11 @@ import { devServerHostUri } from '@/lib/devServer';
 import { goBack } from '@/lib/navigation';
 import { payPageUrl } from '@/lib/payPage';
 import { normalizePhone } from '@/lib/phone';
-import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/requests';
+import { expensesBehind, paymentLink, paymentNote, requestMessage, smsLink } from '@/lib/requests';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 import { useUsernameCheck } from '@/lib/useUsernameCheck';
-import { colors, sizes, space } from '@/theme';
+import { colors, radius, sizes, space } from '@/theme';
 
 const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null, zelle: null };
 
@@ -111,7 +112,7 @@ async function newPayPageLink(participantId: string): Promise<string | null> {
   return payPageUrl(await createShareLink(participantId), configured, hostUri);
 }
 
-type Form = 'none' | 'record' | 'paid' | 'forgive' | 'phone';
+type Form = 'none' | 'record' | 'paid' | 'forgive' | 'phone' | 'ready';
 
 export default function PersonDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -145,6 +146,8 @@ function PersonView({
   onChanged,
 }: Awaited<ReturnType<typeof fetchPerson>> & { onChanged: () => void }) {
   const [form, setForm] = useState<Form>('none');
+  // On the web: the request, ready to send with a fresh tap.
+  const [ready, setReady] = useState<{ message: string; phone: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const firstName = them.displayName.split(' ')[0] ?? them.displayName;
   const hasApp = them.userId !== null;
@@ -182,6 +185,7 @@ function PersonView({
       return;
     }
     onChanged();
+    if (Platform.OS === 'web') return showReady(message, phone);
     try {
       if (await SMS.isAvailableAsync()) await SMS.sendSMSAsync([phone], message);
       else await Share.share({ message });
@@ -199,11 +203,21 @@ function PersonView({
       return;
     }
     onChanged();
+    if (Platform.OS === 'web') return showReady(message, null);
     try {
       await Share.share({ message });
     } catch {
       setError('Couldn’t open sharing. Try again.');
     }
+  }
+
+  /**
+   * Browsers only open Messages or sharing straight from a tap, and making the link took a
+   * moment, so the web shows the request with buttons to send it.
+   */
+  function showReady(message: string, phone: string | null) {
+    setReady({ message, phone });
+    setForm('ready');
   }
 
   function requestPayment() {
@@ -301,6 +315,13 @@ function PersonView({
             )
           }
           onCancel={() => setForm('none')}
+        />
+      ) : form === 'ready' && ready ? (
+        <ReadyToSend
+          name={firstName}
+          message={ready.message}
+          phone={ready.phone}
+          onDone={() => setForm('none')}
         />
       ) : form === 'phone' ? (
         <PhoneForRequest
@@ -475,6 +496,67 @@ function ProblemNote({
           });
         }}
       />
+    </View>
+  );
+}
+
+/** On the web: the request, to copy, text or share. Each button acts on its own tap. */
+function ReadyToSend({
+  name,
+  message,
+  phone,
+  onDone,
+}: {
+  name: string;
+  message: string;
+  phone: string | null;
+  onDone: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  return (
+    <View style={styles.claim}>
+      <Text variant="sectionHeading">Your request to {name} is ready</Text>
+      <View style={styles.messageBox}>
+        <Text variant="body" selectable>
+          {message}
+        </Text>
+      </View>
+      {error ? <FormMessage message={error} /> : null}
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <Button
+            label={copied ? 'Copied' : 'Copy message'}
+            variant={phone ? 'secondary' : 'primary'}
+            onPress={() =>
+              void Clipboard.setStringAsync(message).then(
+                () => setCopied(true),
+                () => setError('Couldn’t copy. Select the message above and copy it instead.'),
+              )
+            }
+          />
+        </View>
+        {phone ? (
+          <View style={styles.flex}>
+            <Button
+              label={`Text ${name}`}
+              onPress={() => {
+                window.location.href = smsLink(phone, message);
+              }}
+            />
+          </View>
+        ) : null}
+      </View>
+      {canShare ? (
+        <TextButton
+          label="Share another way"
+          icon="share"
+          onPress={() => void navigator.share({ text: message }).catch(() => undefined)}
+        />
+      ) : null}
+      <TextButton label="Done" onPress={onDone} />
     </View>
   );
 }
@@ -758,6 +840,12 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: space.md,
+  },
+  messageBox: {
+    padding: space.lg,
+    borderWidth: sizes.hairline,
+    borderColor: colors.controlBorder,
+    borderRadius: radius.button,
   },
   claim: {
     gap: space.md,
