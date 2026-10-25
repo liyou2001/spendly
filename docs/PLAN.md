@@ -445,6 +445,7 @@ Splitting rules:
 - A domain with DNS on Cloudflare. Move the payment page and the receipts address to it, and set up Universal Links and App Links so payment links open the app when it's installed.
 - Builds with EAS: TestFlight and Google Play internal testing, plus store listings.
 - Register your 10DLC texting brand and campaign early (sole proprietor is fine), since approval takes time.
+- Receipt photos kept with the expense (the payer can choose not to) so everyone in the group can check the split against the receipt; photos no expense uses are deleted daily.
 - Backups: the free Supabase plan has no downloadable backups, so schedule a database export or move to Supabase Pro.
 
 **Done when:**
@@ -464,3 +465,4 @@ Splitting rules:
 - Supabase Pro for 7-day logs and backups.
 - Stored balances that update with each event, once groups have long histories.
 - Custom link previews for payment links (no amounts in the preview).
+- Receipt photos on the payment page, and "Delete my account" removing the person's photos.

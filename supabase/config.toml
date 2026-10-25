@@ -444,6 +444,10 @@ verify_jwt = false
 [functions.send-reminders]
 verify_jwt = false
 
+# Called daily by pg_cron with CRON_SECRET (X-Cron-Secret) instead.
+[functions.clean-receipts]
+verify_jwt = false
+
 # Called by Twilio or Telnyx, checked with the provider's signature instead.
 [functions.sms-inbound]
 verify_jwt = false

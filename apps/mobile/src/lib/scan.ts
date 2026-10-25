@@ -67,9 +67,9 @@ async function shrink(photo: Photo): Promise<string> {
   }
   const context = ImageManipulator.manipulate(photo.uri);
   if (Math.max(width, height) > LONG_EDGE) {
-    context.resize(
-      height >= width ? { width: null, height: LONG_EDGE } : { width: LONG_EDGE, height: null },
-    );
+    // Give only the long edge; the other follows the photo's shape. Not `null` for the other: the
+    // web version reads null as 0 and fails.
+    context.resize(height >= width ? { height: LONG_EDGE } : { width: LONG_EDGE });
   }
   const image = await context.renderAsync();
   const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 });
@@ -82,8 +82,15 @@ async function readPhoto(uri: string): Promise<ArrayBuffer> {
   return new File(uri).arrayBuffer();
 }
 
-/** Shrinks, uploads and reads the photo. Throws a UserFacingError with what to do if it can't. */
-export async function scanReceipt(userId: string, photo: Photo): Promise<ScanResult> {
+/**
+ * Shrinks, uploads and reads the photo. Throws a UserFacingError with what to do if it can't.
+ * Returns where the photo is kept, to attach to the expense (or discard) when it's saved, and
+ * the shrunk copy on this device, to look at again while checking the lines.
+ */
+export async function scanReceipt(
+  userId: string,
+  photo: Photo,
+): Promise<ScanResult & { path: string; previewUri: string }> {
   const uri = await shrink(photo);
   const path = `${userId}/${randomUUID()}.jpg`;
   const { error: uploadError } = await supabase.storage
@@ -95,8 +102,8 @@ export async function scanReceipt(userId: string, photo: Photo): Promise<ScanRes
     body: { path },
   });
   if (error || !data) {
-    // The function deletes photos it reads; one that never got that far is deleted here.
-    void supabase.storage.from('receipts').remove([path]);
+    // The function deletes photos it can't read; one that never got that far is deleted here.
+    discardReceiptPhoto(path);
     // The function explains itself in { error }, e.g. the monthly limit.
     const context = (error as { context?: Response } | null)?.context;
     const message = await context
@@ -107,5 +114,13 @@ export async function scanReceipt(userId: string, photo: Photo): Promise<ScanRes
       message ?? 'Couldn’t read the receipt. Try again, or enter it by hand.',
     );
   }
-  return data;
+  return { ...data, path, previewUri: uri };
+}
+
+/**
+ * Deletes a scanned photo that won't be kept with an expense. If this fails, clean-receipts
+ * deletes it within a couple of days.
+ */
+export function discardReceiptPhoto(path: string): void {
+  void supabase.storage.from('receipts').remove([path]);
 }

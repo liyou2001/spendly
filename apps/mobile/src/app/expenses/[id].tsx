@@ -1,7 +1,7 @@
 import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Image, StyleSheet, View } from 'react-native';
 
 import {
   Breakdown,
@@ -24,6 +24,7 @@ import {
   fetchExpense,
   fetchGroup,
   friendlyError,
+  receiptPhotoUrl,
   setShareCategory,
   voidExpense,
   type Category,
@@ -37,7 +38,7 @@ import { debtLabel, itemTitle, yourPartOf } from '@/lib/labels';
 import { useSession } from '@/lib/session';
 import { canEditExpense, labelForIds, owedToPayer, type SplitPeople } from '@/lib/split';
 import { useLoad } from '@/lib/useLoad';
-import { colors, sizes, space } from '@/theme';
+import { colors, radius, sizes, space } from '@/theme';
 
 async function fetchDetail(expenseId: string, userId: string) {
   const [expense, categories] = await Promise.all([
@@ -210,9 +211,12 @@ function FullView({
         </Section>
       ) : null}
 
-      {lines.length > 0 ? (
+      {lines.length > 0 || expense.receiptPhoto ? (
         <Section title="Receipt" description={`Everyone in ${group.name} sees this receipt.`}>
           <View>
+            {expense.receiptPhoto ? (
+              <ReceiptPhotoRow expenseId={expense.id} path={expense.receiptPhoto.path} />
+            ) : null}
             {[...lines, ...adjustments].map((item) => (
               <ListRow
                 key={item.id}
@@ -449,6 +453,30 @@ function ShareView({
 
 const openExpense = (id: string) => router.push({ pathname: '/expenses/[id]', params: { id } });
 
+/** The receipt photo kept with an expense: a small thumbnail that opens it full screen. */
+function ReceiptPhotoRow({ expenseId, path }: { expenseId: string; path: string }) {
+  const url = useLoad(useCallback(() => receiptPhotoUrl(path), [path]));
+  return (
+    <ListRow
+      title="Receipt photo"
+      subtitle={url.status === 'error' ? 'Couldn’t load the photo' : 'Tap to see the whole receipt'}
+      leading={
+        <View style={styles.thumbnail}>
+          {url.status === 'ready' ? (
+            <Image
+              source={{ uri: url.data }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
+        </View>
+      }
+      onPress={() => router.push({ pathname: '/receipt-photo', params: { expense: expenseId } })}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   stack: {
     gap: space.md,
@@ -469,6 +497,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: space.sm,
+  },
+  thumbnail: {
+    width: 56,
+    height: 72,
+    borderRadius: radius.button,
+    overflow: 'hidden',
+    backgroundColor: colors.divider,
   },
   expanded: {
     paddingLeft: space.lg,

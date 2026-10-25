@@ -217,7 +217,7 @@ Scanning reads a receipt photo with Gemini or Claude and fills in Add expense. T
 
 With both set, Gemini is used unless `RECEIPT_PROVIDER=claude`. `RECEIPT_SCANS_PER_MONTH` sets the monthly limit per person, photos and forwarded emails together (default 40). `functions serve` reloads when the file changes. Hosted: `npx supabase secrets set --env-file supabase/functions/.env`.
 
-Without a key, scanning says it isn't set up yet and you enter the expense by hand. Photos are deleted as soon as they've been read; only the draft is kept, in `receipt_extractions`.
+Without a key, scanning says it isn't set up yet and you enter the expense by hand. A photo that reads as a receipt is kept until the expense is saved: with "Keep the photo" on (the default), it's attached to the expense and everyone in the group can see it; otherwise it's deleted. Unreadable photos are deleted right away, and the daily `clean-receipts` job (it uses the same Vault secrets as reminders, below) deletes photos no expense uses after a day.
 
 To measure accuracy, put about 20 real receipt photos (`.jpg` or `.png`) in `receipts/` (git-ignored). Optionally add `<name>.json` next to a photo with what's right, e.g. `{"total_cents": 14000, "items": 9}`. Then run `npm run receipts:accuracy`. It uses the same key and provider, and reports per model how often the lines add up, the total is right and the item count is right.
 

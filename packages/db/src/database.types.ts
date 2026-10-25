@@ -97,6 +97,36 @@ export type Database = {
           },
         ];
       };
+      expense_receipts: {
+        Row: {
+          attached_by: string;
+          created_at: string;
+          expense_id: string;
+          storage_path: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          attached_by?: string;
+          created_at?: string;
+          expense_id: string;
+          storage_path: string;
+        };
+        Update: {
+          attached_by?: string;
+          created_at?: string;
+          expense_id?: string;
+          storage_path?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'expense_receipts_expense_id_fkey';
+            columns: ['expense_id'];
+            isOneToOne: true;
+            referencedRelation: 'expenses';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       expenses: {
         Row: {
           category_id: string | null;
@@ -962,6 +992,7 @@ export type Database = {
         };
         Returns: string;
       };
+      attach_receipt: { Args: { p_expense_id: string; p_path: string }; Returns: undefined };
       balances: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -1129,6 +1160,7 @@ export type Database = {
         Returns: undefined;
       };
       set_time_zone: { Args: { p_time_zone: string }; Returns: undefined };
+      unattached_receipts: { Args: { p_older_than: string }; Returns: string[] };
       username_available: { Args: { p_username: string }; Returns: boolean };
       verify_email: { Args: { p_code: string; p_email: string }; Returns: undefined };
       void_expense: { Args: { p_expense_id: string }; Returns: undefined };

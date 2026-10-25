@@ -4,9 +4,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from 'react-native';
@@ -32,6 +34,7 @@ import {
 import { formatDate, todayLocal } from '@/lib/dates';
 import {
   addPerson,
+  attachReceipt,
   closeDraft,
   createGroup,
   fetchCategories,
@@ -58,7 +61,13 @@ import {
   type ScannedReceipt,
   type ScanResult,
 } from '@/lib/receipts';
-import { pickReceiptPhoto, scanReceipt, usesPageCamera, type Photo } from '@/lib/scan';
+import {
+  discardReceiptPhoto,
+  pickReceiptPhoto,
+  scanReceipt,
+  usesPageCamera,
+  type Photo,
+} from '@/lib/scan';
 import { useSession } from '@/lib/session';
 import {
   assignedTo,
@@ -277,10 +286,19 @@ function ExpenseForm({
   // A forwarded receipt arrives already read, like a scan.
   const [scan, setScan] = useState<ScanState>(
     fromDraft
-      ? { status: 'read', receipt: fromDraft.receipt, scansLeft: Number.POSITIVE_INFINITY }
+      ? {
+          status: 'read',
+          receipt: fromDraft.receipt,
+          scansLeft: Number.POSITIVE_INFINITY,
+          photoPath: null,
+          photoUri: null,
+        }
       : { status: 'idle' },
   );
   const scanAttempt = useRef(0);
+  // The last scanned photo, so scanning again deletes the one it replaces.
+  const lastPhoto = useRef<string | null>(null);
+  const [keepPhoto, setKeepPhoto] = useState(true);
   const scanning = scan.status === 'scanning';
 
   const people: SplitPeople = useMemo(
@@ -366,7 +384,12 @@ function ExpenseForm({
   }
 
   /** Fills the form from a scanned receipt. The AI's draft is only a start: everything is editable. */
-  function applyScan(scanned: ScanResult) {
+  function applyScan(scanned: ScanResult & { path: string; previewUri: string }) {
+    // An unreadable photo is already deleted; a readable one replaces any earlier scan's.
+    if (scanned.status !== 'unreadable') {
+      if (lastPhoto.current) discardReceiptPhoto(lastPhoto.current);
+      lastPhoto.current = scanned.path;
+    }
     if (scanned.status === 'unreadable') {
       setScan({
         status: 'error',
@@ -383,7 +406,13 @@ function ExpenseForm({
     setOpenItem(null);
     setShowErrors(false);
     setSaveError(null);
-    setScan({ status: 'read', receipt, scansLeft: scanned.scans_left });
+    setScan({
+      status: 'read',
+      receipt,
+      scansLeft: scanned.scans_left,
+      photoPath: scanned.path,
+      photoUri: scanned.previewUri,
+    });
   }
 
   function scanFrom(from: 'camera' | 'library') {
@@ -452,6 +481,13 @@ function ExpenseForm({
               : 'photo',
         ...(editing ? { replacesExpenseId: editing.expenseId } : {}),
       });
+      const photo = scan.status === 'read' ? scan.photoPath : null;
+      if (photo) {
+        lastPhoto.current = null;
+        // Without the photo the expense still counts; an unattached photo is cleaned up later.
+        if (keepPhoto) await attachReceipt(id, photo).catch(() => undefined);
+        else discardReceiptPhoto(photo);
+      }
       if (editing) {
         // Close the editor, then swap the old version's screen for the new one.
         router.back();
@@ -533,6 +569,10 @@ function ExpenseForm({
               onConfirm={scanFrom}
               onPhoto={(photo) => void scanPhoto(async () => photo)}
               onCancel={cancelScan}
+              keepPhoto={keepPhoto}
+              onKeepPhotoChange={setKeepPhoto}
+              shared={shared}
+              groupName={group.name}
               {...(fromDraft
                 ? {
                     onDismissDraft: () =>
@@ -1215,7 +1255,17 @@ const ADJUSTMENTS = [
 type ScanState =
   | { status: 'idle' }
   | { status: 'scanning' }
-  | { status: 'read'; receipt: ScannedReceipt; scansLeft: number }
+  /**
+   * photoPath: the scanned photo, which can be kept with the expense; photoUri: its copy on this
+   * device, to look at again. Both null for a forwarded receipt.
+   */
+  | {
+      status: 'read';
+      receipt: ScannedReceipt;
+      scansLeft: number;
+      photoPath: string | null;
+      photoUri: string | null;
+    }
   | { status: 'error'; message: string }
   /** Asking before a scan replaces what's been entered. */
   | { status: 'confirm'; from: 'camera' | 'library'; previous: ScanState }
@@ -1231,9 +1281,20 @@ function ScanReceipt({
   onPhoto,
   onCancel,
   onDismissDraft,
+  keepPhoto,
+  onKeepPhotoChange,
+  shared,
+  groupName,
 }: {
   state: ScanState;
   currentTotal: number | null;
+  /** Keep the scanned photo with the expense when it's saved. */
+  keepPhoto: boolean;
+  onKeepPhotoChange: (keep: boolean) => void;
+  /** Split with others, rather than in your Personal group: who'll see the photo. */
+  shared: boolean;
+  /** Everyone in it sees an attached photo. */
+  groupName: string;
   /** Take or choose a photo; asks first if something's been entered. */
   onScan: (from: 'camera' | 'library') => void;
   /** Scan anyway, replacing what's been entered. */
@@ -1245,6 +1306,8 @@ function ScanReceipt({
   /** For a forwarded receipt: it isn't one, take it off Needs you. */
   onDismissDraft?: () => void;
 }) {
+  // The scanned photo, shown again under its results to check the lines against.
+  const [showPhoto, setShowPhoto] = useState(false);
   if (state.status === 'confirm') {
     return (
       <View style={styles.stack} accessibilityLiveRegion="polite">
@@ -1300,6 +1363,66 @@ function ScanReceipt({
             ? ` ${state.scansLeft} ${state.scansLeft === 1 ? 'scan' : 'scans'} left this month.`
             : ''}
         </Text>
+        {state.photoUri && state.photoPath ? (
+          <View style={styles.stack}>
+            <View style={styles.photoRow}>
+              <Pressable
+                onPress={() => setShowPhoto(!showPhoto)}
+                accessibilityRole="button"
+                accessibilityLabel={showPhoto ? 'Hide the photo' : 'See the photo larger'}
+                style={({ pressed }) => [styles.thumbnail, pressed && styles.pressed]}
+              >
+                <Image
+                  source={{ uri: state.photoUri }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                  accessibilityIgnoresInvertColors
+                />
+                <View style={styles.thumbnailIcon}>
+                  <Feather
+                    name={showPhoto ? 'minimize-2' : 'maximize-2'}
+                    size={12}
+                    color={colors.ink}
+                  />
+                </View>
+              </Pressable>
+              <View style={styles.flex}>
+                <Text variant="body">Attach the receipt photo</Text>
+                <Text variant="small">
+                  {!keepPhoto
+                    ? 'Not attached. It’s deleted when you save.'
+                    : shared
+                      ? `Everyone in ${groupName} can see it.`
+                      : 'Only you can see it.'}
+                </Text>
+              </View>
+              <Switch
+                value={keepPhoto}
+                onValueChange={onKeepPhotoChange}
+                accessibilityLabel="Attach the receipt photo"
+                trackColor={{ false: colors.controlBorder, true: colors.accent }}
+                thumbColor={colors.background}
+                ios_backgroundColor={colors.controlBorder}
+              />
+            </View>
+            {showPhoto ? (
+              <Pressable
+                onPress={() => setShowPhoto(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Hide the photo"
+                style={styles.photo}
+              >
+                <Image
+                  source={{ uri: state.photoUri }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="contain"
+                  accessibilityLabel="The receipt you scanned"
+                  accessibilityIgnoresInvertColors
+                />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         {onDismissDraft ? (
           <TextButton label="Not a receipt? Dismiss it" icon="x" onPress={onDismissDraft} />
         ) : (
@@ -1443,6 +1566,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
     minHeight: 44,
+  },
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  thumbnail: {
+    width: 48,
+    height: 64,
+    borderRadius: radius.button,
+    overflow: 'hidden',
+    backgroundColor: colors.divider,
+  },
+  thumbnailIcon: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    padding: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.background,
+  },
+  photo: {
+    height: 320,
+    borderRadius: radius.button,
+    overflow: 'hidden',
+    backgroundColor: colors.divider,
   },
   stack: {
     gap: space.md,

@@ -50,6 +50,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="groups/new" options={{ presentation: 'modal' }} />
           <Stack.Screen name="groups/[id]" />
           <Stack.Screen name="expenses/[id]" />
+          <Stack.Screen name="receipt-photo" />
           <Stack.Screen name="settings/profile" />
           <Stack.Screen name="settings/categories" />
           <Stack.Screen name="settings/emails" />

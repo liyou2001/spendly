@@ -384,6 +384,8 @@ export interface FullExpense {
    * category set when it was saved). Only you see it; other people's categories stay private.
    */
   myCategoryId: string | null;
+  /** The receipt photo kept with it, if there is one: where it is and who added it. */
+  receiptPhoto: { path: string; attachedBy: string } | null;
   items: {
     id: string;
     name: string;
@@ -437,7 +439,7 @@ export async function fetchExpense(
   if (error) throw error;
 
   if (data) {
-    const [replacement, forgiveness, mine] = await Promise.all([
+    const [replacement, forgiveness, mine, photo] = await Promise.all([
       supabase.from('expenses').select('id').eq('replaces_expense_id', expenseId).maybeSingle(),
       supabase
         .from('payments')
@@ -446,10 +448,16 @@ export async function fetchExpense(
         .eq('kind', 'forgiveness')
         .eq('status', 'confirmed'),
       supabase.rpc('my_category_for', { p_expense_id: expenseId }),
+      supabase
+        .from('expense_receipts')
+        .select('storage_path, attached_by')
+        .eq('expense_id', expenseId)
+        .maybeSingle(),
     ]);
     if (replacement.error) throw replacement.error;
     if (forgiveness.error) throw forgiveness.error;
     if (mine.error) throw mine.error;
+    if (photo.error) throw photo.error;
     return {
       view: 'full',
       replacesExpenseId: data.replaces_expense_id,
@@ -457,6 +465,9 @@ export async function fetchExpense(
       hasForgiveness: (forgiveness.count ?? 0) > 0,
       createdBy: data.created_by,
       myCategoryId: mine.data ?? null,
+      receiptPhoto: photo.data
+        ? { path: photo.data.storage_path, attachedBy: photo.data.attached_by }
+        : null,
       id: data.id,
       groupId: data.group_id,
       paidBy: data.paid_by,
@@ -519,6 +530,22 @@ export async function fetchExpense(
       };
     }),
   };
+}
+
+/** Keeps the photo you scanned with the expense you just saved, for its group to see. */
+export async function attachReceipt(expenseId: string, path: string): Promise<void> {
+  const { error } = await supabase.rpc('attach_receipt', {
+    p_expense_id: expenseId,
+    p_path: path,
+  });
+  if (error) throw error;
+}
+
+/** A link to a receipt photo, good for an hour. Only works for photos you can see. */
+export async function receiptPhotoUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 // Payments -------------------------------------------------------------------
