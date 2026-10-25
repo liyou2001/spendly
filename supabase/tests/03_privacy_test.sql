@@ -131,7 +131,8 @@ select ok(
 select results_eq(
   $$select f.display_name, t.display_name, b.amount_cents from public.balances() b
     join public.participants f on f.id = b.from_participant
-    join public.participants t on t.id = b.to_participant$$,
+    join public.participants t on t.id = b.to_participant
+    order by f.display_name$$,
   $$values ('Jeff', 'Leo', 1500::bigint), ('Maya', 'Leo', 4200::bigint)$$,
   'Jeff sees the whole group’s balances, including what Maya owes Leo'
 );
