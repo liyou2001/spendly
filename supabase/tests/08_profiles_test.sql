@@ -20,7 +20,7 @@ update public.participants set user_id = 'aaaaaaaa-0000-0000-0000-000000000002'
 where id = '33333333-3333-3333-3333-333333330002';
 
 select tests.as_user('11111111-1111-1111-1111-111111111111');
-update public.profiles set display_name = 'Leo Kim' where id = '11111111-1111-1111-1111-111111111111';
+select public.set_my_name('Leo', 'Kim');
 
 select results_eq(
   $$select distinct display_name from public.participants

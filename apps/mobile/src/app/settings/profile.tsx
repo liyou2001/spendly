@@ -85,16 +85,31 @@ function ProfileEditor({ userId, initial }: { userId: string; initial: ProfileFo
 
   return (
     <>
-      <TextField
-        label="Display name"
-        value={form.display_name}
-        onChangeText={(text) => edit('display_name', text)}
-        hint="What people in your groups see."
-        error={errors.display_name}
-        autoComplete="name"
-        textContentType="name"
-        maxLength={80}
-      />
+      <View style={styles.names}>
+        <View style={styles.flex}>
+          <TextField
+            label="First name"
+            value={form.first_name}
+            onChangeText={(text) => edit('first_name', text)}
+            error={errors.first_name}
+            autoComplete="given-name"
+            textContentType="givenName"
+            maxLength={40}
+          />
+        </View>
+        <View style={styles.flex}>
+          <TextField
+            label="Last name"
+            value={form.last_name}
+            onChangeText={(text) => edit('last_name', text)}
+            error={errors.last_name}
+            autoComplete="family-name"
+            textContentType="familyName"
+            maxLength={40}
+          />
+        </View>
+      </View>
+      <Text variant="small">People in your groups see your full name.</Text>
 
       <UsernameField
         label="Username"
@@ -233,6 +248,13 @@ function AutoConfirm({ userId }: { userId: string }) {
 }
 
 const styles = StyleSheet.create({
+  names: {
+    flexDirection: 'row',
+    gap: space.md,
+  },
+  flex: {
+    flex: 1,
+  },
   warning: {
     flexDirection: 'row',
     gap: space.sm,

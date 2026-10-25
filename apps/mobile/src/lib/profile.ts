@@ -2,10 +2,14 @@ import type { Tables } from '@spendly/db';
 
 import { normalizePhone } from './phone';
 
-/** The profile columns a user can edit (the only ones granted for update). */
+/**
+ * The profile columns a user can edit: the payment ones directly, the names through
+ * set_my_name() (which also sets the name people see, "First Last").
+ */
 export type ProfileFields = Pick<
   Tables<'profiles'>,
-  | 'display_name'
+  | 'first_name'
+  | 'last_name'
   | 'username'
   | 'venmo_username'
   | 'paypal_username'
@@ -17,11 +21,12 @@ export type ProfileForm = Record<keyof ProfileFields, string>;
 export type ProfileErrors = Partial<Record<keyof ProfileFields, string>>;
 
 export const profileColumns =
-  'display_name, username, venmo_username, paypal_username, cashapp_tag, zelle_contact';
+  'first_name, last_name, username, venmo_username, paypal_username, cashapp_tag, zelle_contact';
 
 export function toForm(profile: ProfileFields): ProfileForm {
   return {
-    display_name: profile.display_name,
+    first_name: profile.first_name ?? '',
+    last_name: profile.last_name ?? '',
     username: profile.username,
     venmo_username: profile.venmo_username ?? '',
     paypal_username: profile.paypal_username ?? '',
@@ -59,6 +64,26 @@ export function validateZelle(
     : { ok: false, error: 'Enter the email or US phone number your Zelle uses.' };
 }
 
+/** First and last name, trimmed and checked the way set_my_name() checks them. */
+export function validateName(
+  first: string,
+  last: string,
+):
+  | { ok: true; first: string; last: string }
+  | { ok: false; errors: { first_name?: string; last_name?: string } } {
+  const errors: { first_name?: string; last_name?: string } = {};
+  const firstName = first.trim();
+  const lastName = last.trim();
+  // Count characters the way Postgres does (code points), not UTF-16 units.
+  if (!firstName) errors.first_name = 'Enter your first name.';
+  else if (Array.from(firstName).length > 40) errors.first_name = 'Keep it to 40 characters.';
+  if (!lastName) errors.last_name = 'Enter your last name.';
+  else if (Array.from(lastName).length > 40) errors.last_name = 'Keep it to 40 characters.';
+  return Object.keys(errors).length > 0
+    ? { ok: false, errors }
+    : { ok: true, first: firstName, last: lastName };
+}
+
 /**
  * A Spendly username as typed ("@Jeff_K ") cleaned up and checked: lowercase, no "@", and
  * 3–20 letters, numbers, "_" or ".". Blank means nothing was typed.
@@ -84,7 +109,7 @@ export function validateUsername(
 export function validateProfile(
   form: ProfileForm,
 ): { ok: true; values: ProfileFields } | { ok: false; errors: ProfileErrors } {
-  const displayName = form.display_name.trim();
+  const name = validateName(form.first_name, form.last_name);
   const venmo = form.venmo_username.trim().replace(/^@/, '');
   const paypal = form.paypal_username
     .trim()
@@ -93,11 +118,7 @@ export function validateProfile(
   const cashtag = form.cashapp_tag.trim().replace(/^\$/, '');
   const zelle = validateZelle(form.zelle_contact);
 
-  const errors: ProfileErrors = {};
-  // Count characters the way Postgres does (code points), not UTF-16 units.
-  const nameLength = Array.from(displayName).length;
-  if (nameLength === 0) errors.display_name = 'Enter the name people will see.';
-  else if (nameLength > 80) errors.display_name = 'Keep it to 80 characters or fewer.';
+  const errors: ProfileErrors = name.ok ? {} : { ...name.errors };
   const username = validateUsername(form.username);
   if (!username.ok) errors.username = username.error ?? 'Choose a username.';
   if (venmo && !VENMO.test(venmo)) {
@@ -115,7 +136,8 @@ export function validateProfile(
   return {
     ok: true,
     values: {
-      display_name: displayName,
+      first_name: name.ok ? name.first : '',
+      last_name: name.ok ? name.last : '',
       username: username.ok ? username.username : '',
       venmo_username: venmo || null,
       paypal_username: paypal || null,

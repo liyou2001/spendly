@@ -83,10 +83,7 @@ export default function Home() {
   const { invites, refresh: refreshInvites } = useInvites();
   useFocusEffect(useCallback(() => refreshInvites(), [refreshInvites]));
 
-  const firstName =
-    profile.status === 'ready'
-      ? (profile.data.display_name.split(' ')[0] ?? profile.data.display_name)
-      : null;
+  const firstName = profile.status === 'ready' ? profile.data.first_name || null : null;
   const firstRun = summary.status === 'ready' && summary.data.firstRun;
   const claims =
     people.status === 'ready'

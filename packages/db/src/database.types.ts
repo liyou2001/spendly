@@ -597,7 +597,9 @@ export type Database = {
           cashapp_tag: string | null;
           created_at: string;
           display_name: string;
+          first_name: string | null;
           id: string;
+          last_name: string | null;
           paypal_username: string | null;
           time_zone: string | null;
           username: string;
@@ -610,7 +612,9 @@ export type Database = {
           cashapp_tag?: string | null;
           created_at?: string;
           display_name: string;
+          first_name?: string | null;
           id: string;
+          last_name?: string | null;
           paypal_username?: string | null;
           time_zone?: string | null;
           username: string;
@@ -622,7 +626,9 @@ export type Database = {
           cashapp_tag?: string | null;
           created_at?: string;
           display_name?: string;
+          first_name?: string | null;
           id?: string;
+          last_name?: string | null;
           paypal_username?: string | null;
           time_zone?: string | null;
           username?: string;
@@ -1155,6 +1161,7 @@ export type Database = {
         Args: { p_amount_cents?: number; p_category_id: string; p_month: string };
         Returns: undefined;
       };
+      set_my_name: { Args: { p_first_name: string; p_last_name: string }; Returns: undefined };
       set_share_category: {
         Args: { p_category_id?: string; p_expense_id: string };
         Returns: undefined;

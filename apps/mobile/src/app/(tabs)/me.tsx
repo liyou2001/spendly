@@ -13,7 +13,7 @@ import { space } from '@/theme';
 async function fetchSummary(userId: string) {
   const [profile, categories] = await Promise.all([fetchProfile(userId), fetchCategories(userId)]);
   return {
-    displayName: profile.display_name,
+    displayName: `${profile.first_name} ${profile.last_name}`.trim() || null,
     username: profile.username,
     categoryCount: categories.length,
   };

@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { InvitesProvider } from '@/lib/invites';
+import { NameProvider, useName } from '@/lib/name';
 import { usePushNotifications } from '@/lib/push';
 import { SessionProvider, useSession } from '@/lib/session';
 import { useSaveTimeZone } from '@/lib/timeZone';
@@ -16,16 +17,20 @@ export default function RootLayout() {
 
   return (
     <SessionProvider>
-      {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
-      <RootNavigator fontsReady={fontsLoaded || fontError !== null} />
-      <StatusBar style="dark" />
+      <NameProvider>
+        {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
+        <RootNavigator fontsReady={fontsLoaded || fontError !== null} />
+        <StatusBar style="dark" />
+      </NameProvider>
     </SessionProvider>
   );
 }
 
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const { session, isLoading } = useSession();
-  const ready = fontsReady && !isLoading;
+  const { needsName } = useName();
+  // Signed in, the splash stays until we know whether to ask for a name.
+  const ready = fontsReady && !isLoading && needsName !== null;
   // Only once the navigator below is mounted, so a tapped notification can open its screen.
   usePushNotifications(ready && session !== null);
   useSaveTimeZone(ready && session !== null);
@@ -36,15 +41,16 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
 
   if (!ready) return null;
 
-  // Signed-out users can only reach sign-in; signed-in users can't. Signing in or out flips the
-  // guards, and Expo Router moves to the first screen that's allowed.
+  // Signed-out users can only reach sign-in; signed-in users can't. A new account first gives its
+  // name (welcome). Signing in or out, or saving the name, flips the guards, and Expo Router
+  // moves to the first screen that's allowed.
   return (
     // Keyed by account, so signing in as someone else starts with their invites.
     <InvitesProvider key={session?.user.id ?? 'signed-out'}>
       <Stack
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       >
-        <Stack.Protected guard={session !== null}>
+        <Stack.Protected guard={session !== null && !needsName}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="add-expense" options={{ presentation: 'modal' }} />
           <Stack.Screen name="groups/new" options={{ presentation: 'modal' }} />
@@ -58,6 +64,9 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="people/[id]" />
           <Stack.Screen name="invites" />
           <Stack.Screen name="activity" />
+        </Stack.Protected>
+        <Stack.Protected guard={session !== null && needsName === true}>
+          <Stack.Screen name="welcome" />
         </Stack.Protected>
         <Stack.Protected guard={session === null}>
           <Stack.Screen name="sign-in" />

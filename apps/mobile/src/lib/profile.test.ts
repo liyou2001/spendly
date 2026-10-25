@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateProfile, validateUsername, validateZelle } from './profile';
+import { validateName, validateProfile, validateUsername, validateZelle } from './profile';
 
 describe('validateUsername', () => {
   it('cleans up what was typed: a leading @, spaces and capitals', () => {
@@ -33,7 +33,8 @@ describe('validateUsername', () => {
 
 describe('validateProfile', () => {
   const form = {
-    display_name: 'Leo',
+    first_name: ' Leo ',
+    last_name: 'Li',
     username: '@Leo',
     venmo_username: '@leo-k',
     paypal_username: 'paypal.me/leok',
@@ -45,7 +46,8 @@ describe('validateProfile', () => {
     expect(validateProfile(form)).toEqual({
       ok: true,
       values: {
-        display_name: 'Leo',
+        first_name: 'Leo',
+        last_name: 'Li',
         username: 'leo',
         venmo_username: 'leo-k',
         paypal_username: 'leok',
@@ -77,5 +79,23 @@ describe('validateZelle', () => {
     });
     expect(validateZelle('+447700900123').ok).toBe(false);
     expect(validateZelle('leo').ok).toBe(false);
+  });
+});
+
+describe('validateName', () => {
+  it('trims both names', () => {
+    expect(validateName(' Leo ', ' Li ')).toEqual({ ok: true, first: 'Leo', last: 'Li' });
+  });
+
+  it('requires both, up to 40 characters each, like the database', () => {
+    expect(validateName('', '')).toEqual({
+      ok: false,
+      errors: { first_name: 'Enter your first name.', last_name: 'Enter your last name.' },
+    });
+    expect(validateName('Leo', 'L'.repeat(41))).toEqual({
+      ok: false,
+      errors: { last_name: 'Keep it to 40 characters.' },
+    });
+    expect(validateName('Leo', 'L'.repeat(40)).ok).toBe(true);
   });
 });

@@ -248,9 +248,17 @@ export async function fetchProfile(userId: string): Promise<ProfileForm> {
 
 /** Saves your editable profile fields. Validate them with validateProfile first. */
 export async function updateProfile(userId: string, values: ProfileFields): Promise<void> {
-  const { error } = await supabase.from('profiles').update(values).eq('id', userId);
+  const { first_name, last_name, ...rest } = values;
+  const { error } = await supabase.from('profiles').update(rest).eq('id', userId);
   if (error?.code === '23505')
     throw new UserFacingError('That username was just taken. Try another.');
+  if (error) throw error;
+  await setMyName(first_name ?? '', last_name ?? '');
+}
+
+/** Your first and last name; everyone in your groups then sees "First Last". */
+export async function setMyName(first: string, last: string): Promise<void> {
+  const { error } = await supabase.rpc('set_my_name', { p_first_name: first, p_last_name: last });
   if (error) throw error;
 }
 
