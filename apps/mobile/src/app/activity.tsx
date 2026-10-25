@@ -6,6 +6,7 @@ import { ListRow, Loadable, Money, Screen, Text } from '@/components';
 import { monthLabel, monthStart } from '@/lib/budget';
 import { fetchCategories, fetchSpendingItems } from '@/lib/data';
 import { formatDate, todayLocal } from '@/lib/dates';
+import { goBack } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 
@@ -29,7 +30,7 @@ export default function Activity() {
   return (
     <Screen
       title={onlyUncategorized ? 'Uncategorized' : `Activity · ${monthLabel(month)}`}
-      onBack={() => router.back()}
+      onBack={() => goBack()}
     >
       {onlyUncategorized ? (
         <Text variant="small">

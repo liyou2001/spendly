@@ -49,6 +49,7 @@ import {
 import { explainShare } from '@/lib/breakdown';
 import { formatDate } from '@/lib/dates';
 import { devServerHostUri } from '@/lib/devServer';
+import { goBack } from '@/lib/navigation';
 import { payPageUrl } from '@/lib/payPage';
 import { normalizePhone } from '@/lib/phone';
 import { expensesBehind, paymentLink, paymentNote, requestMessage } from '@/lib/requests';
@@ -121,7 +122,7 @@ export default function PersonDetail() {
   return (
     <Screen
       title={person.status === 'ready' ? person.data.them.displayName : ''}
-      onBack={() => router.back()}
+      onBack={() => goBack('/people')}
     >
       <Loadable load={person} errorMessage="Couldn’t load this person.">
         {(data) => <PersonView {...data} onChanged={person.reload} />}

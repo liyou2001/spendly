@@ -1,5 +1,4 @@
 import Feather from '@expo/vector-icons/Feather';
-import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -20,6 +19,7 @@ import {
   setAutoConfirmDays,
   updateProfile,
 } from '@/lib/data';
+import { goBack } from '@/lib/navigation';
 import { toForm, validateProfile, type ProfileErrors, type ProfileForm } from '@/lib/profile';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
@@ -32,7 +32,7 @@ export default function ProfileSettings() {
   const profile = useLoad(useCallback(() => fetchProfile(userId), [userId]));
 
   return (
-    <Screen title="Profile & payments" onBack={() => router.back()}>
+    <Screen title="Profile & payments" onBack={() => goBack('/me')}>
       <Loadable load={profile} errorMessage="Couldn’t load your profile.">
         {(saved) => <ProfileEditor userId={userId} initial={saved} />}
       </Loadable>

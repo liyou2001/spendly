@@ -1,10 +1,11 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
 import { Image, Linking, Platform, ScrollView, StyleSheet } from 'react-native';
 
 import { Loadable, Screen, Text, TextButton } from '@/components';
 import { fetchExpense, fetchGroup, receiptPhotoUrl } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
+import { goBack } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 
@@ -29,7 +30,7 @@ export default function ReceiptPhoto() {
   const { session } = useSession();
   const userId = session?.user.id ?? '';
   const photo = useLoad(useCallback(() => fetchPhoto(expense, userId), [expense, userId]));
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  const back = () => goBack();
 
   if (photo.status !== 'ready') {
     return (

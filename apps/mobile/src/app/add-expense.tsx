@@ -52,6 +52,7 @@ import {
 } from '@/lib/data';
 import { debtLabel, evenSplitMessage } from '@/lib/labels';
 import { deviceDecimalSeparator } from '@/lib/locale';
+import { goBack } from '@/lib/navigation';
 import { dedupePeople, oneOffName, type KnownPerson } from '@/lib/oneOff';
 import {
   categoryForReceipt,
@@ -140,7 +141,7 @@ export default function AddExpense() {
   const { session } = useSession();
   const userId = session?.user.id ?? '';
   const loaded = useLoad(useCallback(() => fetchForm(userId, edit, draft), [userId, edit, draft]));
-  const close = () => router.back();
+  const close = () => goBack();
 
   if (loaded.status !== 'ready') {
     return (
@@ -490,7 +491,7 @@ function ExpenseForm({
       }
       if (editing) {
         // Close the editor, then swap the old version's screen for the new one.
-        router.back();
+        if (router.canGoBack()) router.back();
       }
       // The forwarded receipt is split; it leaves Needs you.
       if (fromDraft) void closeDraft(fromDraft.id, true).catch(() => undefined);

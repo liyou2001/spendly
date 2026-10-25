@@ -14,6 +14,7 @@ import {
   TextField,
 } from '@/components';
 import { createGroup, friendlyError } from '@/lib/data';
+import { goBack } from '@/lib/navigation';
 import { space } from '@/theme';
 
 interface NewPerson {
@@ -56,7 +57,7 @@ export default function NewGroup() {
     <Screen
       title="New group"
       edges={['top', 'bottom', 'left', 'right']}
-      headerRight={<IconButton icon="x" label="Close" onPress={() => router.back()} />}
+      headerRight={<IconButton icon="x" label="Close" onPress={() => goBack()} />}
     >
       <TextField
         label="Group name"

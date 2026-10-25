@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
@@ -21,6 +20,7 @@ import {
   renameCategory,
   type Category,
 } from '@/lib/data';
+import { goBack } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 import { space } from '@/theme';
@@ -91,7 +91,7 @@ export default function CategorySettings() {
   }
 
   return (
-    <Screen title="Categories" onBack={() => router.back()}>
+    <Screen title="Categories" onBack={() => goBack('/me')}>
       <Text variant="small">How your spending is sorted. Only you see these.</Text>
 
       <Loadable load={categories} errorMessage="Couldn’t load your categories.">

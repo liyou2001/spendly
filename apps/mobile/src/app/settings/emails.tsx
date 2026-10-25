@@ -1,5 +1,4 @@
 import * as Clipboard from 'expo-clipboard';
-import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -25,6 +24,7 @@ import {
   removeEmail,
   verifyEmail,
 } from '@/lib/data';
+import { goBack } from '@/lib/navigation';
 import { useLoad } from '@/lib/useLoad';
 import { space } from '@/theme';
 
@@ -63,7 +63,7 @@ export default function ForwardReceipts() {
   }
 
   return (
-    <Screen title="Forward receipts" onBack={() => router.back()}>
+    <Screen title="Forward receipts" onBack={() => goBack('/me')}>
       <KeyBlock>
         <Text variant="sectionHeading">Forward receipts to</Text>
         {RECEIPTS_EMAIL ? (

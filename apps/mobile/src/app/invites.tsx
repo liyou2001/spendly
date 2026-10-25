@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { InviteRow, Screen, Text } from '@/components';
 import { useInvites } from '@/lib/invites';
+import { goBack } from '@/lib/navigation';
 
 /** Every pending invite, newest first. The People tab shows only the first two. */
 export default function Invites() {
@@ -11,7 +12,7 @@ export default function Invites() {
   useFocusEffect(useCallback(() => refresh(), [refresh]));
 
   return (
-    <Screen title="Invites" onBack={() => router.back()}>
+    <Screen title="Invites" onBack={() => goBack()}>
       {invites.length === 0 ? (
         <Text variant="small">No invites right now.</Text>
       ) : (

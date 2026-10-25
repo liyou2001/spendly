@@ -35,6 +35,7 @@ import {
 import { formatDate } from '@/lib/dates';
 import { explainShare } from '@/lib/breakdown';
 import { debtLabel, itemTitle, yourPartOf } from '@/lib/labels';
+import { goBack } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import { canEditExpense, labelForIds, owedToPayer, type SplitPeople } from '@/lib/split';
 import { useLoad } from '@/lib/useLoad';
@@ -54,7 +55,7 @@ export default function ExpenseDetail() {
   const { session } = useSession();
   const userId = session?.user.id ?? '';
   const detail = useLoad(useCallback(() => fetchDetail(id, userId), [id, userId]));
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
+  const back = () => goBack();
 
   if (detail.status !== 'ready') {
     return (

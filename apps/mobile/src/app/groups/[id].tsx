@@ -28,6 +28,7 @@ import {
 } from '@/lib/data';
 import { formatDate } from '@/lib/dates';
 import { debtLabel, expenseListNote } from '@/lib/labels';
+import { goBack } from '@/lib/navigation';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 import { colors, space } from '@/theme';
@@ -51,7 +52,7 @@ export default function GroupDetail() {
   return (
     <Screen
       title={detail.status === 'ready' ? detail.data.group.name : ''}
-      onBack={() => router.back()}
+      onBack={() => goBack('/people')}
     >
       <Loadable load={detail} errorMessage="Couldn’t load this group.">
         {({ group, balances, expenses }) => {

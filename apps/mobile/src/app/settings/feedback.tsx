@@ -1,8 +1,8 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { Button, FormMessage, Screen, Text, TextField } from '@/components';
 import { friendlyError, sendFeedback } from '@/lib/data';
+import { goBack } from '@/lib/navigation';
 
 export default function Feedback() {
   const [message, setMessage] = useState('');
@@ -30,7 +30,7 @@ export default function Feedback() {
   }
 
   return (
-    <Screen title="Send feedback" onBack={() => router.back()}>
+    <Screen title="Send feedback" onBack={() => goBack('/me')}>
       <Text variant="body">
         Something confusing, broken or missing? Tell us in your own words. A sentence is plenty.
       </Text>
