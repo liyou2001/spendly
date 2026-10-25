@@ -10,7 +10,7 @@
     "ios": "npm run start -- --ios",
     "web": "npm run start -- --web",
     "build:web:prod": "rm -rf dist && node --env-file=.env.prod ../../node_modules/expo/bin/cli export --platform web",
-    "deploy:web:prod": "npm run build:web:prod && npx vercel deploy dist --prod",
+    "deploy:web:prod": "npm run build:web:prod && node scripts/vercel-output.mjs && cd ../.. && npx vercel deploy --prebuilt --prod",
     "typecheck": "tsc --noEmit",
     "doctor": "expo-doctor",
     "test": "vitest run"

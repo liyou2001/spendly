@@ -52,3 +52,4 @@ receipts/
 # Cloudflare Worker local state and secrets
 .wrangler/
 .dev.vars
+.vercel

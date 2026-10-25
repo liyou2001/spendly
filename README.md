@@ -292,11 +292,20 @@ For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.
 
 To let friends try the app without the App Store, publish the web version on Vercel. It talks to the hosted project (`apps/mobile/.env.prod`):
 
+Needs Node 24 (`nvm use`; the Vercel CLI refuses Node 20). The first time, log in and link the project from the repo root:
+
+```sh
+npx vercel login
+npx vercel link
+```
+
+Then, and after every change you want to publish:
+
 ```sh
 npm run web:deploy
 ```
 
-This builds the site into `apps/mobile/dist` and uploads it. The first time, the Vercel CLI asks you to log in and name the project; it prints the link (`https://<name>.vercel.app`). Run it again after changes to publish a new version. To check the build on your computer first: `npm run build:web:prod --workspace mobile`, then `npx expo serve` from `apps/mobile`.
+This builds the site into `apps/mobile/dist`, packs it as a prebuilt deployment in `.vercel/output` (with the rules that send every path to `index.html`, so deep links and refreshes work), and uploads exactly that. The link is `https://<name>.vercel.app`. To check the build on your computer first: `npm run build:web:prod --workspace mobile`, then `npx expo serve` from `apps/mobile`.
 
 - Friends sign in with their own email, so codes must reach any inbox: the hosted project needs SMTP from a verified domain (see above).
 - Push notifications and texting from the phone don't work on the web.
