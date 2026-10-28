@@ -307,6 +307,8 @@ npm run web:deploy
 
 This builds the site into `apps/mobile/dist`, packs it as a prebuilt deployment in `.vercel/output` (with the rules that send every path to `index.html`, so deep links and refreshes work), and uploads exactly that. The link is `https://<name>.vercel.app`. To check the build on your computer first: `npm run build:web:prod --workspace mobile`, then `npx expo serve` from `apps/mobile`.
 
+Pushing to GitHub doesn't deploy, even with the Vercel project connected to the repo: `vercel.json` at the repo root turns off deploys from Git. A Git build would run at the repo root, where there's no site, and replace the live one with an empty page.
+
 - Friends sign in with their own email, so codes must reach any inbox: the hosted project needs SMTP from a verified domain (see above).
 - Push notifications and texting from the phone don't work on the web.
 - Payment links need the payment page deployed too ([Deploying the page to Vercel](#deploying-the-page-to-vercel)) and its URL in `EXPO_PUBLIC_PAY_PAGE_URL` in `.env.prod`. Without it, the app doesn't offer links.
