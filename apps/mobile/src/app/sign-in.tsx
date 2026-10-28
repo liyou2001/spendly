@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Screen, Text, TextField } from '@/components';
+import { goBack } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import { colors, space } from '@/theme';
 
@@ -77,7 +78,11 @@ export default function SignIn() {
       style={styles.fill}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Screen edges={['top', 'bottom', 'left', 'right']}>
+      <Screen
+        edges={['top', 'bottom', 'left', 'right']}
+        // On the web, back to the landing page; the app starts here.
+        {...(Platform.OS === 'web' ? { onBack: () => goBack('/landing') } : {})}
+      >
         <View style={styles.intro}>
           <Text variant="screenTitle" accessibilityRole="header">
             Spendly

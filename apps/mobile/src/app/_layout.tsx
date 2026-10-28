@@ -2,6 +2,7 @@ import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 import { InvitesProvider } from '@/lib/invites';
 import { NameProvider, useName } from '@/lib/name';
@@ -67,6 +68,10 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
         </Stack.Protected>
         <Stack.Protected guard={session !== null && needsName === true}>
           <Stack.Screen name="welcome" />
+        </Stack.Protected>
+        {/* On the web, signed-out visitors land here first; the app goes straight to sign-in. */}
+        <Stack.Protected guard={session === null && Platform.OS === 'web'}>
+          <Stack.Screen name="landing" />
         </Stack.Protected>
         <Stack.Protected guard={session === null}>
           <Stack.Screen name="sign-in" />
