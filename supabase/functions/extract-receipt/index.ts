@@ -4,9 +4,10 @@
 // the expense (attach_receipt); one that doesn't is deleted, and clean-receipts deletes kept
 // ones that never get attached. Every attempt is logged in receipt_extractions.
 import { adminClient, withinLimit } from '../_shared/admin.ts';
+import { scanAllowance, type ScanAllowance } from '../_shared/allowance.ts';
 import { corsHeaders, fail, json, readBody, TOO_MANY } from '../_shared/http.ts';
 import { receiptReader } from '../_shared/reader.ts';
-import { extractReceipt, monthlyScanLimit, toBase64 } from '../_shared/receipt.ts';
+import { extractReceipt, toBase64 } from '../_shared/receipt.ts';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -31,15 +32,19 @@ Deno.serve(async (req) => {
     return fail(503, 'Receipt scanning isn’t set up yet. Enter it by hand for now.');
   }
   if (!(await withinLimit(admin, `receipt:user:${user.id}`, 20, 3600))) return fail(429, TOO_MANY);
-  const limit = monthlyScanLimit(Deno.env.get('RECEIPT_SCANS_PER_MONTH'));
-  const { data: used, error: countError } = await admin.rpc('receipt_scans_this_month', {
-    p_user_id: user.id,
-  });
-  if (countError) return fail(500, 'Something went wrong. Try again.');
-  if (used >= limit) {
+  let allowance: ScanAllowance;
+  try {
+    allowance = await scanAllowance(admin, user.id);
+  } catch (error) {
+    console.error('Couldn’t count scans', error);
+    return fail(500, 'Something went wrong. Try again.');
+  }
+  if (allowance.left <= 0) {
     return fail(
       429,
-      `You’ve used all ${limit} receipt scans this month. Enter it by hand for now.`,
+      allowance.limit === 0
+        ? 'Receipt scanning is off for now. Enter it by hand.'
+        : `You’ve used all ${allowance.limit} receipt scans this month. Enter it by hand for now.`,
     );
   }
 
@@ -85,5 +90,11 @@ Deno.serve(async (req) => {
   if (outcome.status === 'failed') {
     return fail(502, 'Couldn’t read receipts right now. Try again, or enter it by hand.');
   }
-  return json({ ...outcome, scans_left: Math.max(limit - used - 1, 0) });
+  // This scan counts too. The limit and reset date let the app show the count from this alone.
+  return json({
+    ...outcome,
+    scans_left: Math.max(allowance.left - 1, 0),
+    scan_limit: allowance.limit,
+    resets_on: allowance.resetsOn,
+  });
 });

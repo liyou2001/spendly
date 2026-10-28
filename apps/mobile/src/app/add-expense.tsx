@@ -1,6 +1,6 @@
 import { formatCents } from '@spendly/ledger';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
 import {
   ActivityIndicator,
@@ -144,6 +144,9 @@ export default function AddExpense() {
   const { session } = useSession();
   const userId = session?.user.id ?? '';
   const loaded = useLoad(useCallback(() => fetchForm(userId, edit, draft), [userId, edit, draft]));
+  // Scans left this month, asked for alongside the form rather than after it. Not for edits or
+  // forwarded receipts, which don't scan.
+  const [firstAllowance] = useState(() => (edit || draft ? null : fetchScanAllowance()));
   const close = () => goBack();
 
   if (loaded.status !== 'ready') {
@@ -178,6 +181,7 @@ export default function AddExpense() {
       editing={loaded.data.editing}
       fromDraft={loaded.data.fromDraft}
       knownPeople={loaded.data.knownPeople}
+      firstAllowance={firstAllowance}
       onGroupsChanged={loaded.reload}
       onClose={close}
     />
@@ -219,6 +223,8 @@ interface ExpenseFormProps {
   fromDraft: ReceiptDraft | null;
   /** People from your other groups, suggested when starting a quick split. */
   knownPeople: KnownPerson[];
+  /** Scans left this month, already being fetched; null when this form won't scan. */
+  firstAllowance: Promise<ScanAllowance | null> | null;
   onGroupsChanged: () => void;
   onClose: () => void;
 }
@@ -231,6 +237,7 @@ function ExpenseForm({
   editing,
   fromDraft,
   knownPeople,
+  firstAllowance,
   onGroupsChanged,
   onClose,
 }: ExpenseFormProps) {
@@ -302,19 +309,27 @@ function ExpenseForm({
   // The last scanned photo, so scanning again deletes the one it replaces.
   const lastPhoto = useRef<string | null>(null);
   const [keepPhoto, setKeepPhoto] = useState(true);
-  // Scans left this month, shown under the scan buttons. Not for edits or forwarded receipts,
-  // which don't scan.
+  // Scans left this month, shown under the scan buttons. The server keeps the count; the form
+  // asks again after every scan, so cancelled scans, refused ones and forwarded emails show too.
+  const canScan = !editing && !fromDraft;
   const [allowance, setAllowance] = useState<ScanAllowance | null>(null);
-  useEffect(() => {
-    if (editing || fromDraft) return;
-    let live = true;
-    void fetchScanAllowance().then((loaded) => {
-      if (live) setAllowance(loaded);
+  // Only the newest answer counts: a slow earlier request never overwrites a later one.
+  const allowanceVersion = useRef(0);
+  const pendingAllowance = useRef(firstAllowance);
+  const refreshAllowance = useCallback((request: Promise<ScanAllowance | null>) => {
+    const version = ++allowanceVersion.current;
+    void request.then((loaded) => {
+      if (loaded && version === allowanceVersion.current) setAllowance(loaded);
     });
-    return () => {
-      live = false;
-    };
-  }, [editing, fromDraft]);
+  }, []);
+  // On opening, and on coming back to this screen, since a new month may have started.
+  useFocusEffect(
+    useCallback(() => {
+      if (!canScan) return;
+      refreshAllowance(pendingAllowance.current ?? fetchScanAllowance());
+      pendingAllowance.current = null;
+    }, [canScan, refreshAllowance]),
+  );
   const scanning = scan.status === 'scanning';
 
   const people: SplitPeople = useMemo(
@@ -401,8 +416,13 @@ function ExpenseForm({
 
   /** Fills the form from a scanned receipt. The AI's draft is only a start: everything is editable. */
   function applyScan(scanned: ScanResult & { path: string; previewUri: string }) {
-    // Every read scan counts, unreadable ones too; the server says how many are left.
-    setAllowance((prev) => (prev ? { ...prev, left: scanned.scans_left } : prev));
+    // This scan's own count straight away, ahead of any older request still on its way.
+    allowanceVersion.current++;
+    setAllowance((prev) => ({
+      left: scanned.scans_left,
+      limit: scanned.scan_limit ?? prev?.limit ?? null,
+      resetsOn: scanned.resets_on ?? prev?.resetsOn ?? null,
+    }));
     // An unreadable photo is already deleted; a readable one replaces any earlier scan's.
     if (scanned.status !== 'unreadable') {
       if (lastPhoto.current) discardReceiptPhoto(lastPhoto.current);
@@ -411,7 +431,10 @@ function ExpenseForm({
     if (scanned.status === 'unreadable') {
       setScan({
         status: 'error',
-        message: `Couldn’t read that receipt (${scanned.problem}). Try a sharper photo in good light, or enter it by hand.`,
+        message:
+          scanned.scans_left > 0
+            ? `Couldn’t read that receipt (${scanned.problem}). Try a sharper photo in good light, or enter it by hand.`
+            : `Couldn’t read that receipt (${scanned.problem}). Enter it by hand.`,
       });
       return;
     }
@@ -446,16 +469,21 @@ function ExpenseForm({
   async function scanPhoto(getPhoto: () => Promise<Photo | null>) {
     // A cancelled scan's result is ignored when it arrives.
     const attempt = ++scanAttempt.current;
+    let sent = false;
     try {
       const photo = await getPhoto();
       if (!photo) return;
       setScan({ status: 'scanning' });
+      sent = true;
       const scanned = await scanReceipt(userId, photo);
       if (attempt === scanAttempt.current) applyScan(scanned);
     } catch (e) {
       if (attempt === scanAttempt.current) {
         setScan({ status: 'error', message: friendlyError(e as Error) });
       }
+    } finally {
+      // Any attempt that reached the server may have used a scan, even a cancelled one.
+      if (sent) refreshAllowance(fetchScanAllowance());
     }
   }
 
@@ -1359,12 +1387,15 @@ function ScanReceipt({
       </View>
     );
   }
-  const scans = allowance ? scansLeftLabel(allowance) : null;
-  // With none left, a note replaces the buttons, since a scan would be refused.
-  const scansLine = scans ? <ScansLeft text={scans.text} low={scans.low} /> : null;
-  const buttons = scans?.none ? (
-    scansLine
-  ) : (
+  const scans = allowance
+    ? scansLeftLabel(
+        allowance,
+        state.status === 'read' ? 'read' : state.status === 'error' ? 'error' : 'idle',
+      )
+    : null;
+  const scansLine = scans?.text ? <ScansLeft text={scans.text} low={scans.low} /> : null;
+  // With none left, the buttons go: another scan would be refused.
+  const buttons = scans?.none ? null : (
     <View style={styles.wrap}>
       <TextButton
         label={state.status === 'read' ? 'Scan again' : 'Take photo'}
@@ -1450,7 +1481,7 @@ function ScanReceipt({
         ) : (
           <>
             {buttons}
-            {scans && !scans.none ? scansLine : null}
+            {scansLine}
           </>
         )}
       </View>
@@ -1460,18 +1491,18 @@ function ScanReceipt({
     <View style={styles.stack}>
       {scans?.none ? null : <Text variant="small">Have the receipt? Scan it to fill this in.</Text>}
       {buttons}
-      {scans && !scans.none ? scansLine : null}
       {state.status === 'error' ? <FormMessage message={state.message} /> : null}
+      {scansLine}
     </View>
   );
 }
 
-/** Scans left this month: a quiet line, with an attention dot when few or none are left. */
+/** Scans left this month: a quiet muted line; the attention dot marks few or none left. */
 function ScansLeft({ text, low }: { text: string; low: boolean }) {
   return (
     <View style={styles.scansLeft}>
       {low ? <View style={styles.attentionDot} /> : null}
-      <Text variant="caption" style={[styles.flex, low && styles.inkText]}>
+      <Text variant="caption" style={styles.flex}>
         {text}
       </Text>
     </View>
@@ -1616,9 +1647,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
     borderRadius: radius.pill,
     backgroundColor: colors.accent,
-  },
-  inkText: {
-    color: colors.ink,
   },
   photoRow: {
     flexDirection: 'row',

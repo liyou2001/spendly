@@ -18,11 +18,16 @@ export interface ScannedReceipt {
   category: string | null;
 }
 
-export type ScanResult =
+export type ScanResult = (
   | { status: 'ok'; receipt: ScannedReceipt; scans_left: number }
   /** The lines read don't add up to the total, off by gap_cents (lines minus total). */
   | { status: 'mismatch'; receipt: ScannedReceipt; gap_cents: Cents; scans_left: number }
-  | { status: 'unreadable'; problem: string; scans_left: number };
+  | { status: 'unreadable'; problem: string; scans_left: number }
+) & {
+  /** The monthly limit and when it resets; missing from servers before scan-allowance. */
+  scan_limit?: number;
+  resets_on?: string;
+};
 
 /** The scan's lines as an itemized draft. Every item starts as yours, to assign on screen. */
 export function draftFromReceipt(
@@ -106,37 +111,46 @@ export function hasEnteredDetails(draft: Draft, merchant: string): boolean {
   );
 }
 
-/** How many receipt scans you have left this month, and when they come back (scan-allowance). */
+/** How many receipt scans you have left this month, and when they come back. */
 export interface ScanAllowance {
   left: number;
-  limit: number;
-  /** The first of next month, "2026-11-01". */
-  resetsOn: string;
+  /** null when only a scan's own count is known, from a server older than scan-allowance. */
+  limit: number | null;
+  /** The first of next month, "2026-11-01"; null when unknown. */
+  resetsOn: string | null;
 }
 
-/** At or below this, the count is shown with an attention dot. */
+/** At or below this, the count gets an attention dot. */
 export const LOW_SCANS = 5;
 
 /**
- * The quiet line under the scan buttons. `low` adds the attention dot; `none` replaces the
- * buttons, since a scan would be refused.
+ * The quiet line under the scan buttons: before a scan, after one that read (`read`), or after
+ * one that didn't (`error`, whose own message already says to enter it by hand). `low` adds the
+ * attention dot; `none` hides the buttons, since another scan would be refused. Empty text
+ * means there's nothing to add.
  */
-export function scansLeftLabel(allowance: ScanAllowance): {
-  text: string;
-  low: boolean;
-  none: boolean;
-} {
+export function scansLeftLabel(
+  allowance: ScanAllowance,
+  context: 'idle' | 'read' | 'error' = 'idle',
+): { text: string; low: boolean; none: boolean } {
   const { left, limit, resetsOn } = allowance;
-  if (left <= 0) {
+  if (left > 0) {
     return {
-      text: `You’ve used all ${limit} scans this month. Enter this one by hand. Scans come back ${monthDay(resetsOn)}.`,
-      low: true,
-      none: true,
+      text: `${left} ${left === 1 ? 'scan' : 'scans'} left this month`,
+      low: left <= LOW_SCANS,
+      none: false,
     };
   }
-  return {
-    text: `${left} ${left === 1 ? 'scan' : 'scans'} left this month`,
-    low: left <= LOW_SCANS,
-    none: false,
-  };
+  if (limit === 0) {
+    return { text: 'Receipt scanning is off for now.', low: true, none: true };
+  }
+  const back = resetsOn ? `Scans come back ${monthDay(resetsOn)}.` : '';
+  const used =
+    limit === null ? 'all your scans' : limit === 1 ? 'your one scan' : `all ${limit} scans`;
+  const text = {
+    idle: `You’ve used ${used} this month. Enter this one by hand. ${back}`,
+    read: `That was your last scan this month. ${back}`,
+    error: back,
+  }[context].trim();
+  return { text, low: true, none: true };
 }

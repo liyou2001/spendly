@@ -7,6 +7,7 @@ import {
   extractReceipt,
   mathGap,
   monthlyScanLimit,
+  nextMonthStart,
   parseReading,
   RECEIPT_SCHEMA,
   toBase64,
@@ -391,4 +392,11 @@ Deno.test('emails are sent as fenced text, and PDFs as documents', async () => {
     fetchImpl: fakeFetch as typeof fetch,
   });
   assertEquals(blocks()[0]?.type, 'document');
+});
+
+Deno.test('Scans reset on the 1st of next month, UTC', () => {
+  assertEquals(nextMonthStart(new Date('2026-10-27T19:00:00Z')), '2026-11-01');
+  assertEquals(nextMonthStart(new Date('2026-12-31T23:59:59Z')), '2027-01-01');
+  // Still October in New York, already November in UTC: the UTC month counts.
+  assertEquals(nextMonthStart(new Date('2026-11-01T02:00:00Z')), '2026-12-01');
 });

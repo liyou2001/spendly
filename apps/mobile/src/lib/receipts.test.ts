@@ -134,11 +134,32 @@ describe('scansLeftLabel', () => {
     expect(scansLeftLabel({ ...allowance, left: 1 }).text).toBe('1 scan left this month');
   });
 
-  it('says when scans come back once they are all used', () => {
+  it('with none left, says what to do and when scans come back', () => {
     expect(scansLeftLabel({ ...allowance, left: 0 })).toEqual({
       text: 'You’ve used all 40 scans this month. Enter this one by hand. Scans come back Nov 1.',
       low: true,
       none: true,
     });
+  });
+
+  it('after the last scan reads, doesn’t say to enter it by hand', () => {
+    expect(scansLeftLabel({ ...allowance, left: 0 }, 'read').text).toBe(
+      'That was your last scan this month. Scans come back Nov 1.',
+    );
+    // An error already says to enter it by hand.
+    expect(scansLeftLabel({ ...allowance, left: 0 }, 'error').text).toBe('Scans come back Nov 1.');
+  });
+
+  it('reads right for any limit, or none known', () => {
+    expect(scansLeftLabel({ left: 0, limit: 1, resetsOn: '2026-11-01' }).text).toBe(
+      'You’ve used your one scan this month. Enter this one by hand. Scans come back Nov 1.',
+    );
+    expect(scansLeftLabel({ left: 0, limit: 0, resetsOn: '2026-11-01' }).text).toBe(
+      'Receipt scanning is off for now.',
+    );
+    expect(scansLeftLabel({ left: 0, limit: null, resetsOn: null }).text).toBe(
+      'You’ve used all your scans this month. Enter this one by hand.',
+    );
+    expect(scansLeftLabel({ left: 0, limit: null, resetsOn: null }, 'error').text).toBe('');
   });
 });

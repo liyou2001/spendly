@@ -322,3 +322,10 @@ export function monthlyScanLimit(value: string | undefined): number {
   const limit = Number(value);
   return value && Number.isSafeInteger(limit) && limit >= 0 ? limit : 40;
 }
+
+/** "2026-11-01": when scans counted this month (UTC, like receipt_scans_this_month) reset. */
+export function nextMonthStart(now: Date): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+    .toISOString()
+    .slice(0, 10);
+}
