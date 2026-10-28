@@ -4,8 +4,9 @@ import {
   categoryForReceipt,
   draftFromReceipt,
   hasEnteredDetails,
-  totalCheck,
   type ScannedReceipt,
+  scansLeftLabel,
+  totalCheck,
 } from './receipts';
 import { buildSplit, type Draft, type DraftItem } from './split';
 
@@ -114,5 +115,30 @@ describe('hasEnteredDetails', () => {
     expect(hasEnteredDetails(withItems({ assignment: { kind: 'all' } }), '')).toBe(true);
     expect(hasEnteredDetails({ ...empty, tax: '1.00' }, '')).toBe(true);
     expect(hasEnteredDetails({ ...empty, quickTotal: '20' }, '')).toBe(true);
+  });
+});
+
+describe('scansLeftLabel', () => {
+  const allowance = { left: 32, limit: 40, resetsOn: '2026-11-01' };
+
+  it('is a quiet count most of the time', () => {
+    expect(scansLeftLabel(allowance)).toEqual({
+      text: '32 scans left this month',
+      low: false,
+      none: false,
+    });
+  });
+
+  it('flags the last few, in the singular for one', () => {
+    expect(scansLeftLabel({ ...allowance, left: 5 })).toMatchObject({ low: true, none: false });
+    expect(scansLeftLabel({ ...allowance, left: 1 }).text).toBe('1 scan left this month');
+  });
+
+  it('says when scans come back once they are all used', () => {
+    expect(scansLeftLabel({ ...allowance, left: 0 })).toEqual({
+      text: 'You’ve used all 40 scans this month. Enter this one by hand. Scans come back Nov 1.',
+      low: true,
+      none: true,
+    });
   });
 });

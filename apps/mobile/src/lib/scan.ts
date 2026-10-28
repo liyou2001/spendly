@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
 import { UserFacingError } from './data';
-import type { ScanResult } from './receipts';
+import type { ScanAllowance, ScanResult } from './receipts';
 import { supabase } from './supabase';
 
 /** Claude reads images up to about this many pixels on the long edge; larger ones are scaled. */
@@ -115,6 +115,17 @@ export async function scanReceipt(
     );
   }
   return { ...data, path, previewUri: uri };
+}
+
+/** Scans left this month, from the server, which holds the limit. null if it can't say. */
+export async function fetchScanAllowance(): Promise<ScanAllowance | null> {
+  const { data, error } = await supabase.functions.invoke<{
+    limit: number;
+    left: number | null;
+    resets_on: string;
+  }>('scan-allowance');
+  if (error || !data || data.left === null) return null;
+  return { left: data.left, limit: data.limit, resetsOn: data.resets_on };
 }
 
 /**

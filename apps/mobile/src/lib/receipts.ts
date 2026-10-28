@@ -1,6 +1,7 @@
 // Turning a scanned receipt into the Add expense form (Step 9). Pure, so it's unit tested.
 import { formatAmount, formatCents, type Cents } from '@spendly/ledger';
 
+import { monthDay } from './dates';
 import type { Draft, SplitOptions } from './split';
 
 /** The draft extract-receipt returns. Amounts are whole cents; the lines were added up in code. */
@@ -103,4 +104,39 @@ export function hasEnteredDetails(draft: Draft, merchant: string): boolean {
       item.quantity.trim() ||
       item.assignment.kind !== 'you',
   );
+}
+
+/** How many receipt scans you have left this month, and when they come back (scan-allowance). */
+export interface ScanAllowance {
+  left: number;
+  limit: number;
+  /** The first of next month, "2026-11-01". */
+  resetsOn: string;
+}
+
+/** At or below this, the count is shown with an attention dot. */
+export const LOW_SCANS = 5;
+
+/**
+ * The quiet line under the scan buttons. `low` adds the attention dot; `none` replaces the
+ * buttons, since a scan would be refused.
+ */
+export function scansLeftLabel(allowance: ScanAllowance): {
+  text: string;
+  low: boolean;
+  none: boolean;
+} {
+  const { left, limit, resetsOn } = allowance;
+  if (left <= 0) {
+    return {
+      text: `You’ve used all ${limit} scans this month. Enter this one by hand. Scans come back ${monthDay(resetsOn)}.`,
+      low: true,
+      none: true,
+    };
+  }
+  return {
+    text: `${left} ${left === 1 ? 'scan' : 'scans'} left this month`,
+    low: left <= LOW_SCANS,
+    none: false,
+  };
 }

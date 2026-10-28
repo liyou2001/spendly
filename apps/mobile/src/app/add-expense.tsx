@@ -1,6 +1,6 @@
 import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
 import {
   ActivityIndicator,
@@ -58,12 +58,15 @@ import {
   categoryForReceipt,
   draftFromReceipt,
   hasEnteredDetails,
+  scansLeftLabel,
   totalCheck,
+  type ScanAllowance,
   type ScannedReceipt,
   type ScanResult,
 } from '@/lib/receipts';
 import {
   discardReceiptPhoto,
+  fetchScanAllowance,
   pickReceiptPhoto,
   scanReceipt,
   usesPageCamera,
@@ -290,7 +293,6 @@ function ExpenseForm({
       ? {
           status: 'read',
           receipt: fromDraft.receipt,
-          scansLeft: Number.POSITIVE_INFINITY,
           photoPath: null,
           photoUri: null,
         }
@@ -300,6 +302,19 @@ function ExpenseForm({
   // The last scanned photo, so scanning again deletes the one it replaces.
   const lastPhoto = useRef<string | null>(null);
   const [keepPhoto, setKeepPhoto] = useState(true);
+  // Scans left this month, shown under the scan buttons. Not for edits or forwarded receipts,
+  // which don't scan.
+  const [allowance, setAllowance] = useState<ScanAllowance | null>(null);
+  useEffect(() => {
+    if (editing || fromDraft) return;
+    let live = true;
+    void fetchScanAllowance().then((loaded) => {
+      if (live) setAllowance(loaded);
+    });
+    return () => {
+      live = false;
+    };
+  }, [editing, fromDraft]);
   const scanning = scan.status === 'scanning';
 
   const people: SplitPeople = useMemo(
@@ -386,6 +401,8 @@ function ExpenseForm({
 
   /** Fills the form from a scanned receipt. The AI's draft is only a start: everything is editable. */
   function applyScan(scanned: ScanResult & { path: string; previewUri: string }) {
+    // Every read scan counts, unreadable ones too; the server says how many are left.
+    setAllowance((prev) => (prev ? { ...prev, left: scanned.scans_left } : prev));
     // An unreadable photo is already deleted; a readable one replaces any earlier scan's.
     if (scanned.status !== 'unreadable') {
       if (lastPhoto.current) discardReceiptPhoto(lastPhoto.current);
@@ -410,7 +427,6 @@ function ExpenseForm({
     setScan({
       status: 'read',
       receipt,
-      scansLeft: scanned.scans_left,
       photoPath: scanned.path,
       photoUri: scanned.previewUri,
     });
@@ -570,6 +586,7 @@ function ExpenseForm({
               onConfirm={scanFrom}
               onPhoto={(photo) => void scanPhoto(async () => photo)}
               onCancel={cancelScan}
+              allowance={allowance}
               keepPhoto={keepPhoto}
               onKeepPhotoChange={setKeepPhoto}
               shared={shared}
@@ -1263,7 +1280,6 @@ type ScanState =
   | {
       status: 'read';
       receipt: ScannedReceipt;
-      scansLeft: number;
       photoPath: string | null;
       photoUri: string | null;
     }
@@ -1282,6 +1298,7 @@ function ScanReceipt({
   onPhoto,
   onCancel,
   onDismissDraft,
+  allowance,
   keepPhoto,
   onKeepPhotoChange,
   shared,
@@ -1289,6 +1306,8 @@ function ScanReceipt({
 }: {
   state: ScanState;
   currentTotal: number | null;
+  /** Scans left this month; null while unknown, and for edits and forwarded receipts. */
+  allowance: ScanAllowance | null;
   /** Keep the scanned photo with the expense when it's saved. */
   keepPhoto: boolean;
   onKeepPhotoChange: (keep: boolean) => void;
@@ -1340,7 +1359,12 @@ function ScanReceipt({
       </View>
     );
   }
-  const buttons = (
+  const scans = allowance ? scansLeftLabel(allowance) : null;
+  // With none left, a note replaces the buttons, since a scan would be refused.
+  const scansLine = scans ? <ScansLeft text={scans.text} low={scans.low} /> : null;
+  const buttons = scans?.none ? (
+    scansLine
+  ) : (
     <View style={styles.wrap}>
       <TextButton
         label={state.status === 'read' ? 'Scan again' : 'Take photo'}
@@ -1360,9 +1384,6 @@ function ScanReceipt({
             ? `, and it matches the total of ${formatCents(state.receipt.total_cents)}`
             : ''}
           . Check each line, then choose who each item is for.
-          {state.scansLeft <= 5
-            ? ` ${state.scansLeft} ${state.scansLeft === 1 ? 'scan' : 'scans'} left this month.`
-            : ''}
         </Text>
         {state.photoUri && state.photoPath ? (
           <View style={styles.stack}>
@@ -1427,16 +1448,32 @@ function ScanReceipt({
         {onDismissDraft ? (
           <TextButton label="Not a receipt? Dismiss it" icon="x" onPress={onDismissDraft} />
         ) : (
-          buttons
+          <>
+            {buttons}
+            {scans && !scans.none ? scansLine : null}
+          </>
         )}
       </View>
     );
   }
   return (
     <View style={styles.stack}>
-      <Text variant="small">Have the receipt? Scan it to fill this in.</Text>
+      {scans?.none ? null : <Text variant="small">Have the receipt? Scan it to fill this in.</Text>}
       {buttons}
+      {scans && !scans.none ? scansLine : null}
       {state.status === 'error' ? <FormMessage message={state.message} /> : null}
+    </View>
+  );
+}
+
+/** Scans left this month: a quiet line, with an attention dot when few or none are left. */
+function ScansLeft({ text, low }: { text: string; low: boolean }) {
+  return (
+    <View style={styles.scansLeft}>
+      {low ? <View style={styles.attentionDot} /> : null}
+      <Text variant="caption" style={[styles.flex, low && styles.inkText]}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -1567,6 +1604,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
     minHeight: 44,
+  },
+  scansLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space.sm,
+  },
+  attentionDot: {
+    width: 8,
+    height: 8,
+    marginTop: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+  },
+  inkText: {
+    color: colors.ink,
   },
   photoRow: {
     flexDirection: 'row',
