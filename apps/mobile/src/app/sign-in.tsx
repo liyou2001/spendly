@@ -41,7 +41,7 @@ export default function SignIn() {
   async function submitEmail() {
     const address = email.trim().toLowerCase();
     if (!EMAIL.test(address)) {
-      setError('Enter an email address like you@school.edu.');
+      setError('Enter an email address like you@example.com.');
       return;
     }
     if (await sendCode(address)) {
@@ -96,7 +96,7 @@ export default function SignIn() {
               label="Email"
               value={email}
               onChangeText={setEmail}
-              placeholder="you@school.edu"
+              placeholder="you@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
