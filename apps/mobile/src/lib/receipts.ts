@@ -27,6 +27,8 @@ export type ScanResult = (
   /** The monthly limit and when it resets; missing from servers before scan-allowance. */
   scan_limit?: number;
   resets_on?: string;
+  /** Photos this expense can still scan (it allows 6); null or missing without a session. */
+  rescans_left?: number | null;
 };
 
 /** The scan's lines as an itemized draft. Every item starts as yours, to assign on screen. */

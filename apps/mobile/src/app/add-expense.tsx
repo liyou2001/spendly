@@ -1,4 +1,5 @@
 import { formatCents } from '@spendly/ledger';
+import { randomUUID } from 'expo-crypto';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import Feather from '@expo/vector-icons/Feather';
@@ -313,6 +314,9 @@ function ExpenseForm({
   // asks again after every scan, so cancelled scans, refused ones and forwarded emails show too.
   const canScan = !editing && !fromDraft;
   const [allowance, setAllowance] = useState<ScanAllowance | null>(null);
+  // Every photo scanned here counts as one scan this month, up to 6 (a scan and 5 rescans).
+  const [scanSession] = useState(() => randomUUID());
+  const [rescansLeft, setRescansLeft] = useState<number | null>(null);
   // Only the newest answer counts: a slow earlier request never overwrites a later one.
   const allowanceVersion = useRef(0);
   const pendingAllowance = useRef(firstAllowance);
@@ -418,6 +422,7 @@ function ExpenseForm({
   function applyScan(scanned: ScanResult & { path: string; previewUri: string }) {
     // This scan's own count straight away, ahead of any older request still on its way.
     allowanceVersion.current++;
+    if (scanned.rescans_left != null) setRescansLeft(scanned.rescans_left);
     setAllowance((prev) => ({
       left: scanned.scans_left,
       limit: scanned.scan_limit ?? prev?.limit ?? null,
@@ -475,7 +480,7 @@ function ExpenseForm({
       if (!photo) return;
       setScan({ status: 'scanning' });
       sent = true;
-      const scanned = await scanReceipt(userId, photo);
+      const scanned = await scanReceipt(userId, photo, scanSession);
       if (attempt === scanAttempt.current) applyScan(scanned);
     } catch (e) {
       if (attempt === scanAttempt.current) {
@@ -615,6 +620,7 @@ function ExpenseForm({
               onPhoto={(photo) => void scanPhoto(async () => photo)}
               onCancel={cancelScan}
               allowance={allowance}
+              rescansLeft={rescansLeft}
               keepPhoto={keepPhoto}
               onKeepPhotoChange={setKeepPhoto}
               shared={shared}
@@ -1327,6 +1333,7 @@ function ScanReceipt({
   onCancel,
   onDismissDraft,
   allowance,
+  rescansLeft,
   keepPhoto,
   onKeepPhotoChange,
   shared,
@@ -1336,6 +1343,8 @@ function ScanReceipt({
   currentTotal: number | null;
   /** Scans left this month; null while unknown, and for edits and forwarded receipts. */
   allowance: ScanAllowance | null;
+  /** Photos this expense can still scan, once it has scanned one; null before that. */
+  rescansLeft: number | null;
   /** Keep the scanned photo with the expense when it's saved. */
   keepPhoto: boolean;
   onKeepPhotoChange: (keep: boolean) => void;
@@ -1393,12 +1402,21 @@ function ScanReceipt({
         state.status === 'read' ? 'read' : state.status === 'error' ? 'error' : 'idle',
       )
     : null;
-  const scansLine = scans?.text ? <ScansLeft text={scans.text} low={scans.low} /> : null;
-  // With none left, the buttons go: another scan would be refused.
-  const buttons = scans?.none ? null : (
+  // After this expense's first scan, rescans are free but limited; before it, the month's count
+  // decides. Either way, with none left the buttons go: another scan would be refused.
+  const rescanned = rescansLeft !== null;
+  const outOfRescans = rescanned && rescansLeft <= 0;
+  const scansLine = outOfRescans ? (
+    <ScansLeft text="That’s the most rescans for one expense." low />
+  ) : scans?.text ? (
+    <ScansLeft text={scans.text} low={scans.low} />
+  ) : null;
+  const fewRescans =
+    rescanned && rescansLeft > 0 && rescansLeft <= 2 ? ` (${rescansLeft} left)` : '';
+  const buttons = (rescanned ? outOfRescans : scans?.none) ? null : (
     <View style={styles.wrap}>
       <TextButton
-        label={state.status === 'read' ? 'Scan again' : 'Take photo'}
+        label={`${state.status === 'read' ? 'Scan again' : 'Take photo'}${fewRescans}`}
         icon="camera"
         onPress={() => onScan('camera')}
       />

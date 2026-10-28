@@ -83,13 +83,15 @@ async function readPhoto(uri: string): Promise<ArrayBuffer> {
 }
 
 /**
- * Shrinks, uploads and reads the photo. Throws a UserFacingError with what to do if it can't.
+ * Shrinks, uploads and reads the photo. Photos sent with the same `session` (one Add expense)
+ * count as one scan toward the monthly limit. Throws a UserFacingError with what to do if it can't.
  * Returns where the photo is kept, to attach to the expense (or discard) when it's saved, and
  * the shrunk copy on this device, to look at again while checking the lines.
  */
 export async function scanReceipt(
   userId: string,
   photo: Photo,
+  session: string,
 ): Promise<ScanResult & { path: string; previewUri: string }> {
   const uri = await shrink(photo);
   const path = `${userId}/${randomUUID()}.jpg`;
@@ -99,7 +101,7 @@ export async function scanReceipt(
   if (uploadError) throw new UserFacingError('Couldn’t upload the photo. Check your connection.');
 
   const { data, error } = await supabase.functions.invoke<ScanResult>('extract-receipt', {
-    body: { path },
+    body: { path, session },
   });
   if (error || !data) {
     // The function deletes photos it can't read; one that never got that far is deleted here.

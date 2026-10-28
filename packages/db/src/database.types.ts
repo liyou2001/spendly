@@ -708,6 +708,7 @@ export type Database = {
           id: string;
           model: string | null;
           result: Json | null;
+          scan_session: string | null;
           source: string;
           status: string;
           storage_path: string | null;
@@ -720,6 +721,7 @@ export type Database = {
           id?: string;
           model?: string | null;
           result?: Json | null;
+          scan_session?: string | null;
           source: string;
           status: string;
           storage_path?: string | null;
@@ -731,6 +733,7 @@ export type Database = {
           id?: string;
           model?: string | null;
           result?: Json | null;
+          scan_session?: string | null;
           source?: string;
           status?: string;
           storage_path?: string | null;

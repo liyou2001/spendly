@@ -1,15 +1,23 @@
 // extract-receipt: reads a receipt photo you uploaded into a draft for the split screen, with
 // Gemini or Claude (see _shared/reader.ts). Signed in only, for photos in your own folder,
-// within a monthly limit. A photo that reads as a receipt is kept, so the app can attach it to
-// the expense (attach_receipt); one that doesn't is deleted, and clean-receipts deletes kept
-// ones that never get attached. Every attempt is logged in receipt_extractions.
+// within a monthly limit. Photos sent with the same `session` (one Add expense) count as one
+// scan, up to 6 of them; each photo is read once. A photo that reads as a receipt is kept, so
+// the app can attach it to the expense (attach_receipt); one that doesn't is deleted, and
+// clean-receipts deletes kept ones that never get attached. Every attempt is logged in
+// receipt_extractions.
 import { adminClient, withinLimit } from '../_shared/admin.ts';
-import { scanAllowance, type ScanAllowance } from '../_shared/allowance.ts';
+import {
+  MAX_SESSION_PHOTOS,
+  photoChecks,
+  scanAllowance,
+  type ScanAllowance,
+} from '../_shared/allowance.ts';
 import { corsHeaders, fail, json, readBody, TOO_MANY } from '../_shared/http.ts';
 import { receiptReader } from '../_shared/reader.ts';
 import { extractReceipt, toBase64 } from '../_shared/receipt.ts';
 
 const MAX_BYTES = 5 * 1024 * 1024;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -25,6 +33,9 @@ Deno.serve(async (req) => {
   const path = body?.path;
   const ownPhoto = new RegExp(`^${user.id}/[0-9a-f-]{36}\\.jpg$`);
   if (typeof path !== 'string' || !ownPhoto.test(path)) return fail(400, 'Which photo?');
+  // Without one (an older app), each photo counts as its own scan.
+  const session =
+    typeof body?.session === 'string' && UUID.test(body.session) ? body.session : null;
 
   const reader = receiptReader();
   if (!reader) {
@@ -33,13 +44,27 @@ Deno.serve(async (req) => {
   }
   if (!(await withinLimit(admin, `receipt:user:${user.id}`, 20, 3600))) return fail(429, TOO_MANY);
   let allowance: ScanAllowance;
+  let checks: Awaited<ReturnType<typeof photoChecks>>;
   try {
-    allowance = await scanAllowance(admin, user.id);
+    [allowance, checks] = await Promise.all([
+      scanAllowance(admin, user.id),
+      photoChecks(admin, user.id, path, session),
+    ]);
   } catch (error) {
     console.error('Couldn’t count scans', error);
     return fail(500, 'Something went wrong. Try again.');
   }
-  if (allowance.left <= 0) {
+  // Each photo is read once, and one kept with an expense is never touched: an unreadable result
+  // would delete the photo the group checks its split against.
+  if (checks.alreadyRead || checks.attached) {
+    return fail(409, 'That photo was already scanned. Take a new one.');
+  }
+  if (checks.sessionPhotos >= MAX_SESSION_PHOTOS) {
+    return fail(429, 'That’s the most rescans for one expense. Enter the rest by hand.');
+  }
+  // Rescans for the same expense are free; a new one needs a scan left this month.
+  const newScan = checks.sessionPhotos === 0;
+  if (newScan && allowance.left <= 0) {
     return fail(
       429,
       allowance.limit === 0
@@ -77,6 +102,7 @@ Deno.serve(async (req) => {
         user_id: user.id,
         source: 'photo',
         storage_path: path,
+        scan_session: session,
         model: attempt.model,
         status: attempt.status,
         result: attempt.result,
@@ -90,11 +116,13 @@ Deno.serve(async (req) => {
   if (outcome.status === 'failed') {
     return fail(502, 'Couldn’t read receipts right now. Try again, or enter it by hand.');
   }
-  // This scan counts too. The limit and reset date let the app show the count from this alone.
+  // A new expense's first photo uses a scan; rescans don't. The limit and reset date let the app
+  // show the count from this alone.
   return json({
     ...outcome,
-    scans_left: Math.max(allowance.left - 1, 0),
+    scans_left: newScan ? Math.max(allowance.left - 1, 0) : allowance.left,
     scan_limit: allowance.limit,
     resets_on: allowance.resetsOn,
+    rescans_left: session ? MAX_SESSION_PHOTOS - (checks.sessionPhotos + 1) : null,
   });
 });
