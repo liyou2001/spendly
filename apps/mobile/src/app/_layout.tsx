@@ -65,6 +65,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="people/[id]" />
           <Stack.Screen name="invites" />
           <Stack.Screen name="activity" />
+          <Stack.Screen name="tutorial" options={{ presentation: 'fullScreenModal' }} />
         </Stack.Protected>
         <Stack.Protected guard={session !== null && needsName === true}>
           <Stack.Screen name="welcome" />

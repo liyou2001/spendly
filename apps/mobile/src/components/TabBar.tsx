@@ -11,7 +11,8 @@ import { Text } from './Text';
 
 type IconName = ComponentProps<typeof Feather>['name'];
 
-const icons: Record<string, IconName> = {
+/** Each tab's icon, by route name. The tutorial draws the same bar. */
+export const TAB_ICONS: Record<string, IconName> = {
   index: 'home',
   budget: 'pie-chart',
   people: 'users',
@@ -49,7 +50,7 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: B
       >
         <View style={[styles.iconPill, focused && styles.iconPillActive]}>
           <Feather
-            name={icons[route.name] ?? 'circle'}
+            name={TAB_ICONS[route.name] ?? 'circle'}
             size={sizes.icon}
             color={focused ? colors.ink : colors.muted}
           />

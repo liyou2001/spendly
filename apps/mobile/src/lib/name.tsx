@@ -1,4 +1,11 @@
-import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 
 import { useSession } from './session';
 import { supabase } from './supabase';
@@ -8,6 +15,9 @@ interface NameState {
   needsName: boolean | null;
   /** After saving your name: on to the app. */
   markNamed: () => void;
+  /** True once a new account has just given its name, until Home opens the tutorial. */
+  justNamed: boolean;
+  clearJustNamed: () => void;
 }
 
 const NameContext = createContext<NameState | null>(null);
@@ -21,6 +31,8 @@ export function NameProvider({ children }: PropsWithChildren) {
   const userId = session?.user.id ?? null;
   // Remembers whose name was checked, so switching accounts checks again.
   const [checked, setChecked] = useState<{ userId: string; needsName: boolean } | null>(null);
+  const [justNamed, setJustNamed] = useState(false);
+  const clearJustNamed = useCallback(() => setJustNamed(false), []);
 
   useEffect(() => {
     if (!userId) return;
@@ -42,10 +54,16 @@ export function NameProvider({ children }: PropsWithChildren) {
 
   const needsName = !userId ? false : checked?.userId === userId ? checked.needsName : null;
   const markNamed = () => {
-    if (userId) setChecked({ userId, needsName: false });
+    if (!userId) return;
+    setChecked({ userId, needsName: false });
+    setJustNamed(true);
   };
 
-  return <NameContext value={{ needsName, markNamed }}>{children}</NameContext>;
+  return (
+    <NameContext value={{ needsName, markNamed, justNamed, clearJustNamed }}>
+      {children}
+    </NameContext>
+  );
 }
 
 export function useName(): NameState {

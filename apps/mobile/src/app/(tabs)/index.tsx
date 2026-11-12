@@ -1,6 +1,6 @@
 import { formatCents } from '@spendly/ledger';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import {
@@ -30,6 +30,7 @@ import {
 import { formatDate, todayLocal } from '@/lib/dates';
 import { useInvites } from '@/lib/invites';
 import { expenseListNote } from '@/lib/labels';
+import { useName } from '@/lib/name';
 import { buildPeopleView } from '@/lib/people';
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
@@ -82,6 +83,14 @@ export default function Home() {
   const recent = useLoad(useCallback(() => fetchRecent(), []));
   const { invites, refresh: refreshInvites } = useInvites();
   useFocusEffect(useCallback(() => refreshInvites(), [refreshInvites]));
+
+  // A new account sees the tutorial once, right after giving its name. Me → Help has it after.
+  const { justNamed, clearJustNamed } = useName();
+  useEffect(() => {
+    if (!justNamed) return;
+    clearJustNamed();
+    router.push('/tutorial');
+  }, [justNamed, clearJustNamed]);
 
   const firstName = profile.status === 'ready' ? profile.data.first_name || null : null;
   const firstRun = summary.status === 'ready' && summary.data.firstRun;

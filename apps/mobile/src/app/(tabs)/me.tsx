@@ -84,12 +84,19 @@ export default function Me() {
       </Section>
 
       <Section title="Help">
-        <ListRow
-          title="Send feedback"
-          subtitle="Tell us what’s confusing or broken"
-          onPress={() => router.push('/settings/feedback')}
-          divider={false}
-        />
+        <View>
+          <ListRow
+            title="How Spendly works"
+            subtitle="Read the tutorial again"
+            onPress={() => router.push('/tutorial')}
+          />
+          <ListRow
+            title="Send feedback"
+            subtitle="Tell us what’s confusing or broken"
+            onPress={() => router.push('/settings/feedback')}
+            divider={false}
+          />
+        </View>
       </Section>
 
       <Button

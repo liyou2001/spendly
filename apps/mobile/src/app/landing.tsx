@@ -6,6 +6,7 @@ import type { ComponentProps } from 'react';
 import { Image, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Avatar, Button, KeyBlock, Text, TextButton } from '@/components';
+import { COSTCO_ITEM_GROUPS, COSTCO_TOTAL_CENTS, costcoShare } from '@/lib/costcoExample';
 import { colors, fonts, radius, sizes, space } from '@/theme';
 
 // Web only: what someone sees before signing in (the app goes straight to sign-in).
@@ -51,19 +52,11 @@ const DIFFERENCES = [
 ];
 
 // The plan's example: Leo pays $140.00 at Costco, split by item.
-const EXAMPLE = {
-  total: 14000,
-  items: [
-    { names: 'Protein powder, graphic tee, granola bars', cents: 6800, people: ['Leo'] },
-    { names: 'Paper towels, dish soap, trash bags', cents: 4500, people: ['Leo', 'Jeff', 'Maya'] },
-    { names: 'Oat milk, hummus, veggie chips', cents: 2700, people: ['Maya'] },
-  ],
-  results: [
-    { label: 'Your spending', cents: 8300 },
-    { label: 'Jeff owes you', cents: 1500 },
-    { label: 'Maya owes you', cents: 4200 },
-  ],
-};
+const RESULTS = [
+  { label: 'Your spending', cents: costcoShare('Leo') },
+  { label: 'Jeff owes you', cents: costcoShare('Jeff') },
+  { label: 'Maya owes you', cents: costcoShare('Maya') },
+];
 
 export default function Landing() {
   const { width } = useWindowDimensions();
@@ -112,9 +105,9 @@ export default function Landing() {
               <Text variant="small" style={styles.inkSmall}>
                 Leo paid at Costco
               </Text>
-              <Text variant="bigNumber">{formatCents(EXAMPLE.total)}</Text>
+              <Text variant="bigNumber">{formatCents(COSTCO_TOTAL_CENTS)}</Text>
               <View style={styles.exampleItems}>
-                {EXAMPLE.items.map((item) => (
+                {COSTCO_ITEM_GROUPS.map((item) => (
                   <View key={item.names} style={styles.exampleItem}>
                     <View style={styles.flex}>
                       <Text variant="small" style={styles.inkSmall}>
@@ -138,7 +131,7 @@ export default function Landing() {
                 ))}
               </View>
               <View style={styles.exampleResults}>
-                {EXAMPLE.results.map((row) => (
+                {RESULTS.map((row) => (
                   <View key={row.label} style={styles.exampleRow}>
                     <Text variant="body" style={styles.flex}>
                       {row.label}
