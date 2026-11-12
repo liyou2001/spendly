@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Avatar, Button, KeyBlock, ListRow, Screen, Section, Text } from '@/components';
 import { fetchCategories, fetchProfile } from '@/lib/data';
+import { formatPhone } from '@/lib/phone';
 import { useSession } from '@/lib/session';
 import { unregisterPush } from '@/lib/push';
 import { supabase } from '@/lib/supabase';
@@ -22,7 +23,11 @@ async function fetchSummary(userId: string) {
 export default function Me() {
   const { session } = useSession();
   const userId = session?.user.id ?? '';
-  const email = session?.user.email;
+  // What you sign in with: your email, or your phone number if you signed up with one (stored
+  // without the +).
+  const signIn =
+    session?.user.email ||
+    (session?.user.phone ? formatPhone(`+${session.user.phone}`) : undefined);
   const summary = useLoad(useCallback(() => fetchSummary(userId), [userId]));
   const [signingOut, setSigningOut] = useState(false);
 
@@ -42,7 +47,7 @@ export default function Me() {
   return (
     <Screen title="Me">
       <KeyBlock style={styles.identity}>
-        <Avatar name={displayName ?? email ?? '?'} size={52} onKeyBlock />
+        <Avatar name={displayName ?? signIn ?? '?'} size={52} onKeyBlock />
         <View style={styles.identityText}>
           <Text variant="bodyMedium" numberOfLines={1}>
             {displayName ?? ' '}
@@ -53,7 +58,7 @@ export default function Me() {
             </Text>
           ) : null}
           <Text variant="small" numberOfLines={1}>
-            {email}
+            {signIn}
           </Text>
         </View>
       </KeyBlock>

@@ -52,7 +52,7 @@ Bank sync, moving money in the app, automatic repayment detection, advanced budg
 | Mobile app                                | Expo (React Native) + TypeScript, Expo Router                                                                                     |
 | Payment page (for people without the app) | Static web page on Vercel. Expo Router's web output, or a small separate Vite + React app if that's simpler. No Vercel functions. |
 | Database                                  | Supabase Postgres with row-level security                                                                                         |
-| Login                                     | Supabase Auth (email one-time code for now; phone later)                                                                          |
+| Login                                     | Supabase Auth (one-time code by email or text)                                                                                    |
 | File storage                              | Supabase Storage (private receipt photos)                                                                                         |
 | Server code                               | Supabase Edge Functions (Deno, standard web APIs)                                                                                 |
 | Receipt reading                           | Claude Haiku 5.5 (`claude-haiku-5-5`), retry on Claude Sonnet 5.5 (`claude-sonnet-5-5`)                                           |
@@ -238,7 +238,7 @@ Splitting rules:
   - `Button` (primary in ink, secondary outlined) and `Tag`.
   - `Avatar` (an initial in a circle), `ProgressBar` and `Money` (tabular figures).
 - Tabs: Home, Budget, + (center, opens Add expense), People, Me. Placeholder content for now.
-- Supabase Auth with an email one-time code. Phone login comes later because it needs a paid text provider. Supabase's built-in email has low rate limits, which is fine for testing.
+- Supabase Auth with an email one-time code. Phone login was added later; the hosted project needs a paid text provider for it. Supabase's built-in email has low rate limits, which is fine for testing.
 - Me screen: display name, Venmo, PayPal and Cash App usernames, sign out. (Me is now a settings hub: Profile & payments and Categories are pages under it, and later steps add their settings there too.)
 - The session stays signed in between app launches.
 

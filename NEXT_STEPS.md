@@ -180,7 +180,7 @@ For each question, the **How to test** line suggests something to ask or a task 
 ### 16. Is an emailed one-time code an acceptable way to sign in?
 
 - **Status:** Open
-- **Now:** email code only. Phone sign-in comes later; there are no passwords.
+- **Now:** a code by email or by text (phone sign-up added 2026-11-12); there are no passwords. Apple and Google sign-in were considered and set aside, and Instagram has no login for consumer apps.
 - **Why it matters:** students may prefer phone codes or Apple/Google sign-in. Switching to the email app every time adds friction.
 - **How to test:** time a first sign-in and ask how they'd prefer to sign in.
 

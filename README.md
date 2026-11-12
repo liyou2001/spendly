@@ -98,6 +98,10 @@ The app signs in with a 6-digit code sent by email. Against local Supabase, the 
 3. Open the app, enter an email and tap **Email me a code**. Use `leo@example.com` to sign in as the seed user, or any other address to create a new account (it gets a profile, a Personal group and the default categories).
 4. On your computer, open Mailpit at http://127.0.0.1:54324, open the newest "Your Spendly sign-in code" email and type the code into the app. It signs in as soon as all 6 digits are in.
 
+To sign in with a phone number instead, tap **Phone** and use `(608) 555-0100` with the code `123456`. Locally nothing is texted: that number's code is fixed in `supabase/config.toml` (`[auth.sms.test_otp]`), and other numbers fail because the local text provider is only a placeholder. A phone account has no email; it gets its username from the name it gives on the welcome screen.
+
+For real texts on the hosted project, turn on **Phone** in the Supabase dashboard (Authentication → Sign In / Providers) with a text provider. Twilio Verify is the simplest: it handles US carrier registration. Each code costs a few cents.
+
 The session is saved on the phone (encrypted, with the key in the iOS Keychain / Android Keystore), so the app stays signed in after you close it. **Me → Sign out** signs out.
 
 Settings live in the **Me** tab: **Profile & payments** (your name and Venmo/PayPal/Cash App usernames) and **Categories** (add, rename or delete the categories your spending is sorted into).
