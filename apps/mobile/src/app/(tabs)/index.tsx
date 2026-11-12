@@ -19,15 +19,18 @@ import { monthStart } from '@/lib/budget';
 import { fetchMonth } from '@/lib/budgetData';
 import {
   fetchBalances,
+  fetchCategories,
   fetchExpenses,
   fetchGroups,
   fetchPayments,
   fetchDrafts,
   fetchForwardingCodes,
+  fetchMyCategoryIds,
   fetchProblemReports,
   fetchProfile,
 } from '@/lib/data';
 import { formatDate, todayLocal } from '@/lib/dates';
+import { categoryTag } from '@/lib/expenseList';
 import { useInvites } from '@/lib/invites';
 import { expenseListNote } from '@/lib/labels';
 import { useName } from '@/lib/name';
@@ -69,9 +72,21 @@ async function fetchPeople(userId: string) {
   };
 }
 
-async function fetchRecent() {
-  const [recent, groups] = await Promise.all([fetchExpenses({ limit: 10 }), fetchGroups()]);
-  return { recent, groupNames: Object.fromEntries(groups.map((g) => [g.id, g.name])) };
+async function fetchRecent(userId: string) {
+  const [recent, groups, categories] = await Promise.all([
+    fetchExpenses({ limit: 10 }),
+    fetchGroups(),
+    fetchCategories(userId),
+  ]);
+  const mine = await fetchMyCategoryIds(
+    recent.filter((e) => !e.voided && e.myShareCents !== null).map((e) => e.id),
+  );
+  const names = Object.fromEntries(categories.map((c) => [c.id, c.name]));
+  return {
+    recent,
+    groupNames: Object.fromEntries(groups.map((g) => [g.id, g.name])),
+    tags: Object.fromEntries(recent.map((e) => [e.id, categoryTag(e, mine[e.id], names)])),
+  };
 }
 
 export default function Home() {
@@ -80,7 +95,7 @@ export default function Home() {
   const profile = useLoad(useCallback(() => fetchProfile(userId), [userId]));
   const summary = useLoad(useCallback(() => fetchSummary(userId), [userId]));
   const people = useLoad(useCallback(() => fetchPeople(userId), [userId]));
-  const recent = useLoad(useCallback(() => fetchRecent(), []));
+  const recent = useLoad(useCallback(() => fetchRecent(userId), [userId]));
   const { invites, refresh: refreshInvites } = useInvites();
   useFocusEffect(useCallback(() => refreshInvites(), [refreshInvites]));
 
@@ -216,7 +231,7 @@ export default function Home() {
 
       <Section title="Recent">
         <Loadable load={recent} errorMessage="Couldn’t load recent expenses.">
-          {({ recent: expenses, groupNames }) =>
+          {({ recent: expenses, groupNames, tags }) =>
             expenses.length === 0 ? (
               <Text variant="small">No expenses yet. Tap + to add one.</Text>
             ) : (
@@ -232,6 +247,7 @@ export default function Home() {
                     ]
                       .filter(Boolean)
                       .join(' · ')}
+                    below={tags[expense.id] ? <Tag label={tags[expense.id]!} /> : null}
                     trailing={
                       expense.voided ? (
                         <Tag label="Voided" />

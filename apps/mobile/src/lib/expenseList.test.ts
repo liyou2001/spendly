@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { toSummaries, type ExpenseListRow } from './expenseList';
+import { categoryTag, toSummaries, type ExpenseListRow } from './expenseList';
 
 const row = (overrides: Partial<ExpenseListRow>): ExpenseListRow => ({
   id: 'e-costco',
@@ -40,5 +40,21 @@ describe('toSummaries', () => {
       ['void', true],
       ['new', false],
     ]);
+  });
+});
+
+describe('categoryTag', () => {
+  const names = { 'c-groceries': 'Groceries' };
+  const mine = { voided: false, myShareCents: 8300 };
+
+  it('names your category, or says it has none', () => {
+    expect(categoryTag(mine, 'c-groceries', names)).toBe('Groceries');
+    expect(categoryTag(mine, null, names)).toBe('Uncategorized');
+    expect(categoryTag(mine, 'c-deleted', names)).toBe('Uncategorized');
+  });
+
+  it('has no tag for expenses you’re not on, or voided ones', () => {
+    expect(categoryTag({ voided: false, myShareCents: null }, null, names)).toBeNull();
+    expect(categoryTag({ voided: true, myShareCents: 8300 }, 'c-groceries', names)).toBeNull();
   });
 });

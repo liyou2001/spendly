@@ -370,6 +370,19 @@ export async function fetchExpenses(
   return toSummaries(unwrap(rows), session.data.session?.user.id);
 }
 
+/**
+ * Your category for each of these expenses (see FullExpense.myCategoryId), by expense id.
+ * Categories are private, so each comes from my_category_for(); meant for a short list.
+ */
+export async function fetchMyCategoryIds(
+  expenseIds: readonly string[],
+): Promise<Record<string, string | null>> {
+  const results = await Promise.all(
+    expenseIds.map((id) => supabase.rpc('my_category_for', { p_expense_id: id })),
+  );
+  return Object.fromEntries(results.map((result, index) => [expenseIds[index], unwrap(result)]));
+}
+
 export interface FullExpense {
   view: 'full';
   id: string;

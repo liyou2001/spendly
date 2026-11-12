@@ -60,3 +60,16 @@ export function toSummaries(
         b.expenseDate.localeCompare(a.expenseDate) || b.createdAt.localeCompare(a.createdAt),
     );
 }
+
+/**
+ * The category tag for an expense in a list: your category for it, as the expense screen shows
+ * it, or "Uncategorized". None when it isn't yours (nothing of it is in your budget) or voided.
+ */
+export function categoryTag(
+  expense: Pick<ExpenseSummary, 'voided' | 'myShareCents'>,
+  categoryId: string | null | undefined,
+  names: Readonly<Record<string, string>>,
+): string | null {
+  if (expense.voided || expense.myShareCents === null) return null;
+  return (categoryId ? names[categoryId] : undefined) ?? 'Uncategorized';
+}

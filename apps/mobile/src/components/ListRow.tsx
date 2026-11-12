@@ -9,6 +9,8 @@ import { Text } from './Text';
 interface ListRowProps {
   title: string;
   subtitle?: string;
+  /** Under the subtitle, e.g. a category tag. */
+  below?: ReactNode;
   leading?: ReactNode;
   trailing?: ReactNode;
   /** Makes the row tappable and shows a chevron. */
@@ -23,6 +25,7 @@ interface ListRowProps {
 export function ListRow({
   title,
   subtitle,
+  below,
   leading,
   trailing,
   onPress,
@@ -41,6 +44,7 @@ export function ListRow({
             {subtitle}
           </Text>
         ) : null}
+        {below ? <View style={styles.below}>{below}</View> : null}
       </View>
       {trailing}
       {onPress && chevron ? <Feather name="chevron-right" size={20} color={colors.muted} /> : null}
@@ -79,5 +83,8 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     gap: 2,
+  },
+  below: {
+    paddingTop: space.xs,
   },
 });
