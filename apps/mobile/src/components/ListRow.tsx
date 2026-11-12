@@ -9,8 +9,8 @@ import { Text } from './Text';
 interface ListRowProps {
   title: string;
   subtitle?: string;
-  /** Under the subtitle, e.g. a category tag. */
-  below?: ReactNode;
+  /** After the title on its line, e.g. a category tag. A long title is cut short first. */
+  besideTitle?: ReactNode;
   leading?: ReactNode;
   trailing?: ReactNode;
   /** Makes the row tappable and shows a chevron. */
@@ -25,7 +25,7 @@ interface ListRowProps {
 export function ListRow({
   title,
   subtitle,
-  below,
+  besideTitle,
   leading,
   trailing,
   onPress,
@@ -36,15 +36,17 @@ export function ListRow({
     <>
       {leading}
       <View style={styles.text}>
-        <Text variant="body" numberOfLines={1}>
-          {title}
-        </Text>
+        <View style={styles.titleLine}>
+          <Text variant="body" numberOfLines={1} style={styles.title}>
+            {title}
+          </Text>
+          {besideTitle}
+        </View>
         {subtitle ? (
           <Text variant="small" numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
-        {below ? <View style={styles.below}>{below}</View> : null}
       </View>
       {trailing}
       {onPress && chevron ? <Feather name="chevron-right" size={20} color={colors.muted} /> : null}
@@ -84,7 +86,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  below: {
-    paddingTop: space.xs,
+  titleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  title: {
+    flexShrink: 1,
   },
 });

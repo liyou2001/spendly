@@ -247,7 +247,7 @@ export default function Home() {
                     ]
                       .filter(Boolean)
                       .join(' · ')}
-                    below={tags[expense.id] ? <Tag label={tags[expense.id]!} /> : null}
+                    besideTitle={tags[expense.id] ? <Tag label={tags[expense.id]!} /> : null}
                     trailing={
                       expense.voided ? (
                         <Tag label="Voided" />
