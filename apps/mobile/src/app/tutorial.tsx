@@ -20,7 +20,6 @@ import {
   KeyBlock,
   ListRow,
   Money,
-  ProgressBar,
   Tag,
   Text,
   TextButton,
@@ -43,15 +42,6 @@ import { colors, radius, sizes, space } from '@/theme';
 const COLUMN_WIDTH = 480;
 
 const jeffBreakdown = costcoBreakdown('Jeff');
-
-const BUDGET = [
-  // Leo's share of the Costco trip.
-  { name: 'Groceries', spentCents: costcoShare('Leo'), budgetCents: 30000 },
-  { name: 'Dining', spentCents: 4250, budgetCents: 15000 },
-];
-
-const amountsOf = (line: (typeof BUDGET)[number]) =>
-  `${formatCents(line.spentCents)} of ${formatCents(line.budgetCents)}`;
 
 const PAGES: {
   title: string;
@@ -96,12 +86,6 @@ const PAGES: {
     body: 'Request payment sends Jeff a link with the whole bill, and he can pay you with Venmo, PayPal or Cash App without the app. Paying back settles the debt; it never counts as income.',
     picture: `Jeff’s page: Jeff owes you ${formatCents(costcoShare('Jeff'))}, with Request payment and Jeff paid me.`,
     Example: PersonScreen,
-  },
-  {
-    title: 'Track your spending',
-    body: 'Everything you spend, shared or just yours, is sorted into categories like Groceries and Dining. Set a monthly limit for each and see how you’re doing on the Budget tab.',
-    picture: `Budget categories: ${BUDGET.map((line) => `${line.name} ${amountsOf(line)}`).join(', ')}.`,
-    Example: BudgetScreen,
   },
 ];
 
@@ -373,35 +357,6 @@ function PersonScreen() {
   );
 }
 
-// The Budget tab's category rows ((tabs)/budget.tsx).
-function BudgetScreen() {
-  return (
-    <View>
-      <Text variant="sectionHeading">Categories</Text>
-      {BUDGET.map((line, index) => (
-        <View
-          key={line.name}
-          style={[styles.budgetRow, index < BUDGET.length - 1 && styles.budgetDivider]}
-        >
-          <View style={styles.budgetTop}>
-            <Text variant="body" style={styles.flex}>
-              {line.name}
-            </Text>
-            <Text variant="bodyMedium" style={styles.tabular}>
-              {amountsOf(line)}
-            </Text>
-          </View>
-          <ProgressBar
-            value={line.spentCents}
-            max={line.budgetCents}
-            accessibilityLabel={`${line.name}: ${amountsOf(line)}`}
-          />
-        </View>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -531,22 +486,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  budgetRow: {
-    gap: space.sm,
-    paddingVertical: space.md,
-  },
-  budgetTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-  },
-  budgetDivider: {
-    borderBottomWidth: sizes.hairline,
-    borderBottomColor: colors.divider,
-  },
-  tabular: {
-    fontVariant: ['tabular-nums'],
   },
   flex: {
     flex: 1,
