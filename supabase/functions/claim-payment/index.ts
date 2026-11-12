@@ -15,7 +15,7 @@ import {
 } from '../_shared/http.ts';
 import { claimMessage, pushToUser } from '../_shared/push.ts';
 
-const METHODS = ['venmo', 'paypal', 'cashapp', 'zelle', 'cash', 'other'];
+const METHODS = ['venmo', 'paypal', 'cashapp', 'cash', 'other'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

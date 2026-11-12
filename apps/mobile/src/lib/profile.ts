@@ -1,27 +1,19 @@
 import type { Tables } from '@spendly/db';
 
-import { normalizePhone } from './phone';
-
 /**
  * The profile columns a user can edit: the payment ones directly, the names through
  * set_my_name() (which also sets the name people see, "First Last").
  */
 export type ProfileFields = Pick<
   Tables<'profiles'>,
-  | 'first_name'
-  | 'last_name'
-  | 'username'
-  | 'venmo_username'
-  | 'paypal_username'
-  | 'cashapp_tag'
-  | 'zelle_contact'
+  'first_name' | 'last_name' | 'username' | 'venmo_username' | 'paypal_username' | 'cashapp_tag'
 >;
 
 export type ProfileForm = Record<keyof ProfileFields, string>;
 export type ProfileErrors = Partial<Record<keyof ProfileFields, string>>;
 
 export const profileColumns =
-  'first_name, last_name, username, venmo_username, paypal_username, cashapp_tag, zelle_contact';
+  'first_name, last_name, username, venmo_username, paypal_username, cashapp_tag';
 
 export function toForm(profile: ProfileFields): ProfileForm {
   return {
@@ -31,7 +23,6 @@ export function toForm(profile: ProfileFields): ProfileForm {
     venmo_username: profile.venmo_username ?? '',
     paypal_username: profile.paypal_username ?? '',
     cashapp_tag: profile.cashapp_tag ?? '',
-    zelle_contact: profile.zelle_contact ?? '',
   };
 }
 
@@ -41,28 +32,6 @@ const VENMO = /^[A-Za-z0-9_-]{1,30}$/;
 const PAYPAL = /^[A-Za-z0-9]{1,20}$/;
 const CASHTAG = /^[A-Za-z][A-Za-z0-9]{0,19}$/;
 const USERNAME = /^[a-z0-9_.]{3,20}$/;
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-/**
- * The email or US phone number someone's Zelle is registered with, cleaned up: emails in
- * lowercase, phone numbers as +1XXXXXXXXXX. Blank means none.
- */
-export function validateZelle(
-  input: string,
-): { ok: true; contact: string | null } | { ok: false; error: string } {
-  const trimmed = input.trim();
-  if (!trimmed) return { ok: true, contact: null };
-  if (trimmed.includes('@')) {
-    const email = trimmed.toLowerCase();
-    return EMAIL.test(email) && email.length <= 254
-      ? { ok: true, contact: email }
-      : { ok: false, error: 'That doesn’t look like an email address.' };
-  }
-  const phone = normalizePhone(trimmed);
-  return phone.ok && phone.phone?.startsWith('+1') && phone.phone.length === 12
-    ? { ok: true, contact: phone.phone }
-    : { ok: false, error: 'Enter the email or US phone number your Zelle uses.' };
-}
 
 /** First and last name, trimmed and checked the way set_my_name() checks them. */
 export function validateName(
@@ -116,7 +85,6 @@ export function validateProfile(
     .replace(/^(https?:\/\/)?(www\.)?paypal\.me\//i, '')
     .replace(/^@/, '');
   const cashtag = form.cashapp_tag.trim().replace(/^\$/, '');
-  const zelle = validateZelle(form.zelle_contact);
 
   const errors: ProfileErrors = name.ok ? {} : { ...name.errors };
   const username = validateUsername(form.username);
@@ -130,7 +98,6 @@ export function validateProfile(
   if (cashtag && !CASHTAG.test(cashtag)) {
     errors.cashapp_tag = 'Cashtags start with a letter and have up to 20 letters and numbers.';
   }
-  if (!zelle.ok) errors.zelle_contact = zelle.error;
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -142,7 +109,6 @@ export function validateProfile(
       venmo_username: venmo || null,
       paypal_username: paypal || null,
       cashapp_tag: cashtag || null,
-      zelle_contact: zelle.ok ? zelle.contact : null,
     },
   };
 }

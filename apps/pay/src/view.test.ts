@@ -5,7 +5,6 @@ import {
   amountDue,
   firstName,
   formatDay,
-  formatZelle,
   explainYours,
   itemTitle,
   paymentNote,
@@ -105,11 +104,6 @@ describe('view', () => {
     });
     expect(whoFor(drinks, costco)).toBe('Jeff 2, Maya 1');
     expect(itemTitle(drinks)).toBe('3 × Soft drink');
-  });
-
-  it('shows Zelle phone numbers the familiar way', () => {
-    expect(formatZelle('+16085550123')).toBe('(608) 555-0123');
-    expect(formatZelle('leo@example.com')).toBe('leo@example.com');
   });
 
   it('keeps the payment app note vague', () => {

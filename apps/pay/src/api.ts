@@ -45,8 +45,6 @@ export interface SharePage {
     venmo: string | null;
     paypal: string | null;
     cashtag: string | null;
-    /** The email or US phone number their Zelle uses. */
-    zelle: string | null;
   };
   texts_opted_in: boolean;
   /** The expenses behind what's owed now, newest first. */

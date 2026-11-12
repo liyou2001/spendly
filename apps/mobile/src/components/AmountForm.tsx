@@ -16,7 +16,6 @@ const METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'venmo', label: 'Venmo' },
   { value: 'paypal', label: 'PayPal' },
   { value: 'cashapp', label: 'Cash App' },
-  { value: 'zelle', label: 'Zelle' },
   { value: 'cash', label: 'Cash' },
   { value: 'other', label: 'Other' },
 ];

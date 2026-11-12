@@ -210,7 +210,7 @@ For each question, the **How to test** line suggests something to ask or a task 
 ### 20. Does the payment page make sense to someone who's never heard of Spendly?
 
 - **Status:** Open
-- **Now:** the request text links to a private page: "Leo says you owe $15.00", an equal button for each app Leo takes (Venmo, PayPal, Cash App) plus where to send it by Zelle, "I paid Leo", the items behind it, and "Something looks wrong". Shared items show their full price with "Split 3 ways", and a note says your share includes tax and tip.
+- **Now:** the request text links to a private page: "Leo says you owe $15.00", an equal button for each app Leo takes (Venmo, PayPal, Cash App), "I paid Leo", the items behind it, and "Something looks wrong". Shared items show their full price with "Split 3 ways", and a note says your share includes tax and tip.
 - **Why it matters:** the person paying never chose Spendly. If the page looks like spam or the numbers don't add up for them, they won't pay or will ask the payer instead.
 - **How to test:** text a link to someone who's never used the app and watch them open it. Do they trust it? Do they understand why the item prices ($22.99, $11.49, $10.52) don't add up to $15.00? Do they tap "I paid Leo" after paying in Venmo, or assume Venmo told Leo already?
 
@@ -223,10 +223,9 @@ For each question, the **How to test** line suggests something to ask or a task 
 
 ### 22. Do people add Zelle, and is the warning about sharing their email or phone right?
 
-- **Status:** Open
-- **Now:** Profile & payments has a Zelle field (email or US phone). Zelle has no usernames or payment links, so the number or email is shown as is to people in your groups and on payment links, with a copy button. A warning under the field says so.
-- **Why it matters:** many students use Zelle through their bank, but some won't want their phone number on a link that can be forwarded. If the warning scares everyone off, Zelle users have no easy way to get paid.
-- **How to test:** ask Zelle users to set up their profile and watch whether they add it after reading the warning. Ask payers whether copying the address into their bank app feels like too many steps.
+- **Status:** Answered (2026-11-11)
+- **Was:** Profile & payments had a Zelle field (email or US phone), shown as is to people in your groups and on payment links, with a copy button and a warning under the field.
+- **Outcome:** Zelle is removed. It has no payment links, so paying meant opening your own bank's app (there are too many to link to) and pasting the contact, and the contact was exposed on every forwarded link. Saved Zelle contacts were deleted. Older payments marked Zelle still show it; new ones can't be. People who want Zelle can still pay that way and record it as Other.
 
 ## Receipt scanning
 

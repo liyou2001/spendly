@@ -59,12 +59,13 @@ import { useLoad } from '@/lib/useLoad';
 import { useUsernameCheck } from '@/lib/useUsernameCheck';
 import { colors, radius, sizes, space } from '@/theme';
 
-const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null, zelle: null };
+const NO_HANDLES: PaymentHandles = { venmo: null, paypal: null, cashtag: null };
 
 const METHOD_LABELS: Record<string, string> = {
   venmo: 'Venmo',
   paypal: 'PayPal',
   cashapp: 'Cash App',
+  // Only older payments: Zelle is no longer offered.
   zelle: 'Zelle',
   cash: 'cash',
   other: 'other',
@@ -351,10 +352,10 @@ function PersonView({
       ) : netCents > 0 ? (
         <View style={styles.actions}>
           <Button label="Request payment" onPress={requestPayment} />
-          {myHandles.venmo || myHandles.paypal || myHandles.cashtag || myHandles.zelle ? null : (
+          {myHandles.venmo || myHandles.paypal || myHandles.cashtag ? null : (
             <Text variant="small">
-              Add your Venmo, PayPal, Cash App or Zelle in Me → Profile & payments so {firstName}{' '}
-              can pay you easily.
+              Add your Venmo, PayPal or Cash App in Me → Profile & payments so {firstName} can pay
+              you easily.
             </Text>
           )}
           <Button

@@ -118,9 +118,3 @@ export function paymentNote(expenses: readonly ShareExpense[]): string {
   const [, month, day] = first.expense_date.split('-').map(Number);
   return `${first.merchant} ${month}/${day}`;
 }
-
-/** A Zelle contact as people read it: "(608) 555-0123" for a US number, emails as they are. */
-export function formatZelle(contact: string): string {
-  const us = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(contact);
-  return us ? `(${us[1]}) ${us[2]}-${us[3]}` : contact;
-}

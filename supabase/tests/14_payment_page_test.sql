@@ -3,7 +3,7 @@
 -- Apartment: Leo ...0001 (paid the $140 Costco trip), Jeff ...0002, Maya ...0003.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(36);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -161,20 +161,15 @@ select lives_ok(
   'Leo dismisses it'
 );
 
--- Zelle -------------------------------------------------------------------------------------------------
-select tests.as_user('11111111-1111-1111-1111-111111111111');
-select throws_ok(
-  $$update public.profiles set zelle_contact = 'not an email' where id = auth.uid()$$,
-  '23514', null, 'A Zelle contact must be an email or a US phone number'
-);
-select lives_ok(
-  $$update public.profiles set zelle_contact = 'leo@example.com' where id = auth.uid()$$,
-  'Leo adds his Zelle email'
-);
+-- No Zelle -----------------------------------------------------------------------------------------------
 select tests.as_service();
-select is(
-  public.link_share(tests.hash((select token from tests.links)))->'handles'->>'zelle',
-  'leo@example.com', 'Jeff’s page shows where to send it by Zelle'
+select ok(
+  not (public.link_share(tests.hash((select token from tests.links)))->'handles' ? 'zelle'),
+  'Jeff’s page offers no Zelle'
+);
+select throws_ok(
+  $$select public.link_claim(tests.hash((select token from tests.links)), 100, 'zelle')$$,
+  '23514', null, 'A new payment can’t be marked Zelle'
 );
 
 -- Text opt-in (Rule 8) ----------------------------------------------------------------------------

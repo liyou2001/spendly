@@ -1,4 +1,3 @@
-import Feather from '@expo/vector-icons/Feather';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -24,7 +23,7 @@ import { toForm, validateProfile, type ProfileErrors, type ProfileForm } from '@
 import { useSession } from '@/lib/session';
 import { useLoad } from '@/lib/useLoad';
 import { useUsernameCheck } from '@/lib/useUsernameCheck';
-import { colors, space } from '@/theme';
+import { space } from '@/theme';
 
 export default function ProfileSettings() {
   const { session } = useSession();
@@ -157,25 +156,6 @@ function ProfileEditor({ userId, initial }: { userId: string; initial: ProfileFo
           autoCapitalize="none"
           autoCorrect={false}
         />
-        <TextField
-          label="Zelle"
-          value={form.zelle_contact}
-          onChangeText={(text) => edit('zelle_contact', text)}
-          placeholder="Email or phone number"
-          hint="The email or US phone number your Zelle uses."
-          error={errors.zelle_contact}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-        />
-        <View style={styles.warning}>
-          <Feather name="alert-triangle" size={16} color={colors.ink} style={styles.warningIcon} />
-          <Text variant="small" style={styles.warningText}>
-            Zelle has no usernames, so this email or phone number is shown as is: to people in your
-            groups, and on payment links you send. Anyone you forward a link to can see it too. Only
-            add it if you’re OK sharing it.
-          </Text>
-        </View>
         {saveError ? <FormMessage message={saveError} /> : null}
         {justSaved ? <Text variant="small">Saved.</Text> : null}
         <Button
@@ -254,17 +234,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-  },
-  warning: {
-    flexDirection: 'row',
-    gap: space.sm,
-  },
-  warningIcon: {
-    marginTop: 1,
-  },
-  warningText: {
-    flex: 1,
-    color: colors.ink,
   },
   chips: {
     flexDirection: 'row',

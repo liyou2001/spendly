@@ -558,7 +558,8 @@ export async function receiptPhotoUrl(path: string): Promise<string> {
 
 // Payments -------------------------------------------------------------------
 
-export type PaymentMethod = 'venmo' | 'paypal' | 'cashapp' | 'zelle' | 'cash' | 'other';
+/** How a new payment was made. Older payments can also say 'zelle'. */
+export type PaymentMethod = 'venmo' | 'paypal' | 'cashapp' | 'cash' | 'other';
 
 export interface Payment {
   id: string;
@@ -667,17 +668,15 @@ export interface PaymentHandles {
   venmo: string | null;
   paypal: string | null;
   cashtag: string | null;
-  /** The email or US phone number their Zelle uses. */
-  zelle: string | null;
 }
 
-/** Venmo, PayPal, Cash App and Zelle details for these accounts (yours and groupmates'). */
+/** Venmo, PayPal and Cash App details for these accounts (yours and groupmates'). */
 export async function fetchHandles(userIds: string[]): Promise<Record<string, PaymentHandles>> {
   if (userIds.length === 0) return {};
   const rows = unwrap(
     await supabase
       .from('profiles')
-      .select('id, venmo_username, paypal_username, cashapp_tag, zelle_contact')
+      .select('id, venmo_username, paypal_username, cashapp_tag')
       .in('id', userIds),
   );
   return Object.fromEntries(
@@ -687,7 +686,6 @@ export async function fetchHandles(userIds: string[]): Promise<Record<string, Pa
         venmo: row.venmo_username,
         paypal: row.paypal_username,
         cashtag: row.cashapp_tag,
-        zelle: row.zelle_contact,
       },
     ]),
   );

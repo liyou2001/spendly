@@ -14,7 +14,6 @@ import {
   amountDue,
   firstName,
   formatDay,
-  formatZelle,
   explainYours,
   itemTitle,
   whoFor,
@@ -126,12 +125,12 @@ function Share({
 
       {due > 0 ? (
         <section className="stack">
-          {links.length > 0 || page.handles.zelle ? (
+          {links.length > 0 ? (
             <p className="small">Pay {formatCents(due)} with any of these:</p>
           ) : (
             <p className="small">
-              {payer} hasn’t added Venmo, PayPal, Cash App or Zelle. Pay them the way you usually
-              do, then tell them below.
+              {payer} hasn’t added Venmo, PayPal or Cash App. Pay them the way you usually do, then
+              tell them below.
             </p>
           )}
           {links.map((link) => (
@@ -139,7 +138,6 @@ function Share({
               Pay with {link.label}
             </a>
           ))}
-          {page.handles.zelle ? <ZelleRow contact={page.handles.zelle} /> : null}
           {open === 'paid' ? (
             <PaidForm
               payer={payer}
@@ -206,38 +204,6 @@ function Share({
 
       <TextOptIn token={token} payer={payer} initial={page.texts_opted_in} />
     </>
-  );
-}
-
-/** Zelle has no payment links: where to send it, with a copy button. */
-function ZelleRow({ contact }: { contact: string }) {
-  const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
-  return (
-    <div className="zelle">
-      <p className="small-ink">
-        <span className="body-medium">Zelle:</span> send it to{' '}
-        <span className="selectable">{formatZelle(contact)}</span> in your bank’s app
-      </p>
-      <button
-        type="button"
-        className="chip"
-        onClick={() => {
-          // The clipboard only exists on https (and localhost), not the dev server over Wi-Fi.
-          if (!navigator.clipboard) return setCopied('failed');
-          navigator.clipboard.writeText(contact).then(
-            () => setCopied('yes'),
-            () => setCopied('failed'),
-          );
-        }}
-      >
-        {copied === 'yes' ? 'Copied' : 'Copy'}
-      </button>
-      {copied === 'failed' ? (
-        <p className="small" role="status">
-          Couldn’t copy. Press and hold the address to copy it.
-        </p>
-      ) : null}
-    </div>
   );
 }
 
@@ -346,7 +312,6 @@ const METHODS = [
   { value: 'venmo', label: 'Venmo' },
   { value: 'paypal', label: 'PayPal' },
   { value: 'cashapp', label: 'Cash App' },
-  { value: 'zelle', label: 'Zelle' },
   { value: 'cash', label: 'Cash' },
   { value: 'other', label: 'Other' },
 ];

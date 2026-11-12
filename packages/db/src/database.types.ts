@@ -604,7 +604,6 @@ export type Database = {
           time_zone: string | null;
           username: string;
           venmo_username: string | null;
-          zelle_contact: string | null;
         };
         ComputedFields: never;
         Insert: {
@@ -619,7 +618,6 @@ export type Database = {
           time_zone?: string | null;
           username: string;
           venmo_username?: string | null;
-          zelle_contact?: string | null;
         };
         Update: {
           auto_confirm_days?: number | null;
@@ -633,7 +631,6 @@ export type Database = {
           time_zone?: string | null;
           username?: string;
           venmo_username?: string | null;
-          zelle_contact?: string | null;
         };
         Relationships: [];
       };

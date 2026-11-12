@@ -39,7 +39,6 @@ erDiagram
         text venmo_username
         text paypal_username
         text cashapp_tag
-        text zelle_contact "email or +1 phone; shown as is, since Zelle has no usernames"
         smallint auto_confirm_days "null = off; claims to you confirm after this many days"
         text time_zone "your phone's, saved by the app; reminders only go out 9am-9pm there"
     }
@@ -101,7 +100,7 @@ erDiagram
         text kind "payment | forgiveness"
         uuid expense_id FK "forgiveness only"
         text status "claimed | confirmed | rejected"
-        text method "venmo | paypal | cashapp | zelle | cash | other"
+        text method "venmo | paypal | cashapp | cash | other; older rows can say zelle"
         uuid recorded_by FK
         uuid decided_by FK
         timestamptz decided_at
