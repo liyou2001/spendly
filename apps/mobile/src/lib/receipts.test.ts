@@ -41,6 +41,7 @@ const categories = [
   { id: 'c-dining', name: 'Dining' },
   { id: 'c-transport', name: 'Transport' },
   { id: 'c-books', name: 'Books' },
+  { id: 'c-utilities', name: 'Utilities' },
 ];
 
 describe('draftFromReceipt', () => {
@@ -68,6 +69,8 @@ describe('categoryForReceipt', () => {
     expect(categoryForReceipt('Costco Wholesale', 'Books', categories)).toBe('c-groceries');
     expect(categoryForReceipt('Uber Eats', null, categories)).toBe('c-dining');
     expect(categoryForReceipt('Uber', null, categories)).toBe('c-transport');
+    expect(categoryForReceipt('Xfinity', null, categories)).toBe('c-utilities');
+    expect(categoryForReceipt('PG&E', 'Other', categories)).toBe('c-utilities');
   });
 
   it('falls back to the suggestion if it’s one of your categories, else nothing', () => {

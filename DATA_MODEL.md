@@ -129,7 +129,7 @@ erDiagram
     categories {
         uuid id PK
         uuid user_id FK
-        text name "Rent, Groceries, Dining, Transport, Fun, Other"
+        text name "Rent, Utilities, Groceries, Dining, Transport, Fun, Other"
     }
     budgets {
         uuid user_id PK

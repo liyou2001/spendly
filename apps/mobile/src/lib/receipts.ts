@@ -69,6 +69,10 @@ const MERCHANT_RULES: [RegExp, string][] = [
     'Transport',
   ],
   [/\b(amc|regal|cinema|theatre|theater|steam|ticketmaster|bowling|arcade)\b/i, 'Fun'],
+  [
+    /\b(xfinity|comcast|spectrum|pg&e|con ?edison|duke energy|national grid|eversource|dominion energy|utility|utilities)\b/i,
+    'Utilities',
+  ],
 ];
 
 /**

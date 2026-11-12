@@ -1,7 +1,7 @@
 -- Schema-wide guarantees and the signup trigger.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(17);
 
 -- Every table in public has row-level security, so a new table can't ship open by accident.
 select is(
@@ -77,8 +77,16 @@ select results_eq(
 select results_eq(
   $$select name from public.categories
     where user_id = 'aaaaaaaa-0000-0000-0000-000000000001' order by name$$,
-  $$values ('Dining'), ('Fun'), ('Groceries'), ('Other'), ('Rent'), ('Transport')$$,
+  $$values ('Dining'), ('Fun'), ('Groceries'), ('Other'), ('Rent'), ('Transport'), ('Utilities')$$,
   'Signup creates the default categories'
+);
+select is(
+  (select count(*)::int from auth.users u
+   where not exists (
+     select 1 from public.categories c where c.user_id = u.id and lower(c.name) = 'utilities'
+   )),
+  0,
+  'Every account has Utilities'
 );
 select throws_ok(
   $$insert into public.groups (name, created_by, is_personal)
