@@ -186,6 +186,17 @@ SMTP_FROM=you@gmail.com
 
 Codes then stop arriving in Mailpit. Supabase allows 30 emails an hour (`[auth.rate_limit]` in `supabase/config.toml`). To go back to Mailpit, set `SUPABASE_AUTH_EMAIL_SMTP_ENABLED=false` and restart.
 
+### Sign in with Google
+
+The sign-in screen shows **Continue with Google** only when the Supabase project has Google switched on. It goes through the browser (so it works in Expo Go) and comes back signed in. Google opens the same account as an email code for the same address; Supabase links them. A Google email that another account added as a receipt address is refused with a message (the `hook_before_user_created` hook).
+
+1. In Google Cloud (https://console.cloud.google.com), create a project, then **APIs & Services → OAuth consent screen**: External, with the scopes `email`, `profile` and `openid`.
+2. **Credentials → Create credentials → OAuth client ID → Web application.** Under **Authorized redirect URIs** add `https://<project-ref>.supabase.co/auth/v1/callback` (hosted) and `http://127.0.0.1:54321/auth/v1/callback` (local).
+3. Local: put the client ID and secret in `supabase/.env` as `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET`, then `npm run db:stop && npm run db:start`. Locally it only works in a browser on this computer (`npm run mobile -- --web`): Google sends the browser back to `127.0.0.1`, which a phone can't reach. Test on a phone against hosted (`npm run mobile:prod`).
+4. Hosted: see [Hosted Supabase](#hosted-supabase).
+
+Sign in with Apple has to be added before the iPhone app goes to the App Store, which requires it when Google is offered.
+
 ## Payment page and Edge Functions
 
 People without the app open a private link to see their share, pay with Venmo, PayPal or Cash App, and say "I paid". Request payment on a person's screen makes the link.
@@ -287,6 +298,12 @@ One-time setup:
    The project ref is the ID in the dashboard URL (`https://supabase.com/dashboard/project/<project-ref>`).
 
 For email sign-in, paste `supabase/templates/magic_link.html` and `confirmation.html` into the dashboard's **Authentication → Emails** templates (the hosted defaults send only a link, and the app needs the `{{ .Token }}` code). Then set **Authentication → Sign In / Providers → Email → Email OTP Length** to `6`: new hosted projects send 8-digit codes, and the app takes 6. The built-in email sender only delivers to members of your Supabase organization, a few emails an hour. To send codes to anyone, set up custom SMTP under **Authentication → Emails → SMTP Settings** with the same values as [Sign-in codes to real inboxes](#sign-in-codes-to-real-inboxes).
+
+For Google sign-in ([Sign in with Google](#sign-in-with-google)), in the dashboard:
+
+- **Authentication → Sign In / Providers → Google**: switch it on with the Web client's ID and secret.
+- **Authentication → URL Configuration → Redirect URLs**: add `https://app.getspendly.app/**`, `exp://**` (Expo Go) and `spendly://**` (app builds).
+- **Authentication → Hooks → Before User Created**: choose the Postgres function `public.hook_before_user_created` (after `npx supabase db push` has created it).
 
 ### Web demo link
 

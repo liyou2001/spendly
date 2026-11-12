@@ -1072,6 +1072,7 @@ export type Database = {
         Args: { p_key: string; p_max: number; p_window_seconds: number };
         Returns: boolean;
       };
+      hook_before_user_created: { Args: { event: Json }; Returns: Json };
       inbound_find_user: { Args: { p_addresses: string[] }; Returns: string };
       inbound_is_duplicate: {
         Args: { p_date?: string; p_merchant: string; p_total_cents: number; p_user_id: string };

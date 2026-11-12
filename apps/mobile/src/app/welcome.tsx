@@ -4,14 +4,18 @@ import { StyleSheet, View } from 'react-native';
 import { Button, FormMessage, Screen, Text, TextField } from '@/components';
 import { friendlyError, setMyName } from '@/lib/data';
 import { useName } from '@/lib/name';
-import { validateName } from '@/lib/profile';
+import { namesFromMetadata, validateName } from '@/lib/profile';
+import { useSession } from '@/lib/session';
 import { space } from '@/theme';
 
 /** Asked once, right after the first sign-in: the name people in your groups will see. */
 export default function Welcome() {
   const { markNamed } = useName();
-  const [first, setFirst] = useState('');
-  const [last, setLast] = useState('');
+  const { session } = useSession();
+  // Signed up with Google: start with the name it shared, to check and keep.
+  const [shared] = useState(() => namesFromMetadata(session?.user.user_metadata));
+  const [first, setFirst] = useState(shared.first);
+  const [last, setLast] = useState(shared.last);
   const [errors, setErrors] = useState<{
     first_name?: string | undefined;
     last_name?: string | undefined;

@@ -33,6 +33,25 @@ const PAYPAL = /^[A-Za-z0-9]{1,20}$/;
 const CASHTAG = /^[A-Za-z][A-Za-z0-9]{0,19}$/;
 const USERNAME = /^[a-z0-9_.]{3,20}$/;
 
+/**
+ * A first and last name to start the welcome screen with, from what Google shared (given and
+ * family name, or else the full name split at the first space). Blank when there's nothing.
+ */
+export function namesFromMetadata(metadata: Record<string, unknown> | undefined): {
+  first: string;
+  last: string;
+} {
+  const text = (key: string) => {
+    const value = metadata?.[key];
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const first = text('given_name');
+  const last = text('family_name');
+  if (first || last) return { first, last };
+  const [head = '', ...rest] = (text('full_name') || text('name')).split(/\s+/);
+  return { first: head, last: rest.join(' ') };
+}
+
 /** First and last name, trimmed and checked the way set_my_name() checks them. */
 export function validateName(
   first: string,

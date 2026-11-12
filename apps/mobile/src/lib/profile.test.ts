@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateName, validateProfile, validateUsername } from './profile';
+import { namesFromMetadata, validateName, validateProfile, validateUsername } from './profile';
 
 describe('validateUsername', () => {
   it('cleans up what was typed: a leading @, spaces and capitals', () => {
@@ -78,5 +78,29 @@ describe('validateName', () => {
       errors: { last_name: 'Keep it to 40 characters.' },
     });
     expect(validateName('Leo', 'L'.repeat(40)).ok).toBe(true);
+  });
+});
+
+describe('namesFromMetadata', () => {
+  it('takes the given and family name Google shares', () => {
+    expect(
+      namesFromMetadata({ given_name: 'Leo', family_name: 'Li', full_name: 'Leo Li' }),
+    ).toEqual({
+      first: 'Leo',
+      last: 'Li',
+    });
+  });
+
+  it('otherwise splits the full name at the first space', () => {
+    expect(namesFromMetadata({ full_name: ' Maya  van der Berg ' })).toEqual({
+      first: 'Maya',
+      last: 'van der Berg',
+    });
+    expect(namesFromMetadata({ name: 'Jeff' })).toEqual({ first: 'Jeff', last: '' });
+  });
+
+  it('is blank for email sign-ups, which share no name', () => {
+    expect(namesFromMetadata({})).toEqual({ first: '', last: '' });
+    expect(namesFromMetadata(undefined)).toEqual({ first: '', last: '' });
   });
 });

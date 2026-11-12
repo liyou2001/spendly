@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { colors, radius, sizes, space } from '@/theme';
 
@@ -12,6 +13,8 @@ interface ButtonProps {
   disabled?: boolean;
   /** Shows a spinner and ignores taps. */
   loading?: boolean;
+  /** Before the label, e.g. a sign-in provider's logo. */
+  leading?: ReactNode;
 }
 
 export function Button({
@@ -20,6 +23,7 @@ export function Button({
   variant = 'primary',
   disabled = false,
   loading = false,
+  leading,
 }: ButtonProps) {
   const primary = variant === 'primary';
   const inactive = disabled || loading;
@@ -41,9 +45,12 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={primary ? colors.onAccent : colors.ink} />
       ) : (
-        <Text variant="bodyMedium" style={primary ? styles.primaryLabel : undefined}>
-          {label}
-        </Text>
+        <View style={styles.content}>
+          {leading}
+          <Text variant="bodyMedium" style={primary ? styles.primaryLabel : undefined}>
+            {label}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
@@ -57,6 +64,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xl,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
   },
   primary: {
     backgroundColor: colors.accent,
