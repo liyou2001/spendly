@@ -37,10 +37,6 @@ if (!url || !publishableKey) {
 
 const isWeb = Platform.OS === 'web';
 
-/** For calls supabase-js doesn't make, like reading Auth's settings. */
-export const projectUrl: string = url;
-export const projectKey: string = publishableKey;
-
 export const supabase = createClient<Database>(url, publishableKey, {
   auth: {
     // SecureStore doesn't exist on web; there supabase-js falls back to localStorage.

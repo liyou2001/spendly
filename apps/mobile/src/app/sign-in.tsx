@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Chip, FormMessage, Screen, Text, TextField } from '@/components';
 import { readAuthRedirect } from '@/lib/authRedirect';
-import { googleSignInEnabled, signInWithGoogle } from '@/lib/googleSignIn';
+import { signInWithGoogle } from '@/lib/googleSignIn';
 import { goBack } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import { colors, space } from '@/theme';
@@ -27,21 +27,15 @@ export default function SignIn() {
   });
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Google is offered (and first) only once the project says it's switched on, so it's never a
-  // dead button; until then it's email alone.
-  const [googleOn, setGoogleOn] = useState(false);
-  const [chosen, setChosen] = useState<'google' | 'email'>('google');
-  const tab = googleOn ? chosen : 'email';
+  // Google first. Its tab works once the project has Google switched on (README, "Sign in with
+  // Google"); locally that needs the Google client in supabase/.env.
+  const [tab, setTab] = useState<'google' | 'email'>('google');
   const [googleBusy, setGoogleBusy] = useState(false);
 
   function choose(next: 'google' | 'email') {
-    setChosen(next);
+    setTab(next);
     setError(null);
   }
-
-  useEffect(() => {
-    void googleSignInEnabled().then(setGoogleOn);
-  }, []);
 
   async function continueWithGoogle() {
     setError(null);
@@ -126,23 +120,21 @@ export default function SignIn() {
 
           {step.name === 'email' ? (
             <View style={styles.form}>
-              {googleOn ? (
-                <View style={styles.tabs}>
-                  <Chip
-                    label="Google"
-                    selected={tab === 'google'}
-                    onPress={() => choose('google')}
-                    disabled={busy || googleBusy}
-                  />
-                  <Chip
-                    label="Email"
-                    icon="mail"
-                    selected={tab === 'email'}
-                    onPress={() => choose('email')}
-                    disabled={busy || googleBusy}
-                  />
-                </View>
-              ) : null}
+              <View style={styles.tabs}>
+                <Chip
+                  label="Google"
+                  selected={tab === 'google'}
+                  onPress={() => choose('google')}
+                  disabled={busy || googleBusy}
+                />
+                <Chip
+                  label="Email"
+                  icon="mail"
+                  selected={tab === 'email'}
+                  onPress={() => choose('email')}
+                  disabled={busy || googleBusy}
+                />
+              </View>
               {tab === 'google' ? (
                 <View style={styles.google}>
                   <Button

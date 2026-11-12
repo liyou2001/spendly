@@ -188,7 +188,7 @@ Codes then stop arriving in Mailpit. Supabase allows 30 emails an hour (`[auth.r
 
 ### Sign in with Google
 
-The sign-in screen shows **Continue with Google** only when the Supabase project has Google switched on. It goes through the browser (so it works in Expo Go) and comes back signed in. Google opens the same account as an email code for the same address; Supabase links them. A Google email that another account added as a receipt address is refused with a message (the `hook_before_user_created` hook).
+The sign-in screen opens on a **Google** tab (**Continue with Google**), next to **Email**. Google has to be switched on in the Supabase project for it to work. It goes through the browser (so it works in Expo Go) and comes back signed in. Google opens the same account as an email code for the same address; Supabase links them. A Google email that another account added as a receipt address is refused with a message (the `hook_before_user_created` hook).
 
 1. In Google Cloud (https://console.cloud.google.com), create a project, then **APIs & Services → OAuth consent screen**: External, with the scopes `email`, `profile` and `openid`.
 2. **Credentials → Create credentials → OAuth client ID → Web application.** Under **Authorized redirect URIs** add `https://<project-ref>.supabase.co/auth/v1/callback` (hosted) and `http://127.0.0.1:54321/auth/v1/callback` (local).

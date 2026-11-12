@@ -3,23 +3,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
 import { GOOGLE_FAILED, readAuthRedirect } from './authRedirect';
-import { projectKey, projectUrl, supabase } from './supabase';
+import { supabase } from './supabase';
 
 // Sign in with Google through the browser, so it works in Expo Go (Google's own SDK needs a
 // custom build). Supabase links it to an existing account with the same email.
-
-/** Whether Google sign-in is switched on for this Supabase project, so the button can hide. */
-export async function googleSignInEnabled(): Promise<boolean> {
-  try {
-    const response = await fetch(`${projectUrl}/auth/v1/settings`, {
-      headers: { apikey: projectKey },
-    });
-    const settings = (await response.json()) as { external?: { google?: boolean } };
-    return settings.external?.google === true;
-  } catch {
-    return false;
-  }
-}
 
 // Google asks which account every time, so it's clear which email is being used.
 const queryParams = { prompt: 'select_account' };
