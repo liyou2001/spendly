@@ -1,7 +1,7 @@
 -- First and last names: set together through set_my_name(), which builds the name people see.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(9);
 
 create schema tests;
 grant usage on schema tests to public;
@@ -33,29 +33,6 @@ select results_eq(
   $$values ('Leo Li')$$,
   'His groups show the new name'
 );
-select is(
-  (select username from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
-  'leo',
-  'An account with an email keeps the username from it'
-);
-
--- Signed up with a phone number: no email to take a username from.
-reset role;
-insert into auth.users (id, phone) values ('aaaaaaaa-0000-0000-0000-000000000009', '16085550199');
-select tests.as_user('aaaaaaaa-0000-0000-0000-000000000009');
-select public.set_my_name('Tess', 'Lee');
-select is(
-  (select username from public.profiles where id = 'aaaaaaaa-0000-0000-0000-000000000009'),
-  'tesslee',
-  'A phone account gets its username from its name the first time it saves one'
-);
-select public.set_my_name('Tessa', 'Lee');
-select is(
-  (select username from public.profiles where id = 'aaaaaaaa-0000-0000-0000-000000000009'),
-  'tesslee',
-  'Renaming later leaves the username alone'
-);
-select tests.as_user('11111111-1111-1111-1111-111111111111');
 select throws_ok(
   $$select public.set_my_name('Leo', '  ')$$, '22023', 'Enter your last name.',
   'The last name is required'

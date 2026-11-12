@@ -35,7 +35,7 @@ erDiagram
         text first_name "asked for at first sign-in; null until then"
         text last_name "set together with first_name"
         text display_name "what people see: First Last, set by set_my_name()"
-        text username UK "how people find you to invite you; from the email, or the name for phone sign-ups"
+        text username UK "how people find you to invite you"
         text venmo_username
         text paypal_username
         text cashapp_tag

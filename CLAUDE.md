@@ -48,7 +48,7 @@ Bank sync, moving money in the app, automatic repayment detection, advanced budg
 | Mobile app                                | Expo (React Native) + TypeScript, Expo Router                                                                                     |
 | Payment page (for people without the app) | Static web page on Vercel. Expo Router's web output, or a small separate Vite + React app if that's simpler. No Vercel functions. |
 | Database                                  | Supabase Postgres with row-level security                                                                                         |
-| Login                                     | Supabase Auth (one-time code by email or text)                                                                                    |
+| Login                                     | Supabase Auth (email one-time code for now; phone later)                                                                          |
 | File storage                              | Supabase Storage (private receipt photos)                                                                                         |
 | Server code                               | Supabase Edge Functions (Deno, standard web APIs)                                                                                 |
 | Receipt reading                           | Claude Haiku 5.5 (`claude-haiku-5-5`), retry on Claude Sonnet 5.5 (`claude-sonnet-5-5`)                                           |
