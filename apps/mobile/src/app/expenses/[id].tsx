@@ -1,7 +1,7 @@
 import { formatCents } from '@spendly/ledger';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import {
   Breakdown,
@@ -32,6 +32,7 @@ import {
   type Group,
   type ShareOfExpense,
 } from '@/lib/data';
+import { confirmAction } from '@/lib/confirm';
 import { formatDate } from '@/lib/dates';
 import { explainShare } from '@/lib/breakdown';
 import { debtLabel, itemTitle, yourPartOf } from '@/lib/labels';
@@ -131,14 +132,13 @@ function FullView({
   );
 
   function confirmVoid() {
-    Alert.alert(
-      'Void this expense?',
-      'It stays in your history but stops counting toward balances and budgets. This can’t be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Void expense', style: 'destructive', onPress: () => void runVoid() },
-      ],
-    );
+    confirmAction({
+      title: 'Void this expense?',
+      message:
+        'It stays in your history but stops counting toward balances and budgets. This can’t be undone.',
+      confirmLabel: 'Void expense',
+      onConfirm: () => void runVoid(),
+    });
   }
 
   async function runVoid() {

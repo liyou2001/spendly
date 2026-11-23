@@ -72,6 +72,12 @@ export default function Landing() {
           content="A budget for college students that gets shared money right: split receipts by item, track who owes whom, and settle up."
         />
       </Head>
+      <View style={styles.banner} accessibilityRole="summary">
+        <Feather name="smartphone" size={16} color={colors.ink} />
+        <Text variant="small" style={styles.inkSmall}>
+          Mobile app coming soon. Stay tuned!
+        </Text>
+      </View>
       <View style={styles.column}>
         <View style={styles.nav}>
           <View style={styles.brand}>
@@ -211,6 +217,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: space.gutter,
     paddingBottom: space.section * 2,
+  },
+  banner: {
+    alignSelf: 'stretch',
+    marginHorizontal: -space.gutter,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    paddingHorizontal: space.gutter,
+    paddingVertical: space.md,
+    borderBottomWidth: sizes.hairline,
+    borderBottomColor: colors.divider,
   },
   column: {
     width: '100%',

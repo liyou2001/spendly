@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   Button,
@@ -12,6 +12,7 @@ import {
   TextField,
 } from '@/components';
 import { validateCategoryName } from '@/lib/categories';
+import { confirmAction } from '@/lib/confirm';
 import {
   createCategory,
   deleteCategory,
@@ -76,18 +77,13 @@ export default function CategorySettings() {
   }
 
   function confirmDelete(category: Category) {
-    Alert.alert(
-      `Delete ${category.name}?`,
-      'Its monthly budgets are deleted too. Categories that expenses use can’t be deleted; rename them instead.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => void run(() => deleteCategory(category.id)),
-        },
-      ],
-    );
+    confirmAction({
+      title: `Delete ${category.name}?`,
+      message:
+        'Its monthly budgets are deleted too. Categories that expenses use can’t be deleted; rename them instead.',
+      confirmLabel: 'Delete',
+      onConfirm: () => void run(() => deleteCategory(category.id)),
+    });
   }
 
   return (
