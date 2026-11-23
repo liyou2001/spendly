@@ -109,6 +109,26 @@ Deno.test('with only a unit price printed, code multiplies it by the quantity', 
   ]);
 });
 
+Deno.test('a $0.00 line is left out instead of failing the receipt', () => {
+  const parsed = parseReading(
+    {
+      ...costco,
+      items: [
+        ...costco.items,
+        { name: 'Free sample', quantity: 1, amount_cents: 0 },
+        { name: 'Included side', quantity: 2, amount_cents: null, unit_price_cents: 0 },
+      ],
+    },
+    TODAY,
+  );
+  if (!parsed.ok || !parsed.readable) throw new Error('should parse');
+  assertEquals(parsed.receipt.items.length, 9);
+  assertEquals(mathGap(parsed.receipt), 0);
+  // Nothing but free lines is still not a receipt to split.
+  const onlyFree = { ...costco, items: [{ name: 'Free sample', amount_cents: 0 }] };
+  assertEquals(parseReading(onlyFree, TODAY), { ok: false, error: 'No items' });
+});
+
 Deno.test('a missing quantity is 1; a bad one is an error', () => {
   const parsed = parseReading(costco, TODAY);
   assertEquals(parsed.ok && parsed.readable && parsed.receipt.items[0]?.quantity, 1);
@@ -204,32 +224,82 @@ Deno.test('a blurry photo ends as unreadable; an API outage as failed', async ()
   ]);
 });
 
-Deno.test('askClaude forces the receipt tool and returns its input', async () => {
-  let sent: Record<string, unknown> = {};
-  const fakeFetch = (_url: string | URL | Request, init?: RequestInit) => {
-    sent = JSON.parse(String(init?.body));
-    return Promise.resolve(
+Deno.test(
+  'askClaude asks for the receipt tool without forcing it, and returns its input',
+  async () => {
+    let sent: Record<string, unknown> = {};
+    const fakeFetch = (_url: string | URL | Request, init?: RequestInit) => {
+      sent = JSON.parse(String(init?.body));
+      return Promise.resolve(
+        Response.json({
+          stop_reason: 'tool_use',
+          content: [{ type: 'tool_use', name: 'record_receipt', input: costco }],
+        }),
+      );
+    };
+    const input = await askClaude({
+      apiKey: 'test',
+      model: CLAUDE_MODELS[0],
+      content: {
+        kind: 'image',
+        base64: toBase64(new Uint8Array([1, 2, 3])),
+        mediaType: 'image/jpeg',
+      },
+      categories: ['Groceries'],
+      fetchImpl: fakeFetch as typeof fetch,
+    });
+    assertEquals(input, costco);
+    assertEquals(sent.model, 'claude-haiku-5-5');
+    // Sonnet 5.5 answers a forced tool_choice ("tool" or "any") with a 400, so the prompt asks.
+    assertEquals(sent.tool_choice, { type: 'auto', disable_parallel_tool_use: true });
+    assertEquals(String(sent.system).includes('calling the record_receipt tool'), true);
+    const [tool] = sent.tools as { name: string; strict: boolean }[];
+    assertEquals([tool?.name, tool?.strict], ['record_receipt', true]);
+    assertEquals('thinking' in sent, false);
+  },
+);
+
+Deno.test('a Claude reply without the tool call is an error, so the next model tries', async () => {
+  const fakeFetch = () =>
+    Promise.resolve(
       Response.json({
-        stop_reason: 'tool_use',
-        content: [{ type: 'tool_use', name: 'record_receipt', input: costco }],
+        stop_reason: 'end_turn',
+        content: [{ type: 'text', text: 'This looks like a receipt from Costco.' }],
       }),
     );
+  const recorded: Attempt[] = [];
+  const outcome = await extractReceipt(
+    CLAUDE_MODELS,
+    (model) =>
+      askClaude({
+        apiKey: 'test',
+        model,
+        content: { kind: 'text', text: 'Order total $140.00' },
+        categories: [],
+        fetchImpl: fakeFetch as typeof fetch,
+      }),
+    (attempt) => Promise.resolve(void recorded.push(attempt)),
+    TODAY,
+  );
+  assertEquals(outcome.status, 'failed');
+  assertEquals(
+    recorded.map((attempt) => [attempt.model, attempt.error]),
+    CLAUDE_MODELS.map((model) => [model, 'Error: No receipt in the reply']),
+  );
+});
+
+Deno.test('strict tool use: every object in the receipt schema is closed', () => {
+  type Node = { properties?: Record<string, Node>; items?: Node; additionalProperties?: boolean };
+  const open: string[] = [];
+  const walk = (node: Node, path: string) => {
+    if (node.properties) {
+      if (node.additionalProperties !== false) open.push(path);
+      for (const [key, child] of Object.entries(node.properties)) walk(child, `${path}.${key}`);
+    }
+    if (node.items) walk(node.items, `${path}[]`);
   };
-  const input = await askClaude({
-    apiKey: 'test',
-    model: CLAUDE_MODELS[0],
-    content: {
-      kind: 'image',
-      base64: toBase64(new Uint8Array([1, 2, 3])),
-      mediaType: 'image/jpeg',
-    },
-    categories: ['Groceries'],
-    fetchImpl: fakeFetch as typeof fetch,
-  });
-  assertEquals(input, costco);
-  assertEquals(sent.model, 'claude-haiku-5-5');
-  assertEquals(sent.tool_choice, { type: 'tool', name: 'record_receipt' });
-  assertEquals('thinking' in sent, false);
+  walk(RECEIPT_SCHEMA as Node, 'receipt');
+  assertEquals(open, []);
 });
 
 Deno.test('toBase64 matches btoa', () => {

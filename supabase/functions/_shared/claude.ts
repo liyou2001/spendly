@@ -13,13 +13,23 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 /** Haiku first; Sonnet when Haiku's draft doesn't add up. */
 export const CLAUDE_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5'] as const;
 
-/** The one tool Claude must call. Its input is the receipt, copied line by line. */
+/**
+ * The one tool Claude calls. Its input is the receipt, copied line by line; `strict` keeps it in
+ * the schema's shape.
+ */
 const RECEIPT_TOOL = {
   name: 'record_receipt',
   description:
     'Record what the receipt says, line by line. Copy each amount exactly as printed, in cents. Never add, subtract or correct amounts.',
+  strict: true,
   input_schema: RECEIPT_SCHEMA,
 };
+
+/**
+ * Asks for the tool call in words. Sonnet 5.5 rejects a request that forces one (tool_choice
+ * "tool" or "any" is a 400), so the choice is left to the model and the prompt says what to do.
+ */
+const CLAUDE_SYSTEM_PROMPT = `${SYSTEM_PROMPT} Answer only by calling the ${RECEIPT_TOOL.name} tool, once, with no other text. If it isn’t a receipt or can’t be read, still call the tool, with readable set to false.`;
 
 /** The receipt as a Claude content block: an image, a PDF document, or the email's text. */
 function claudeBlock(content: ReceiptContent) {
@@ -40,8 +50,7 @@ function claudeBlock(content: ReceiptContent) {
 
 /**
  * Asks `model` to read the receipt and returns the record_receipt tool's input, unchecked
- * (parseReading checks it). Tool use is forced and extended thinking is off, so the reply is
- * just the structured receipt.
+ * (parseReading checks it). A reply without the tool call is an error, so the next model tries.
  */
 export async function askClaude(input: AskInput): Promise<unknown> {
   const response = await (input.fetchImpl ?? fetch)(API_URL, {
@@ -54,9 +63,9 @@ export async function askClaude(input: AskInput): Promise<unknown> {
     body: JSON.stringify({
       model: input.model,
       max_tokens: 8192,
-      system: SYSTEM_PROMPT,
+      system: CLAUDE_SYSTEM_PROMPT,
       tools: [RECEIPT_TOOL],
-      tool_choice: { type: 'tool', name: RECEIPT_TOOL.name },
+      tool_choice: { type: 'auto', disable_parallel_tool_use: true },
       messages: [
         {
           role: 'user',

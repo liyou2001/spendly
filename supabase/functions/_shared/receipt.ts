@@ -29,6 +29,7 @@ const line = (description: string) => ({
     amount_cents: { type: 'integer', description },
   },
   required: ['name', 'amount_cents'],
+  additionalProperties: false,
 });
 
 /** A purchased line: how many, and its printed total (or only its unit price, if that's all). */
@@ -52,9 +53,13 @@ const ITEM = {
     },
   },
   required: ['name', 'quantity', 'amount_cents'],
+  additionalProperties: false,
 };
 
-/** The receipt record every model fills in, copied line by line (JSON Schema). */
+/**
+ * The receipt record every model fills in, copied line by line (JSON Schema). Every object is
+ * closed to other properties, which Claude's strict tool use needs.
+ */
 export const RECEIPT_SCHEMA = {
   type: 'object',
   properties: {
@@ -101,6 +106,7 @@ export const RECEIPT_SCHEMA = {
     },
   },
   required: ['readable', 'items', 'discounts', 'taxes', 'total_cents'],
+  additionalProperties: false,
 };
 
 export const SYSTEM_PROMPT =
@@ -205,7 +211,9 @@ export function parseReading(input: unknown, today = new Date()): Parsed {
     const unit = printed.unit_price_cents;
     const amount =
       printed.amount_cents ?? (isCents(unit) ? unit * (quantity as number) : printed.amount_cents);
-    if (!isCents(amount) || amount === 0) return { ok: false, error: `Bad item amount: ${amount}` };
+    if (!isCents(amount)) return { ok: false, error: `Bad item amount: ${amount}` };
+    // A $0.00 line (a free item, an included side) is nobody's to pay for, so it's left out.
+    if (amount === 0) continue;
     // A discount printed among the items, as a negative line.
     if (amount < 0) discount -= amount;
     else items.push({ name, quantity: quantity as number, amount_cents: amount });
